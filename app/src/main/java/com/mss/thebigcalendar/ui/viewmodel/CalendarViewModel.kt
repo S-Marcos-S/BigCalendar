@@ -251,6 +251,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(isCalendarVisualizationSettingsOpen = false, isSettingsScreenOpen = true) }
     }
 
+    fun onMainOnboardingComplete() {
+        viewModelScope.launch {
+            settingsRepository.setHasSeenMainOnboarding(true)
+            _uiState.update { it.copy(hasSeenMainOnboarding = true) }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         // Limpar job pendente quando o ViewModel for destruído
@@ -692,6 +699,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.isCrashlyticsEnabled.collect { enabled ->
                 _uiState.update { it.copy(isCrashlyticsEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.hasSeenMainOnboarding.collect { seen ->
+                _uiState.update { it.copy(hasSeenMainOnboarding = seen) }
             }
         }
         viewModelScope.launch {

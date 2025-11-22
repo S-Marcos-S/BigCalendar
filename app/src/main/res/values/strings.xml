@@ -772,4 +772,17 @@
     <!-- Crashlytics Consent -->
     <string name="crashlytics_setting_title">Enviar Relatórios de Erros</string>
     <string name="crashlytics_setting_description">Ajude a melhorar o aplicativo enviando dados anônimos de falhas</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Lixeira</string>
+    <string name="onboarding_trash_desc">Acesse a lixeira para ver e restaurar itens apagados.</string>
+    <string name="onboarding_today_title">Hoje</string>
+    <string name="onboarding_today_desc">Volte rapidamente para o dia de hoje.</string>
+    <string name="onboarding_charts_title">Estatísticas</string>
+    <string name="onboarding_charts_desc">Veja gráficos sobre suas atividades e produtividade.</string>
+    <string name="onboarding_calendar_swipe_title">Expandir/Recolher</string>
+    <string name="onboarding_calendar_swipe_desc">Arraste para cima ou para baixo para ajustar o tamanho do calendário.</string>
+    <string name="onboarding_skip">Pular</string>
+    <string name="onboarding_next">Próximo</string>
+    <string name="onboarding_finish">Finalizar</string>
 </resources>

@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -49,6 +51,8 @@ import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mss.thebigcalendar.ui.components.OnboardingOverlay
+import androidx.compose.ui.layout.LayoutCoordinates
 
 class MainActivity : ComponentActivity() {
 
@@ -449,8 +453,27 @@ class MainActivity : ComponentActivity() {
                                 onNavigateBack = { viewModel.closeBackupScreen() }
                             )
                         }
+
+//... existing code ...
                         else -> {
-                            CalendarScreen(viewModel)
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                var onboardingCoordinates by remember { mutableStateOf<Map<String, LayoutCoordinates>>(emptyMap()) }
+
+                                CalendarScreen(
+                                    onTutorialPositionsReady = { coordinates ->
+                                        onboardingCoordinates = coordinates
+                                    }
+                                )
+
+                                if (!uiState.hasSeenMainOnboarding && onboardingCoordinates.isNotEmpty()) {
+                                    OnboardingOverlay(
+                                        positions = onboardingCoordinates,
+                                        onFinish = {
+                                            viewModel.onMainOnboardingComplete()
+                                        }
+                                    )
+                                }
+                            }
                         }
                         }
                         

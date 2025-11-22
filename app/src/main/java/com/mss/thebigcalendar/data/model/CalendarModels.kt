@@ -163,7 +163,8 @@ data class CalendarUiState(
         minute = 0,
         backupType = com.mss.thebigcalendar.data.repository.BackupType.LOCAL
     ),
-    val isCrashlyticsEnabled: Boolean = false
+    val isCrashlyticsEnabled: Boolean = false,
+    val hasSeenMainOnboarding: Boolean = false
 )
 
 enum class Theme { LIGHT, DARK, SYSTEM }

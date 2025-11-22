@@ -78,6 +78,8 @@ import com.mss.thebigcalendar.ui.components.Sidebar
 import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
 import com.mss.thebigcalendar.ui.components.TasksForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.YearlyCalendarView
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
 import kotlinx.coroutines.launch
 import java.time.YearMonth
@@ -93,12 +95,20 @@ fun Modifier.clickableWithoutRipple(onClick: () -> Unit): Modifier = composed {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    viewModel: CalendarViewModel = viewModel()
+    viewModel: CalendarViewModel = viewModel(),
+    onTutorialPositionsReady: (Map<String, LayoutCoordinates>) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var tutorialCoordinates by remember { mutableStateOf<Map<String, LayoutCoordinates>>(emptyMap()) }
+    LaunchedEffect(tutorialCoordinates) {
+        if (tutorialCoordinates.size >= 3) { // Adjust this number based on how many items you are tracking
+            onTutorialPositionsReady(tutorialCoordinates)
+        }
+    }
 
     // Sincronização bidirecional entre ViewModel e DrawerState
     LaunchedEffect(uiState.isSidebarOpen) {
@@ -261,14 +271,24 @@ fun CalendarScreen(
                                             tint = MaterialTheme.colorScheme.onPrimary
                                         )
                                     }
-                                    IconButton(onClick = { viewModel.onGoToToday() }) {
+                                    IconButton(
+                                        onClick = { viewModel.onGoToToday() },
+                                        modifier = Modifier.onGloballyPositioned {
+                                            tutorialCoordinates = tutorialCoordinates + ("today" to it)
+                                        }
+                                    ) {
                                         Icon(
                                             Icons.Default.Today,
                                             contentDescription = stringResource(id = R.string.go_to_today),
                                             tint = MaterialTheme.colorScheme.onPrimary
                                         )
                                     }
-                                    IconButton(onClick = { viewModel.onChartIconClick() }) {
+                                    IconButton(
+                                        onClick = { viewModel.onChartIconClick() },
+                                        modifier = Modifier.onGloballyPositioned {
+                                            tutorialCoordinates = tutorialCoordinates + ("charts" to it)
+                                        }
+                                    ) {
                                         Icon(
                                             Icons.Filled.BarChart,
                                             stringResource(id = R.string.chart),
@@ -288,7 +308,9 @@ fun CalendarScreen(
                                     }
                                     IconButton(
                                         onClick = { viewModel.onTrashIconClick() },
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(40.dp).onGloballyPositioned {
+                                            tutorialCoordinates = tutorialCoordinates + ("trash" to it)
+                                        }
                                     ) {
                                         Icon(
                                             Icons.Default.Delete,
@@ -335,7 +357,10 @@ fun CalendarScreen(
                                 scope,
                                 drawerState,
                                 snackbarHostState,
-                                animationType = uiState.animationType
+                                animationType = uiState.animationType,
+                                onCalendarReady = {
+                                    tutorialCoordinates = tutorialCoordinates + ("calendar" to it)
+                                }
                             )
                     }
 
@@ -401,7 +426,8 @@ fun MainCalendarView(
     drawerState: androidx.compose.material3.DrawerState,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE
+    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE,
+    onCalendarReady: (LayoutCoordinates) -> Unit
 ) {
     var horizontalDragOffset by remember { mutableFloatStateOf(0f) }
     
@@ -489,6 +515,7 @@ fun MainCalendarView(
                                         onDragCancel = { isZooming = false }
                                     )
                                 }
+                                .onGloballyPositioned { onCalendarReady(it) }
                         ) {
                             Column(
                                 modifier = Modifier.padding(vertical = 8.dp)
