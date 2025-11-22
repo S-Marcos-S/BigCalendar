@@ -79,8 +79,7 @@ import android.app.PendingIntent
 import com.mss.thebigcalendar.widget.EventListWidgetService
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
-
-import com.google.api.services.drive.model.File as DriveFile
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class CalendarViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -233,6 +232,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.setPrimaryColor(colorHex)
             _uiState.update { it.copy(primaryColor = colorHex) }
+        }
+    }
+
+    fun setCrashlyticsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setCrashlyticsEnabled(enabled)
+            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
+            _uiState.update { it.copy(isCrashlyticsEnabled = enabled) }
         }
     }
 
@@ -683,6 +690,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.isCrashlyticsEnabled.collect { enabled ->
+                _uiState.update { it.copy(isCrashlyticsEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
             // Observar o estado de login do Google e o nome de boas-vindas
             _uiState.collect { uiState ->
                 val googleAccount = uiState.googleSignInAccount
@@ -879,7 +891,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                                     allActivitiesForThisDay.addAll(recurringInstances)
                                 }
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // Erro ao processar atividade - continuar com outras atividades
                         }
                     }
@@ -902,10 +914,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     
                     // Incluir tarefas finalizadas na lista final se a opção estiver ativada
                     val finalTasksList = if (state.showCompletedActivities) {
-                        allActivitiesForThisDay.sortedWith(compareByDescending<Activity> { it.categoryColor?.toIntOrNull() ?: 0 }.thenBy { it.startTime ?: LocalTime.MIN })
+                        allActivitiesForThisDay.sortedWith(compareByDescending<Activity> { it.categoryColor.toIntOrNull()
+                            ?: 0 }.thenBy { it.startTime ?: LocalTime.MIN })
                     } else {
                         // Filtrar apenas atividades não finalizadas
-                        allActivitiesForThisDay.filter { !it.isCompleted }.sortedWith(compareByDescending<Activity> { it.categoryColor?.toIntOrNull() ?: 0 }.thenBy { it.startTime ?: LocalTime.MIN })
+                        allActivitiesForThisDay.filter { !it.isCompleted }.sortedWith(compareByDescending<Activity> { it.categoryColor.toIntOrNull()
+                            ?: 0 }.thenBy { it.startTime ?: LocalTime.MIN })
                     }
                     
                     finalTasksList
@@ -958,7 +972,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         } else {
                             false
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         false
                     }
                 }.sortedBy { it.title }
@@ -1045,7 +1059,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Erro ao processar atividade - continuar com outras
             }
         }
@@ -1800,7 +1814,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Erro ao calcular instâncias repetitivas - retornar lista vazia
         }
         

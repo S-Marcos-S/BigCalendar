@@ -427,17 +427,19 @@ class MainActivity : ComponentActivity() {
                                     viewModel.toggleSidebarFilterVisibility(filterKey)
                                 },
                                 currentLanguage = uiState.language,
-                                onLanguageChange = { language ->
-                                    lifecycleScope.launch {
-                                        viewModel.onLanguageChange(language)
-                                        recreate()
-                                    }
-                                },
-                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() }
-                            )
-                        }
-                        uiState.isCalendarVisualizationSettingsOpen -> {
-                            CalendarVisualizationSettingsScreen(
+                                                                onLanguageChange = { language ->
+                                                                    lifecycleScope.launch {
+                                                                        viewModel.onLanguageChange(language)
+                                                                        recreate()
+                                                                    }
+                                                                },
+                                                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
+                                                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                                                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled
+                                                            )
+                                                        }
+                                                        uiState.isCalendarVisualizationSettingsOpen -> {
+                                                            CalendarVisualizationSettingsScreen(
                                 onBackClick = { viewModel.closeCalendarVisualizationSettings() }
                             )
                         }

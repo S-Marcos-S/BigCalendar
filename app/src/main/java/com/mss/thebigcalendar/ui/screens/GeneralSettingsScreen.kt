@@ -42,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import androidx.compose.material3.Switch
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Language
 import com.mss.thebigcalendar.data.model.Theme
@@ -68,7 +69,9 @@ fun GeneralSettingsScreen(
     onToggleSidebarFilterVisibility: (String) -> Unit = {},
     currentLanguage: Language = Language.SYSTEM,
     onLanguageChange: (Language) -> Unit = {},
-    onOpenCalendarVisualization: () -> Unit = {}
+    onOpenCalendarVisualization: () -> Unit = {},
+    isCrashlyticsEnabled: Boolean,
+    onCrashlyticsToggle: (Boolean) -> Unit
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
     Log.d("GeneralSettingsScreen", "🌐 Idioma atual: ${currentLanguage.displayName} (${currentLanguage.code})")
@@ -308,6 +311,40 @@ fun GeneralSettingsScreen(
                     )
                 }
             }
+
+            // Crashlytics Opt-in
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+                    .clickable { onCrashlyticsToggle(!isCrashlyticsEnabled) }
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.crashlytics_setting_title),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(id = R.string.crashlytics_setting_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Switch(
+                    checked = isCrashlyticsEnabled,
+                    onCheckedChange = onCrashlyticsToggle
+                )
+            }
+
+//            // Test Crash Button
+//            Button(onClick = {
+//                throw RuntimeException("Test Crash") // Botão de teste para forçar um crash
+//            }) {
+//                Text("Test Crash")
+//            }
+
 
             // Lista de filtros que podem ser adicionados ao menu
             val hiddenFilters = listOf(

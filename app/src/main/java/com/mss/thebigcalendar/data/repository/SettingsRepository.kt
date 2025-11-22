@@ -55,6 +55,18 @@ class SettingsRepository(private val context: Context) {
         val AUTO_BACKUP_MINUTE = stringPreferencesKey("auto_backup_minute")
         val AUTO_BACKUP_TYPE = stringPreferencesKey("auto_backup_type")
 
+        val CRASHLYTICS_ENABLED = booleanPreferencesKey("crashlytics_enabled")
+    }
+
+    val isCrashlyticsEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.CRASHLYTICS_ENABLED] ?: false
+        }
+
+    suspend fun setCrashlyticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CRASHLYTICS_ENABLED] = enabled
+        }
     }
 
     val theme: Flow<Theme> = context.dataStore.data

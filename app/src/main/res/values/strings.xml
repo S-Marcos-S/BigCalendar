@@ -765,7 +765,11 @@
     <string name="backup_success_notification">Backup do tipo %1$s realizado com sucesso.</string>
     <string name="backup_failed_notification">O backup do tipo %1$s falhou: %2$s</string>
 
-    <!-- PrintCalendarScreen.kt -->
+    <!-- Font Preview -->
     <string name="font_preview">Pré-visualização da fonte:</string>
     <string name="font_selected">Fonte Selecionada</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Enviar Relatórios de Erros</string>
+    <string name="crashlytics_setting_description">Ajude a melhorar o aplicativo enviando dados anônimos de falhas</string>
 </resources>
