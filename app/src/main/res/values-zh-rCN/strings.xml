@@ -755,5 +755,26 @@
     <!-- PrintCalendarScreen.kt -->
     <string name="font_preview">字体预览：</string>
     <string name="font_selected">已选字体</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">如果未完成则顺延</string>
+    <string name="rollover_if_not_completed_description" translatable="false">如果未完成，任务将移至第二天。</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">发送崩溃报告</string>
+    <string name="crashlytics_setting_description">通过发送匿名崩溃数据帮助改进应用程序</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">回收站</string>
+    <string name="onboarding_trash_desc">访问回收站以查看和恢复已删除的项目。</string>
+    <string name="onboarding_today_title">今天</string>
+    <string name="onboarding_today_desc">快速返回今天。</string>
+    <string name="onboarding_charts_title">统计</string>
+    <string name="onboarding_charts_desc">查看有关您的活动和生产力的图表。</string>
+    <string name="onboarding_calendar_swipe_title">展开/折叠</string>
+    <string name="onboarding_calendar_swipe_desc">向上或向下滑动以调整日历大小。</string>
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_next">下一个</string>
+    <string name="onboarding_finish">完成</string>
 </resources>
 

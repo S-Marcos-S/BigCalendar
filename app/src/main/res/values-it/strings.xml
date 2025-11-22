@@ -755,5 +755,26 @@
 
     <string name="font_preview">Anteprima font:</string>
     <string name="font_selected">Font selezionato</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">Riporta se non completato</string>
+    <string name="rollover_if_not_completed_description" translatable="false">Se non completata, l\'attività verrà spostata al giorno successivo.</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Invia segnalazioni di crash</string>
+    <string name="crashlytics_setting_description">Aiuta a migliorare l\'app inviando dati anonimi sui crash</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Cestino</string>
+    <string name="onboarding_trash_desc">Accedi al cestino per vedere e ripristinare gli elementi eliminati.</string>
+    <string name="onboarding_today_title">Oggi</string>
+    <string name="onboarding_today_desc">Torna rapidamente a oggi.</string>
+    <string name="onboarding_charts_title">Statistiche</string>
+    <string name="onboarding_charts_desc">Visualizza grafici sulle tue attività e produttività.</string>
+    <string name="onboarding_calendar_swipe_title">Espandi/Comprimi</string>
+    <string name="onboarding_calendar_swipe_desc">Trascina verso l\'alto o verso il basso per regolare le dimensioni del calendario.</string>
+    <string name="onboarding_skip">Salta</string>
+    <string name="onboarding_next">Successivo</string>
+    <string name="onboarding_finish">Fine</string>
 </resources>
 

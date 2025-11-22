@@ -763,5 +763,26 @@
     <!-- PrintCalendarScreen.kt -->
     <string name="font_preview">Schriftart-Vorschau:</string>
     <string name="font_selected">Ausgewählte Schriftart</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">Bei Nichterledigung auf nächsten Tag verschieben</string>
+    <string name="rollover_if_not_completed_description" translatable="false">Wenn die Aufgabe nicht erledigt wird, wird sie auf den nächsten Tag verschoben.</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Absturzberichte senden</string>
+    <string name="crashlytics_setting_description">Helfen Sie, die App zu verbessern, indem Sie anonyme Absturzdaten senden</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Papierkorb</string>
+    <string name="onboarding_trash_desc">Greifen Sie auf den Papierkorb zu, um gelöschte Elemente anzuzeigen und wiederherzustellen.</string>
+    <string name="onboarding_today_title">Heute</string>
+    <string name="onboarding_today_desc">Kehren Sie schnell zum heutigen Tag zurück.</string>
+    <string name="onboarding_charts_title">Statistiken</string>
+    <string name="onboarding_charts_desc">Sehen Sie sich Diagramme zu Ihren Aktivitäten und Ihrer Produktivität an.</string>
+    <string name="onboarding_calendar_swipe_title">Erweitern/Reduzieren</string>
+    <string name="onboarding_calendar_swipe_desc">Wischen Sie nach oben oder unten, um die Kalendergröße anzupassen.</string>
+    <string name="onboarding_skip">Überspringen</string>
+    <string name="onboarding_next">Weiter</string>
+    <string name="onboarding_finish">Fertig</string>
 </resources>
 

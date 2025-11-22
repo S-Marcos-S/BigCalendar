@@ -763,4 +763,25 @@
     <!-- PrintCalendarScreen.kt -->
     <string name="font_preview">Aperçu de la police :</string>
     <string name="font_selected">Police sélectionnée</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">Reporter si non terminé</string>
+    <string name="rollover_if_not_completed_description" translatable="false">Si elle n\'est pas terminée, la tâche sera reportée au jour suivant.</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Envoyer les rapports de plantage</string>
+    <string name="crashlytics_setting_description">Aidez à améliorer l\'application en envoyant des données de plantage anonymes</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Corbeille</string>
+    <string name="onboarding_trash_desc">Accédez à la corbeille pour voir et restaurer les éléments supprimés.</string>
+    <string name="onboarding_today_title">Aujourd\'hui</string>
+    <string name="onboarding_today_desc">Retournez rapidement à aujourd\'hui.</string>
+    <string name="onboarding_charts_title">Statistiques</string>
+    <string name="onboarding_charts_desc">Consultez des graphiques sur vos activités et votre productivité.</string>
+    <string name="onboarding_calendar_swipe_title">Agrandir/Réduire</string>
+    <string name="onboarding_calendar_swipe_desc">Faites glisser vers le haut ou vers le bas pour ajuster la taille du calendrier.</string>
+    <string name="onboarding_skip">Passer</string>
+    <string name="onboarding_next">Suivant</string>
+    <string name="onboarding_finish">Terminer</string>
 </resources>

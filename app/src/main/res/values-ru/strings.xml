@@ -755,5 +755,26 @@
 
     <string name="font_preview">Предпросмотр шрифта:</string>
     <string name="font_selected">Выбранный шрифт</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">Перенести, если не выполнено</string>
+    <string name="rollover_if_not_completed_description" translatable="false">Если задача не выполнена, она будет перенесена на следующий день.</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Отправлять отчеты о сбоях</string>
+    <string name="crashlytics_setting_description">Помогите улучшить приложение, отправляя анонимные данные о сбоях</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Корзина</string>
+    <string name="onboarding_trash_desc">Получите доступ к корзине для просмотра и восстановления удаленных элементов.</string>
+    <string name="onboarding_today_title">Сегодня</string>
+    <string name="onboarding_today_desc">Быстрый возврат к сегодняшнему дню.</string>
+    <string name="onboarding_charts_title">Статистика</string>
+    <string name="onboarding_charts_desc">Просматривайте графики вашей активности и продуктивности.</string>
+    <string name="onboarding_calendar_swipe_title">Развернуть/Свернуть</string>
+    <string name="onboarding_calendar_swipe_desc">Проведите пальцем вверх или вниз, чтобы изменить размер календаря.</string>
+    <string name="onboarding_skip">Пропустить</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_finish">Завершить</string>
 </resources>
 

@@ -53,6 +53,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.mss.thebigcalendar.ui.components.OnboardingOverlay
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -285,13 +287,17 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     } else {
+//... existing code ...
                         // Mostrar loading até o calendário estar carregado
                         if (!uiState.isCalendarLoaded) {
                             // Tela de loading com barra de progresso reta
                             androidx.compose.foundation.layout.Box(
-                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                modifier = androidx.compose.ui.Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background),
                                 contentAlignment = androidx.compose.ui.Alignment.Center
                             ) {
+//... existing code ...
                                 androidx.compose.foundation.layout.Column(
                                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
@@ -310,7 +316,7 @@ class MainActivity : ComponentActivity() {
                                     
                                     // Iniciar animação quando a tela aparece
                                     androidx.compose.runtime.LaunchedEffect(Unit) {
-                                        kotlinx.coroutines.delay(100) // Pequeno delay para garantir que a tela esteja pronta
+                                        kotlinx.coroutines.delay(50) // Pequeno delay para garantir que a tela esteja pronta
                                         progress = 1f // Anima de 0 para 1
                                     }
                                     
@@ -318,7 +324,7 @@ class MainActivity : ComponentActivity() {
                                     val animatedProgress = androidx.compose.animation.core.animateFloatAsState(
                                         targetValue = progress,
                                         animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 1200, // 1 segundo de animação
+                                            durationMillis = 600, // 1 segundo de animação
                                             easing = androidx.compose.animation.core.FastOutSlowInEasing
                                         ),
                                         label = "loading_animation"

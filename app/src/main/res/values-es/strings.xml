@@ -762,4 +762,28 @@
     <!-- PrintCalendarScreen.kt -->
     <string name="font_preview">Vista previa de la fuente:</string>
     <string name="font_selected">Fuente Seleccionada</string>
+
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">Pasar al día siguiente si no se completa</string>
+    <string name="rollover_if_not_completed_description" translatable="false">Si no se completa, la tarea se moverá al día siguiente.</string>
+    
+    <!-- CalendarScreen.kt -->
+    <string name="month_year_format" translatable="false">%1$s %2$s</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Enviar Informes de Errores</string>
+    <string name="crashlytics_setting_description">Ayuda a mejorar la aplicación enviando datos anónimos de fallos</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Papelera</string>
+    <string name="onboarding_trash_desc">Accede a la papelera para ver y restaurar elementos eliminados.</string>
+    <string name="onboarding_today_title">Hoy</string>
+    <string name="onboarding_today_desc">Vuelve rápidamente al día de hoy.</string>
+    <string name="onboarding_charts_title">Estadísticas</string>
+    <string name="onboarding_charts_desc">Consulta gráficos sobre tus actividades y productividad.</string>
+    <string name="onboarding_calendar_swipe_title">Expandir/Contraer</string>
+    <string name="onboarding_calendar_swipe_desc">Arrastra hacia arriba o hacia abajo para ajustar el tamaño del calendario.</string>
+    <string name="onboarding_skip">Saltar</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_finish">Finalizar</string>
 </resources>

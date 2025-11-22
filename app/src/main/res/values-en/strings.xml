@@ -762,4 +762,21 @@
     <!-- PrintCalendarScreen.kt -->
     <string name="font_preview">Font preview:</string>
     <string name="font_selected">Selected Font</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">Send Crash Reports</string>
+    <string name="crashlytics_setting_description">Help improve the app by sending anonymous crash data</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">Trash</string>
+    <string name="onboarding_trash_desc">Access the trash to see and restore deleted items.</string>
+    <string name="onboarding_today_title">Today</string>
+    <string name="onboarding_today_desc">Quickly go back to today.</string>
+    <string name="onboarding_charts_title">Statistics</string>
+    <string name="onboarding_charts_desc">See charts about your activities and productivity.</string>
+    <string name="onboarding_calendar_swipe_title">Expand/Collapse</string>
+    <string name="onboarding_calendar_swipe_desc">Drag up or down to adjust the calendar size.</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_finish">Finish</string>
 </resources>

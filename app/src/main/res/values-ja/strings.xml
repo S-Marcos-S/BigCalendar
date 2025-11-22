@@ -755,5 +755,26 @@
 
     <string name="font_preview">フォントのプレビュー:</string>
     <string name="font_selected">選択されたフォント</string>
+    
+    <!-- Rollover -->
+    <string name="rollover_if_not_completed" translatable="false">未完了の場合は翌日に繰り越し</string>
+    <string name="rollover_if_not_completed_description" translatable="false">未完了の場合、タスクは翌日に移動されます。</string>
+
+    <!-- Crashlytics Consent -->
+    <string name="crashlytics_setting_title">クラッシュレポートを送信</string>
+    <string name="crashlytics_setting_description">匿名のクラッシュデータを送信してアプリの改善にご協力ください</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_trash_title">ゴミ箱</string>
+    <string name="onboarding_trash_desc">ゴミ箱にアクセスして、削除されたアイテムを表示および復元します。</string>
+    <string name="onboarding_today_title">今日</string>
+    <string name="onboarding_today_desc">今日の日付にすばやく戻ります。</string>
+    <string name="onboarding_charts_title">統計</string>
+    <string name="onboarding_charts_desc">あなたのアクティビティと生産性に関するグラフをご覧ください。</string>
+    <string name="onboarding_calendar_swipe_title">展開/折りたたみ</string>
+    <string name="onboarding_calendar_swipe_desc">上下にドラッグしてカレンダーのサイズを調整します。</string>
+    <string name="onboarding_skip">スキップ</string>
+    <string name="onboarding_next">次へ</string>
+    <string name="onboarding_finish">終了</string>
 </resources>
 
