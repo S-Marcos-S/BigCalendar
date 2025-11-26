@@ -1669,28 +1669,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
      * Verifica se deve solicitar permissão de segundo plano contextualmente
      */
     private fun checkAndRequestBackgroundPermissionIfNeeded(activity: Activity, isNewActivityCreated: Boolean) {
-        
-        // Verificar se tem notificação habilitada
-        val hasNotificationEnabled = activity.notificationSettings.isEnabled &&
-                                   activity.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE
-        
-        // Solicitar permissão sempre que criar nova atividade com notificação
-        if (isNewActivityCreated && hasNotificationEnabled) {
-            
-            // Verificar se a permissão já foi concedida
-            val context = getApplication<Application>()
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            val hasPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                powerManager.isIgnoringBatteryOptimizations(context.packageName)
-            } else {
-                true // Para versões anteriores ao Android 6, não precisa da permissão
-            }
-            
-            // Solicitar permissão apenas se não tiver sido concedida
-            if (!hasPermission) {
-                _uiState.update { it.copy(showBackgroundPermissionDialog = true) }
-            }
-        }
+        // This check is no longer necessary as the app now uses AlarmManager and WorkManager,
+        // which are more robust and do not require this permission.
     }
 
     /**

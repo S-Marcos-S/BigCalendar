@@ -146,20 +146,6 @@ class MainActivity : ComponentActivity() {
     }
 
 
-    private fun requestIgnoreBatteryOptimizations() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
-                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            }
-        }
-    }
-
-
-
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.onAttach(newBase))
     }
@@ -463,8 +449,7 @@ class MainActivity : ComponentActivity() {
                                     viewModel.dismissBackgroundPermissionDialog() 
                                 },
                                 onAllowPermission = { 
-                                    viewModel.requestBackgroundPermission()
-                                    requestIgnoreBatteryOptimizations()
+                                    viewModel.dismissBackgroundPermissionDialog()
                                 },
                                 onDenyPermission = { 
                                     viewModel.dismissBackgroundPermissionDialog() 

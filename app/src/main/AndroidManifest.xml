@@ -9,12 +9,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUICKBOOT_POWERON" />
     
@@ -132,13 +130,6 @@
             android:name=".service.AlarmVerificationService"
             android:exported="false"
             android:enabled="true" />
-
-        <!-- Serviço de notificação em foreground -->
-        <service
-            android:name=".service.NotificationForegroundService"
-            android:exported="false"
-            android:enabled="true"
-            android:foregroundServiceType="dataSync" />
 
         <!-- Notification Receiver para notificações do calendário -->
         <receiver
