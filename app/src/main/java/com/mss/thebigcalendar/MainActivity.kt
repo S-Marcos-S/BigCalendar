@@ -257,33 +257,6 @@ class MainActivity : ComponentActivity() {
                                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 }
-                            },
-                            onRequestStoragePermission = {
-                                // Usar a mesma lógica da tela de backups
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    // Android 11+: Solicitar permissão de gerenciamento de arquivos
-                                    if (!Environment.isExternalStorageManager()) {
-                                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.fromParts("package", packageName, null)
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        try {
-                                            storagePermissionLauncher.launch(intent)
-                                        } catch (e: Exception) {
-                                            // Fallback para configurações gerais do app
-                                            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = Uri.fromParts("package", packageName, null)
-                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                            }
-                                            storagePermissionLauncher.launch(fallbackIntent)
-                                        }
-                                    }
-                                } else {
-                                    // Android < 11: Solicitar permissão de escrita
-                                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                                        writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                    }
-                                }
                             }
                         )
                     } else {

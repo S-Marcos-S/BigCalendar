@@ -1,32 +1,26 @@
 package com.mss.thebigcalendar.data.service
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import android.os.Environment
-import androidx.annotation.RequiresApi
-import androidx.core.content.ContextCompat
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.api.services.drive.model.File as DriveFile
 import com.mss.thebigcalendar.data.model.Activity
 import com.mss.thebigcalendar.data.model.DeletedActivity
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
-import com.mss.thebigcalendar.data.repository.BackupFrequency
-import com.mss.thebigcalendar.data.repository.BackupType
+import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
+import com.mss.thebigcalendar.service.GoogleDriveService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.OutputStreamWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-import com.mss.thebigcalendar.service.GoogleDriveService
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
-import java.time.Instant
-import com.google.api.services.drive.model.File as DriveFile
 
 class BackupService(
     private val context: Context,
@@ -88,7 +82,7 @@ class BackupService(
             val tempFile = File.createTempFile("restore_", ".json", context.cacheDir)
             driveService.downloadBackupFile(fileId, tempFile)
 
-            val result = restoreFromBackup(tempFile)
+            val result = restoreFromBackup(Uri.fromFile(tempFile))
 
             tempFile.delete()
 
@@ -114,112 +108,48 @@ class BackupService(
         private const val BACKUP_FILE_PREFIX = "TBCalendar_Backup_"
         private const val BACKUP_FILE_EXTENSION = ".json"
     }
-    
+
     /**
-     * Verifica se o app tem permissão para escrever no armazenamento
+     * Gera um backup completo de todas as atividades e itens da lixeira usando SAF.
      */
-    fun hasStoragePermission(): Boolean {
-        return when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
-                // Android 11+ (API 30+)
-                Environment.isExternalStorageManager()
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                // Android 10+ (API 29+)
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-            }
-            else -> {
-                // Android < 10
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-            }
-        }
-    }
-    
-    /**
-     * Verifica se precisa solicitar permissão de gerenciamento de armazenamento
-     */
-    fun needsManageExternalStoragePermission(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()
-    }
-    
-    /**
-     * Verifica se precisa solicitar permissão de escrita
-     */
-    fun needsWritePermission(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.R && 
-               ContextCompat.checkSelfPermission(
-                   context,
-                   Manifest.permission.WRITE_EXTERNAL_STORAGE
-               ) != PackageManager.PERMISSION_GRANTED
-    }
-    
-    /**
-     * Gera um backup completo de todas as atividades e itens da lixeira
-     */
-    @RequiresApi(Build.VERSION_CODES.R)
-    suspend fun createBackup(): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun createBackup(directoryUri: Uri): Result<String> = withContext(Dispatchers.IO) {
         try {
+            val directory = DocumentFile.fromTreeUri(context, directoryUri)
+            if (directory == null || !directory.canWrite()) {
+                return@withContext Result.failure(Exception("Permissão negada para escrever no diretório selecionado."))
+            }
+
             // Coletar dados para backup
             val activities = activityRepository.activities.first()
             val deletedActivities = deletedActivityRepository.deletedActivities.first()
             val completedActivities = completedActivityRepository.completedActivities.first()
-            
+
             // Criar estrutura JSON do backup
             val backupData = createBackupJson(activities, deletedActivities, completedActivities)
-            
-            // Criar diretório de backup se não existir
-            val backupDir = createBackupDirectory()
-            
+
             // Gerar nome do arquivo com timestamp
             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
             val backupFileName = "$BACKUP_FILE_PREFIX$timestamp$BACKUP_FILE_EXTENSION"
-            val backupFile = File(backupDir, backupFileName)
-            
-            // Escrever arquivo de backup
-            backupFile.writeText(backupData, Charsets.UTF_8)
-            
-            // Verificar se o arquivo foi criado
-            if (backupFile.exists()) {
-                Result.success(backupFile.absolutePath)
-            } else {
-                Result.failure(Exception("Falha ao criar arquivo de backup"))
+
+            // Criar arquivo de backup usando SAF
+            val backupFile = directory.createFile("application/json", backupFileName)
+            if (backupFile == null) {
+                return@withContext Result.failure(Exception("Falha ao criar arquivo de backup no diretório selecionado."))
             }
-            
+
+            // Escrever no arquivo de backup
+            context.contentResolver.openOutputStream(backupFile.uri)?.use { outputStream ->
+                OutputStreamWriter(outputStream).use { writer ->
+                    writer.write(backupData)
+                }
+            }
+
+            Result.success(backupFile.name ?: backupFileName)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-    
-    /**
-     * Cria o diretório de backup se não existir
-     */
-    @RequiresApi(Build.VERSION_CODES.R)
-    private fun createBackupDirectory(): File {
-        val backupDir = if (hasStoragePermission()) {
-            // Se tem permissão, criar na pasta pública
-            File(Environment.getExternalStorageDirectory(), BACKUP_FOLDER)
-        } else {
-            // Fallback para pasta privada do app
-            File(context.getExternalFilesDir(null), BACKUP_FOLDER)
-        }
-        
-        if (!backupDir.exists()) {
-            val created = backupDir.mkdirs()
-            if (!created) {
-                // Não foi possível criar o diretório de backup
-            }
-        } else {
-        }
-        
-        return backupDir
-    }
-    
+
     /**
      * Cria a estrutura JSON do backup
      */
@@ -362,44 +292,39 @@ class BackupService(
         
         return backupJson.toString(2) // Pretty print com indentação
     }
-    
+
     /**
-     * Lista todos os arquivos de backup disponíveis
+     * Lista todos os arquivos de backup disponíveis usando SAF.
      */
-    suspend fun listBackupFiles(): List<File> = withContext(Dispatchers.IO) {
+    suspend fun listBackupFiles(directoryUri: Uri): List<DocumentFile> = withContext(Dispatchers.IO) {
         try {
-            val backupDir = if (hasStoragePermission()) {
-                File(Environment.getExternalStorageDirectory(), BACKUP_FOLDER)
-            } else {
-                File(context.getExternalFilesDir(null), BACKUP_FOLDER)
-            }
-            
-            if (!backupDir.exists()) {
+            val directory = DocumentFile.fromTreeUri(context, directoryUri)
+            if (directory == null || !directory.canRead()) {
                 return@withContext emptyList()
             }
-            
-            val backupFiles = backupDir.listFiles { file ->
-                file.isFile && file.name.startsWith(BACKUP_FILE_PREFIX) && file.name.endsWith(BACKUP_FILE_EXTENSION)
-            } ?: emptyArray()
-            
-            backupFiles.sortedByDescending { it.lastModified() }.toList()
-            
+
+            directory.listFiles()
+                .filter { it.isFile && it.name?.startsWith(BACKUP_FILE_PREFIX) == true && it.name?.endsWith(BACKUP_FILE_EXTENSION) == true }
+                .sortedByDescending { it.lastModified() }
         } catch (e: Exception) {
             emptyList()
         }
     }
     
     /**
-     * Obtém informações sobre um arquivo de backup
+     * Obtém informações sobre um arquivo de backup usando SAF.
      */
-    suspend fun getBackupInfo(backupFile: File): Result<BackupInfo> = withContext(Dispatchers.IO) {
+    suspend fun getBackupInfo(backupFile: DocumentFile): Result<BackupInfo> = withContext(Dispatchers.IO) {
         try {
-            val content = backupFile.readText(Charsets.UTF_8)
+            val content = context.contentResolver.openInputStream(backupFile.uri)?.use { inputStream ->
+                inputStream.bufferedReader().use { it.readText() }
+            } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo de backup."))
+
             val json = JSONObject(content)
-            
+
             val info = BackupInfo(
-                fileName = backupFile.name,
-                filePath = backupFile.absolutePath,
+                fileName = backupFile.name ?: "Unknown",
+                uri = backupFile.uri.toString(),
                 fileSize = backupFile.length(),
                 createdAt = json.optString("createdAt", ""),
                 totalActivities = json.optInt("totalActivities", 0),
@@ -407,32 +332,35 @@ class BackupService(
                 totalCompletedActivities = json.optInt("totalCompletedActivities", 0),
                 backupVersion = json.optString("backupVersion", "1.0")
             )
-            
+
             Result.success(info)
-            
+
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
-    
+
     /**
-     * Restaura dados de um arquivo de backup
+     * Restaura dados de um arquivo de backup usando SAF.
      */
-    suspend fun restoreFromBackup(backupFile: File): Result<RestoreResult> = withContext(Dispatchers.IO) {
+    suspend fun restoreFromBackup(backupUri: Uri): Result<RestoreResult> = withContext(Dispatchers.IO) {
         try {
-            val content = backupFile.readText(Charsets.UTF_8)
+            val content = context.contentResolver.openInputStream(backupUri)?.use { inputStream ->
+                inputStream.bufferedReader().use { it.readText() }
+            } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo de backup para restauração."))
+
             val json = JSONObject(content)
-            
+
             // Verificar versão do backup
             val backupVersion = json.optString("backupVersion", "1.0")
             if (backupVersion != "1.0") {
                 return@withContext Result.failure(Exception("Versão de backup não suportada: $backupVersion"))
             }
-            
+
             // Extrair atividades
             val activitiesArray = json.optJSONArray("activities") ?: JSONArray()
             val restoredActivities = mutableListOf<com.mss.thebigcalendar.data.model.Activity>()
-            
+
             for (i in 0 until activitiesArray.length()) {
                 val activityJson = activitiesArray.getJSONObject(i)
                 try {
@@ -442,11 +370,11 @@ class BackupService(
                     // Erro ao parsear atividade - continuar com outras
                 }
             }
-            
+
             // Extrair itens da lixeira
             val deletedActivitiesArray = json.optJSONArray("deletedActivities") ?: JSONArray()
             val restoredDeletedActivities = mutableListOf<com.mss.thebigcalendar.data.model.DeletedActivity>()
-            
+
             for (i in 0 until deletedActivitiesArray.length()) {
                 val deletedJson = deletedActivitiesArray.getJSONObject(i)
                 try {
@@ -456,11 +384,11 @@ class BackupService(
                     // Erro ao parsear item da lixeira - continuar com outros
                 }
             }
-            
+
             // Extrair atividades concluídas
             val completedActivitiesArray = json.optJSONArray("completedActivities") ?: JSONArray()
             val restoredCompletedActivities = mutableListOf<com.mss.thebigcalendar.data.model.Activity>()
-            
+
             for (i in 0 until completedActivitiesArray.length()) {
                 val activityJson = completedActivitiesArray.getJSONObject(i)
                 try {
@@ -470,17 +398,37 @@ class BackupService(
                     // Erro ao parsear atividade concluída - continuar com outras
                 }
             }
-            
+
             val result = RestoreResult(
                 activities = restoredActivities,
                 deletedActivities = restoredDeletedActivities,
                 completedActivities = restoredCompletedActivities,
-                backupFileName = backupFile.name,
+                backupFileName = DocumentFile.fromSingleUri(context, backupUri)?.name ?: "Unknown",
                 backupCreatedAt = json.optString("createdAt", "")
             )
-            
+
             Result.success(result)
-            
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Deleta um arquivo de backup usando SAF.
+     */
+    suspend fun deleteBackupFile(backupUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val documentFile = DocumentFile.fromSingleUri(context, backupUri)
+            if (documentFile != null && documentFile.canWrite()) {
+                if (documentFile.delete()) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("Falha ao deletar o arquivo de backup."))
+                }
+            } else {
+                Result.failure(Exception("Não foi possível obter permissão para deletar o arquivo."))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -631,7 +579,7 @@ class BackupService(
  */
 data class BackupInfo(
     val fileName: String,
-    val filePath: String,
+    val uri: String,
     val fileSize: Long,
     val createdAt: String,
     val totalActivities: Int,

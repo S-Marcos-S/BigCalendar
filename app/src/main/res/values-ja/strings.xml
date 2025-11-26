@@ -776,5 +776,18 @@
     <string name="onboarding_skip">スキップ</string>
     <string name="onboarding_next">次へ</string>
     <string name="onboarding_finish">終了</string>
+
+    <!-- Onboarding Dialogs -->
+    <string name="onboarding_welcome_emoji">🎉</string>
+    <string name="onboarding_welcome_title">Big Calendarへようこそ！</string>
+    <string name="onboarding_welcome_subtitle">あなたの個人的で整理されたカレンダー</string>
+    <string name="onboarding_welcome_desc">完全な体験のために、Googleアカウントを接続してイベントを同期してください。</string>
+    <string name="onboarding_connect_google">Googleに接続</string>
+    <string name="onboarding_skip_now">今はスキップ</string>
+    <string name="onboarding_notification_emoji">🔔</string>
+    <string name="onboarding_notification_title">通知の許可</string>
+    <string name="onboarding_notification_subtitle">予定を見逃さないように</string>
+    <string name="onboarding_notification_desc">Big Calendarは通知を使用して、重要なイベントやタスクをリマインドします。アプリを最大限に活用するために、通知の送信を許可してください。</string>
+    <string name="onboarding_allow_notifications">通知を許可</string>
 </resources>
 

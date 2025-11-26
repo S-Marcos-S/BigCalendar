@@ -57,6 +57,18 @@ class SettingsRepository(private val context: Context) {
 
         val CRASHLYTICS_ENABLED = booleanPreferencesKey("crashlytics_enabled")
         val HAS_SEEN_MAIN_ONBOARDING = booleanPreferencesKey("has_seen_main_onboarding")
+        val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
+    }
+
+    val backupDirectoryUri: Flow<String?> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.BACKUP_DIRECTORY_URI]
+        }
+
+    suspend fun saveBackupDirectoryUri(uri: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] = uri
+        }
     }
 
     val hasSeenMainOnboarding: Flow<Boolean> = context.dataStore.data

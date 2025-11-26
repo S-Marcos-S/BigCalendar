@@ -394,16 +394,6 @@ fun CalendarScreen(
                         )
                     }
                     
-                    if (uiState.needsStoragePermission) {
-                        StoragePermissionDialog(
-                            onDismiss = { viewModel.clearBackupMessage() },
-                            onPermissionGranted = {
-                                viewModel.clearBackupMessage()
-                                viewModel.onBackupRequest()
-                            }
-                        )
-                    }
-
                     // Dialog de confirmação para deletar calendário JSON
                     if (uiState.showDeleteJsonCalendarDialog) {
                         DeleteJsonCalendarDialog(

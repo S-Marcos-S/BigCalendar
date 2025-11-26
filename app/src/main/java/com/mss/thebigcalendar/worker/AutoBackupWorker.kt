@@ -43,7 +43,11 @@ class AutoBackupWorker(
 
         val result = when (settings.backupType) {
             BackupType.LOCAL -> {
-                backupService.createBackup()
+                val directoryUriString = settingsRepository.backupDirectoryUri.first()
+                if (directoryUriString.isNullOrBlank()) {
+                    return Result.failure()
+                }
+                backupService.createBackup(android.net.Uri.parse(directoryUriString))
             }
             BackupType.CLOUD -> {
                 val account = googleAuthService.getLastSignedInAccount()

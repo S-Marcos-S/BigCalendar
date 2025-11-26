@@ -1,5 +1,7 @@
 package com.mss.thebigcalendar.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -69,7 +71,6 @@ import com.mss.thebigcalendar.data.repository.BackupFrequency
 import com.mss.thebigcalendar.data.repository.BackupType
 import com.mss.thebigcalendar.data.service.BackupInfo
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
-import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -90,24 +91,31 @@ fun BackupScreen(
     var showCloudRestoreConfirmation by remember { mutableStateOf<DriveFile?>(null) }
     var showCloudDeleteConfirmation by remember { mutableStateOf<DriveFile?>(null) }
 
-    LaunchedEffect(Unit) {
+    val directoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            if (uri != null) {
+                viewModel.onBackupDirectorySelected(uri)
+            } else {
+                viewModel.clearBackupMessage()
+            }
+        }
+    )
+
+    LaunchedEffect(uiState.backupDirectoryUri) {
         viewModel.loadBackupFiles()
         if (uiState.googleSignInAccount != null) {
             viewModel.listCloudBackups()
         }
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.checkStoragePermission()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+    if (uiState.needsBackupDirectorySelection) {
+        RequestBackupDirectoryDialog(
+            onConfirm = {
+                directoryPickerLauncher.launch(null)
+            },
+            onDismiss = { viewModel.clearBackupMessage() }
+        )
     }
 
     Scaffold(
@@ -307,7 +315,7 @@ fun BackupScreen(
                     backupInfo.totalDeletedActivities
                 ),
                 onConfirm = {
-                    viewModel.restoreFromBackup(backupInfo.filePath)
+                    viewModel.restoreFromBackup(backupInfo.uri)
                     showRestoreConfirmation = null
                 },
                 onDismiss = { showRestoreConfirmation = null }
@@ -318,7 +326,7 @@ fun BackupScreen(
             DeleteConfirmationDialog(
                 backupName = backupInfo.fileName,
                 onConfirm = {
-                    viewModel.deleteBackupFile(backupInfo.filePath)
+                    viewModel.deleteBackupFile(backupInfo.uri)
                     showDeleteConfirmation = null
                 },
                 onDismiss = { showDeleteConfirmation = null }
@@ -347,18 +355,32 @@ fun BackupScreen(
                 onDismiss = { showCloudDeleteConfirmation = null }
             )
         }
-
-        if (uiState.needsStoragePermission) {
-            StoragePermissionDialog(
-                onDismiss = { viewModel.clearBackupMessage() },
-                onPermissionGranted = {
-                    viewModel.clearBackupMessage()
-                    viewModel.onBackupRequest()
-                    viewModel.loadBackupFiles()
-                }
-            )
-        }
     }
+}
+
+@Composable
+fun RequestBackupDirectoryDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Selecionar Pasta de Backup") },
+        text = { Text("Para salvar seus backups locais de forma segura e compatível com as novas políticas do Android, por favor, escolha uma pasta. O aplicativo terá acesso apenas à pasta que você selecionar.") },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm()
+                onDismiss()
+            }) {
+                Text("Escolher Pasta")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

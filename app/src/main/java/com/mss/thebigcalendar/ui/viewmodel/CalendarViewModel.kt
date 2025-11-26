@@ -702,6 +702,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.backupDirectoryUri.collect { uri ->
+                _uiState.update { it.copy(backupDirectoryUri = uri) }
+                if (!uri.isNullOrBlank()) {
+                    loadBackupFiles()
+                }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.hasSeenMainOnboarding.collect { seen ->
                 _uiState.update { it.copy(hasSeenMainOnboarding = seen) }
             }
@@ -2170,58 +2178,56 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun onBackupRequest() {
         viewModelScope.launch {
+            val directoryUri = _uiState.value.backupDirectoryUri
+            if (directoryUri.isNullOrBlank()) {
+                _uiState.update { it.copy(needsBackupDirectorySelection = true) }
+                return@launch
+            }
+
             try {
-                // Verificar permissões antes de fazer backup
-                if (!backupService.hasStoragePermission()) {
-                    _uiState.update { it.copy(
-                        backupMessage = "Permissão de armazenamento necessária para backup",
-                        needsStoragePermission = true
-                    ) }
-                    return@launch
-                }
-                
-                val result = backupService.createBackup()
+                val result = backupService.createBackup(Uri.parse(directoryUri))
                 result.fold(
-                    onSuccess = { backupPath ->
-                        // Atualizar o estado para mostrar sucesso
-                        _uiState.update { it.copy(
-                            backupMessage = "Backup criado com sucesso: ${backupPath.substringAfterLast("/")}"
-                        ) }
-                        // Recarregar lista de backups
+                    onSuccess = { backupFileName ->
+                        _uiState.update { it.copy(backupMessage = "Backup criado com sucesso: $backupFileName") }
                         loadBackupFiles()
                     },
                     onFailure = { exception ->
                         Log.e("CalendarViewModel", "❌ Erro ao criar backup", exception)
-                        // Atualizar o estado para mostrar erro
-                        _uiState.update { it.copy(
-                            backupMessage = "Erro ao criar backup: ${exception.message}"
-                        ) }
+                        _uiState.update { it.copy(backupMessage = "Erro ao criar backup: ${exception.message}") }
                     }
                 )
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro inesperado durante backup", e)
-                _uiState.update { it.copy(
-                    backupMessage = "Erro inesperado: ${e.message}"
-                ) }
+                _uiState.update { it.copy(backupMessage = "Erro inesperado: ${e.message}") }
             }
         }
     }
-    
-    fun clearBackupMessage() {
-        _uiState.update { it.copy(backupMessage = null, needsStoragePermission = false) }
-    }
-    
-    fun checkStoragePermission() {
+
+    fun onBackupDirectorySelected(uri: Uri) {
         viewModelScope.launch {
-            val hasPermission = backupService.hasStoragePermission()
-            if (hasPermission && _uiState.value.needsStoragePermission) {
-                // Se a permissão foi concedida e ainda está marcado como necessário, limpar o estado
-                _uiState.update { it.copy(needsStoragePermission = false, backupMessage = null) }
-                // Recarregar a lista de backups para mostrar os backups existentes
-                loadBackupFiles()
+            try {
+                val context = getApplication<Application>()
+                val contentResolver = context.contentResolver
+                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                contentResolver.takePersistableUriPermission(uri, takeFlags)
+
+                settingsRepository.saveBackupDirectoryUri(uri.toString())
+                _uiState.update { it.copy(needsBackupDirectorySelection = false) }
+
+                // Automatically trigger backup after directory is selected
+                onBackupRequest()
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "❌ Falha ao salvar o diretório de backup", e)
+                _uiState.update { it.copy(backupMessage = "Falha ao definir o diretório de backup.") }
             }
         }
     }
+
+    fun clearBackupMessage() {
+        _uiState.update { it.copy(backupMessage = null, needsBackupDirectorySelection = false) }
+    }
+
     fun onRestoreRequest() { println("ViewModel: Pedido de restauração recebido.") }
 
     fun openSidebar() = _uiState.update { it.copy(isSidebarOpen = true) }
@@ -3091,140 +3097,89 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     
     fun loadBackupFiles() {
         viewModelScope.launch {
+            val directoryUriString = _uiState.value.backupDirectoryUri
+            if (directoryUriString.isNullOrBlank()) {
+                _uiState.update { it.copy(backupFiles = emptyList()) }
+                return@launch
+            }
+
             try {
-                val backupFiles = backupService.listBackupFiles()
-                val backupInfos = mutableListOf<BackupInfo>()
-                
-                backupFiles.forEach { file ->
-                    val info = backupService.getBackupInfo(file)
-                    info.onSuccess { backupInfo ->
-                        backupInfos.add(backupInfo)
-                    }
+                val directoryUri = Uri.parse(directoryUriString)
+                val backupDocumentFiles = backupService.listBackupFiles(directoryUri)
+                val backupInfos = backupDocumentFiles.mapNotNull { file ->
+                    backupService.getBackupInfo(file).getOrNull()
                 }
-                
                 _uiState.update { it.copy(backupFiles = backupInfos) }
-                println("📁 ${backupInfos.size} arquivos de backup carregados")
             } catch (e: Exception) {
-                println("❌ Erro ao carregar arquivos de backup: ${e.message}")
+                Log.e("CalendarViewModel", "❌ Erro ao carregar arquivos de backup via SAF", e)
+                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.") }
             }
         }
     }
     
-    fun deleteBackupFile(filePath: String) {
+    fun deleteBackupFile(backupUri: String) {
         viewModelScope.launch {
-            try {
-                val file = java.io.File(filePath)
-                if (file.exists()) {
-                    val deleted = file.delete()
-                    if (deleted) {
-                        println("🗑️ Arquivo de backup deletado: $filePath")
-                        // Recarregar lista de backups
-                        loadBackupFiles()
-                        _uiState.update { it.copy(
-                            backupMessage = "Backup deletado com sucesso"
-                        ) }
-                    } else {
-                        println("❌ Falha ao deletar arquivo de backup: $filePath")
-                        _uiState.update { it.copy(
-                            backupMessage = "Erro ao deletar backup"
-                        ) }
-                    }
+            val result = backupService.deleteBackupFile(Uri.parse(backupUri))
+            result.fold(
+                onSuccess = {
+                    _uiState.update { it.copy(backupMessage = "Backup deletado com sucesso") }
+                    loadBackupFiles()
+                },
+                onFailure = { exception ->
+                    _uiState.update { it.copy(backupMessage = "Erro ao deletar backup: ${exception.message}") }
                 }
-            } catch (e: Exception) {
-                println("❌ Erro ao deletar arquivo de backup: ${e.message}")
-                _uiState.update { it.copy(
-                    backupMessage = "Erro ao deletar backup: ${e.message}"
-                ) }
-            }
+            )
         }
     }
-    
-    fun restoreFromBackup(filePath: String) {
+
+    fun restoreFromBackup(backupUri: String) {
         viewModelScope.launch {
             try {
-                println("🔄 Iniciando restauração do backup: $filePath")
                 _uiState.update { it.copy(
                     backupMessage = null,
                     isRestoringBackup = true,
                     restoreProgress = 0f
                 ) }
-                
-                val backupFile = java.io.File(filePath)
-                if (!backupFile.exists()) {
-                    _uiState.update { it.copy(
-                        backupMessage = "Arquivo de backup não encontrado",
-                        isRestoringBackup = false
-                    ) }
-                    return@launch
-                }
-                
-                // Restaurar dados do backup
-                val restoreResult = backupService.restoreFromBackup(backupFile)
+
+                val restoreResult = backupService.restoreFromBackup(Uri.parse(backupUri))
                 restoreResult.fold(
                     onSuccess = { result ->
-                        println("✅ Backup restaurado com sucesso:")
-                        println("   - Atividades: ${result.activities.size}")
-                        println("   - Itens da lixeira: ${result.deletedActivities.size}")
-                        println("   - Atividades concluídas: ${result.completedActivities.size}")
-                        
-                        // Etapa 1/5: Limpar dados atuais
                         clearAllCurrentData()
                         _uiState.update { it.copy(restoreProgress = 0.2f) }
-                        
-                        // Etapa 2/5: Restaurar atividades
-                        result.activities.forEach { activity ->
-                            activityRepository.saveActivity(activity)
-                        }
+
+                        result.activities.forEach { activity -> activityRepository.saveActivity(activity) }
                         _uiState.update { it.copy(restoreProgress = 0.5f) }
-                        
-                        // Etapa 3/5: Restaurar itens da lixeira
-                        result.deletedActivities.forEach { deletedActivity ->
-                            deletedActivityRepository.addDeletedActivity(deletedActivity.originalActivity)
-                        }
+
+                        result.deletedActivities.forEach { deletedActivity -> deletedActivityRepository.addDeletedActivity(deletedActivity.originalActivity) }
                         _uiState.update { it.copy(restoreProgress = 0.65f) }
-                        
-                        // Etapa 4/5: Restaurar atividades concluídas
-                        result.completedActivities.forEach { activity ->
-                            completedActivityRepository.addCompletedActivity(activity)
-                        }
+
+                        result.completedActivities.forEach { activity -> completedActivityRepository.addCompletedActivity(activity) }
                         _uiState.update { it.copy(restoreProgress = 0.8f) }
-                        
-                        _uiState.update { it.copy(
-                            backupMessage = "Backup restaurado com sucesso! ${result.activities.size} atividades, ${result.deletedActivities.size} itens da lixeira e ${result.completedActivities.size} atividades concluídas restaurados."
-                        ) }
-                        
-                        // Etapa 5/5: Recarregar dados da UI
+
+                        _uiState.update { it.copy(backupMessage = "Backup restaurado com sucesso!") }
+
                         loadData()
                         loadBackupFiles()
                         _uiState.update { it.copy(restoreProgress = 0.9f) }
 
-                        // Reagendar notificações
                         val notificationService = NotificationService(getApplication())
-                        result.activities.forEach { activity ->
-                            notificationService.scheduleNotification(activity)
-                        }
-                        
-                        // Notificar widgets sobre a mudança
+                        result.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
+
                         viewModelScope.launch {
-                            delay(500) // Aguardar 500ms para garantir que os dados foram persistidos
+                            delay(500)
                             notifyWidgetsDataChanged()
-                            _uiState.update { it.copy(
-                                isRestoringBackup = false,
-                                restoreProgress = 1f
-                            ) }
+                            _uiState.update { it.copy(isRestoringBackup = false, restoreProgress = 1f) }
                         }
                     },
                     onFailure = { exception ->
-                        println("❌ Erro ao restaurar backup: ${exception.message}")
                         _uiState.update { it.copy(
                             backupMessage = "Erro ao restaurar backup: ${exception.message}",
                             isRestoringBackup = false
                         ) }
                     }
                 )
-                
+
             } catch (e: Exception) {
-                println("❌ Erro inesperado ao restaurar backup: ${e.message}")
                 _uiState.update { it.copy(
                     backupMessage = "Erro inesperado: ${e.message}",
                     isRestoringBackup = false

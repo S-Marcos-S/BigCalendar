@@ -786,4 +786,17 @@
     <string name="onboarding_skip">Saltar</string>
     <string name="onboarding_next">Siguiente</string>
     <string name="onboarding_finish">Finalizar</string>
+
+    <!-- Onboarding Dialogs -->
+    <string name="onboarding_welcome_emoji">🎉</string>
+    <string name="onboarding_welcome_title">¡Bienvenido a Big Calendar!</string>
+    <string name="onboarding_welcome_subtitle">Tu calendario personal y organizado</string>
+    <string name="onboarding_welcome_desc">Para una experiencia completa, conecta tu cuenta de Google y sincroniza tus eventos.</string>
+    <string name="onboarding_connect_google">Conectar Google</string>
+    <string name="onboarding_skip_now">Omitir por ahora</string>
+    <string name="onboarding_notification_emoji">🔔</string>
+    <string name="onboarding_notification_title">Permiso de Notificación</string>
+    <string name="onboarding_notification_subtitle">Para no perder tus compromisos</string>
+    <string name="onboarding_notification_desc">Big Calendar utiliza notificaciones para recordarte eventos y tareas importantes. Permite el envío de notificaciones para aprovechar al máximo la aplicación.</string>
+    <string name="onboarding_allow_notifications">Permitir Notificaciones</string>
 </resources>
