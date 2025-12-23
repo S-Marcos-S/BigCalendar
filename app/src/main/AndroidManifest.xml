@@ -2,7 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissões para notificações -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
@@ -11,30 +10,25 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUICKBOOT_POWERON" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
 
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    
-    
-    <!-- Permissões específicas para MIUI/HyperOS -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
-    
-
-    
-    <!-- Permissões para backup e restauração -->
-
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
 
     <application
@@ -56,8 +50,7 @@
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
-        
-        <!-- FileProvider para compartilhar arquivos PDF -->
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -71,7 +64,7 @@
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
             android:value="false" />
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -79,12 +72,10 @@
             android:theme="@style/Theme.TheBigCalendar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
-        <!-- Activity para exibir quando o alarme disparar -->
+
         <activity
             android:name=".ui.screens.AlarmActivity"
             android:exported="false"
@@ -97,8 +88,7 @@
             android:finishOnTaskLaunch="false"
             android:clearTaskOnLaunch="false"
             android:theme="@style/Theme.TheBigCalendar" />
-            
-        <!-- Activity para notificações de alta visibilidade -->
+
         <activity
             android:name=".ui.screens.HighVisibilityNotificationActivity"
             android:exported="false"
@@ -110,8 +100,7 @@
             android:finishOnTaskLaunch="false"
             android:clearTaskOnLaunch="false"
             android:theme="@style/Theme.TheBigCalendar" />
-            
-        <!-- Activity para configuração de widgets -->
+
         <activity
             android:name=".ui.screens.WidgetConfigurationActivity"
             android:exported="true"
@@ -120,21 +109,18 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
-            
-        <!-- Serviço para notificações de alta visibilidade -->
+
         <service
             android:name=".service.HighVisibilityNotificationService"
             android:exported="false"
             android:enabled="true"
             android:process=":high_visibility_service" />
-            
-        <!-- Serviço para verificação de alarmes -->
+
         <service
             android:name=".service.AlarmVerificationService"
             android:exported="false"
             android:enabled="true" />
 
-        <!-- Notification Receiver para notificações do calendário -->
         <receiver
             android:name=".service.NotificationReceiver"
             android:exported="true"
@@ -151,8 +137,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
-        
-        <!-- Alarm Receiver para alarmes do despertador -->
+
         <receiver
             android:name=".service.AlarmReceiver"
             android:exported="false"
@@ -169,73 +154,37 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
-        
-        <!-- Widget Provider - Lista de Eventos -->
-        <receiver
-            android:name=".widget.EventListWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/event_list_widget_info" />
+
+        <receiver android:name=".widget.EventListWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/event_list_widget_info" />
         </receiver>
 
-        <!-- Widget Provider - Saudação -->
-        <receiver
-            android:name=".widget.GreetingWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/greeting_widget_info" />
+        <receiver android:name=".widget.GreetingWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/greeting_widget_info" />
         </receiver>
 
-        <!-- Widget Provider - Saudação Compacta -->
-        <receiver
-            android:name=".widget.CompactGreetingWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/compact_greeting_widget_info" />
+        <receiver android:name=".widget.CompactGreetingWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/compact_greeting_widget_info" />
         </receiver>
 
-        <!-- Widget Provider - Saudação Simples -->
-        <receiver
-            android:name=".widget.SimpleGreetingWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/simple_greeting_widget_info" />
+        <receiver android:name=".widget.SimpleGreetingWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/simple_greeting_widget_info" />
         </receiver>
 
-        <!-- Widget Provider - Teste -->
-        <receiver
-            android:name=".widget.TestWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/test_widget_info" />
+        <receiver android:name=".widget.TestWidgetProvider" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/test_widget_info" />
         </receiver>
 
-        <!-- Service para o Widget de Lista de Eventos -->
         <service
             android:name=".widget.EventListWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
-        
+
     </application>
 
 </manifest>
