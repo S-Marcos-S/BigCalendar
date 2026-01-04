@@ -1,4 +1,4 @@
-# TheBigCalendar 📅
+# BigCalendar 📅
 
 [![Android](https://img.shields.io/badge/Android-26%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-blue.svg)](https://kotlinlang.org)
