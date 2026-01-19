@@ -37,6 +37,9 @@ import com.mss.thebigcalendar.data.repository.AlarmRepository
 import com.mss.thebigcalendar.service.AlarmService
 import com.mss.thebigcalendar.service.NotificationService
 import java.time.LocalTime
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +73,23 @@ fun AlarmScreen(
         )
     }
     var showThankYouMessage by remember { mutableStateOf(false) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasOverlayPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Settings.canDrawOverlays(context)
+                } else {
+                    true
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     // Verificar permissões quando a tela abrir
     LaunchedEffect(Unit) {

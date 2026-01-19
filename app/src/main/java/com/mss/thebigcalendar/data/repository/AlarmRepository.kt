@@ -37,7 +37,7 @@ class AlarmRepository(
             Log.d(TAG, "💾 Salvando alarme: ${alarm.label} às ${alarm.time}")
             
             // Validar configurações
-            val validation = AlarmSettings.validate(alarm)
+            val validation = AlarmSettings.validate(alarm, context)
             if (validation is AlarmSettings.ValidationResult.Error) {
                 return Result.failure(Exception(validation.message))
             }
