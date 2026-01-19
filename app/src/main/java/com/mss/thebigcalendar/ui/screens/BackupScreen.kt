@@ -90,6 +90,8 @@ fun BackupScreen(
     var showDeleteConfirmation by remember { mutableStateOf<BackupInfo?>(null) }
     var showCloudRestoreConfirmation by remember { mutableStateOf<DriveFile?>(null) }
     var showCloudDeleteConfirmation by remember { mutableStateOf<DriveFile?>(null) }
+    var isCloudBackupsExpanded by remember { mutableStateOf(true) }
+    var isLocalBackupsExpanded by remember { mutableStateOf(true) }
 
     val directoryPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
@@ -232,35 +234,57 @@ fun BackupScreen(
             if (uiState.googleSignInAccount != null) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = stringResource(R.string.cloud_backups_list),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                }
-                if (uiState.isListingCloudBackups) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = stringResource(R.string.cloud_backups_list),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { isCloudBackupsExpanded = !isCloudBackupsExpanded }) {
+                                Icon(
+                                    imageVector = if (isCloudBackupsExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                    contentDescription = if (isCloudBackupsExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                                )
+                            }
                         }
                     }
-                } else if (uiState.cloudBackupFiles.isEmpty()) {
-                    item {
-                        EmptyState(
-                            icon = Icons.Default.CloudDone,
-                            title = stringResource(R.string.no_cloud_backups_yet),
-                            description = stringResource(R.string.no_cloud_backups_description)
-                        )
-                    }
-                } else {
-                    items(uiState.cloudBackupFiles) { backupFile ->
-                        CloudBackupFileItem(
-                            backupFile = backupFile,
-                            onDelete = { showCloudDeleteConfirmation = backupFile },
-                            onRestore = { showCloudRestoreConfirmation = backupFile }
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(13.dp))
+                }
+                if (isCloudBackupsExpanded) {
+                    if (uiState.isListingCloudBackups) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    } else if (uiState.cloudBackupFiles.isEmpty()) {
+                        item {
+                            EmptyState(
+                                icon = Icons.Default.CloudDone,
+                                title = stringResource(R.string.no_cloud_backups_yet),
+                                description = stringResource(R.string.no_cloud_backups_description)
+                            )
+                        }
+                    } else {
+                        items(uiState.cloudBackupFiles) { backupFile ->
+                            CloudBackupFileItem(
+                                backupFile = backupFile,
+                                onDelete = { showCloudDeleteConfirmation = backupFile },
+                                onRestore = { showCloudRestoreConfirmation = backupFile }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                     }
                 }
             } else {
@@ -278,20 +302,42 @@ fun BackupScreen(
             if (uiState.backupFiles.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = stringResource(R.string.local_backups_list),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = stringResource(R.string.local_backups_list),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { isLocalBackupsExpanded = !isLocalBackupsExpanded }) {
+                                Icon(
+                                    imageVector = if (isLocalBackupsExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                    contentDescription = if (isLocalBackupsExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(13.dp))
                 }
-                items(uiState.backupFiles) { backupInfo ->
-                    BackupFileItem(
-                        backupInfo = backupInfo,
-                        onDelete = { showDeleteConfirmation = backupInfo },
-                        onRestore = { showRestoreConfirmation = backupInfo }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                if (isLocalBackupsExpanded) {
+                    items(uiState.backupFiles) { backupInfo ->
+                        BackupFileItem(
+                            backupInfo = backupInfo,
+                            onDelete = { showDeleteConfirmation = backupInfo },
+                            onRestore = { showRestoreConfirmation = backupInfo }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             } else {
                 item {
