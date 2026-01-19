@@ -38,6 +38,10 @@ class NotificationService(
         const val AUTO_BACKUP_CHANNEL_ID = "auto_backup_notifications"
         const val AUTO_BACKUP_CHANNEL_NAME = "Backups Automáticos"
         const val AUTO_BACKUP_CHANNEL_DESCRIPTION = "Notificações sobre backups automáticos"
+
+        const val MANUAL_BACKUP_CHANNEL_ID = "manual_backup_notifications"
+        const val MANUAL_BACKUP_CHANNEL_NAME = "Backup e Restauração Manual"
+        const val MANUAL_BACKUP_CHANNEL_DESCRIPTION = "Notificações sobre backup e restauração manual"
         
         // Ações para as notificações
         const val ACTION_VIEW_ACTIVITY = "com.mss.thebigcalendar.VIEW_ACTIVITY"
@@ -94,7 +98,74 @@ class NotificationService(
                 enableVibration(false)
             }
             notificationManager.createNotificationChannel(backupChannel)
+
+            val manualBackupChannel = NotificationChannel(
+                MANUAL_BACKUP_CHANNEL_ID,
+                MANUAL_BACKUP_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = MANUAL_BACKUP_CHANNEL_DESCRIPTION
+            }
+            notificationManager.createNotificationChannel(manualBackupChannel)
         }
+    }
+
+    fun showBackupInProgressNotification() {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle("Realizando backup")
+            .setContentText("Aguarde, o backup está em andamento...")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .setProgress(0, 0, true)
+        notificationManager.notify(1, builder.build())
+    }
+
+    fun showBackupCompleteNotification(fileName: String) {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_done)
+            .setContentTitle("Backup concluído")
+            .setContentText("O arquivo $fileName foi salvo com sucesso.")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        notificationManager.notify(1, builder.build())
+    }
+
+    fun showBackupFailedNotification(error: String) {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_off)
+            .setContentTitle("Falha no backup")
+            .setContentText(error)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        notificationManager.notify(1, builder.build())
+    }
+
+    fun showRestoreInProgressNotification() {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_download)
+            .setContentTitle("Restaurando backup")
+            .setContentText("Aguarde, a restauração está em andamento...")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+            .setProgress(0, 0, true)
+        notificationManager.notify(2, builder.build())
+    }
+
+    fun showRestoreCompleteNotification(fileName: String) {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_done)
+            .setContentTitle("Restauração concluída")
+            .setContentText("O backup do arquivo $fileName foi restaurado com sucesso.")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        notificationManager.notify(2, builder.build())
+    }
+
+    fun showRestoreFailedNotification(error: String) {
+        val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_off)
+            .setContentTitle("Falha na restauração")
+            .setContentText(error)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        notificationManager.notify(2, builder.build())
     }
 
     fun showAutoBackupSuccessNotification(backupType: com.mss.thebigcalendar.data.repository.BackupType, backupPath: String) {

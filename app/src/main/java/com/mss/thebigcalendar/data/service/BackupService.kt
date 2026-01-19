@@ -11,6 +11,7 @@ import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
 import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
 import com.mss.thebigcalendar.service.GoogleDriveService
+import com.mss.thebigcalendar.service.NotificationService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -29,11 +30,14 @@ class BackupService(
     private val completedActivityRepository: CompletedActivityRepository
 ) {
 
+    private val notificationService = NotificationService(context)
+
     private fun getGoogleDriveService(account: GoogleSignInAccount): GoogleDriveService {
         return GoogleDriveService(context, account)
     }
 
     suspend fun createCloudBackup(account: GoogleSignInAccount): Result<String> = withContext(Dispatchers.IO) {
+        notificationService.showBackupInProgressNotification()
         val tempFile = File.createTempFile(BACKUP_FILE_PREFIX, BACKUP_FILE_EXTENSION, context.cacheDir)
         try {
             val activities = activityRepository.activities.first()
@@ -53,11 +57,14 @@ class BackupService(
             val uploadedFile = driveService.uploadBackupFile(tempFile, appProperties)
 
             if (uploadedFile != null) {
+                notificationService.showBackupCompleteNotification(uploadedFile.name)
                 Result.success(uploadedFile.id)
             } else {
+                notificationService.showBackupFailedNotification("Falha ao fazer upload do arquivo de backup para o Google Drive")
                 Result.failure(Exception("Falha ao fazer upload do arquivo de backup para o Google Drive"))
             }
         } catch (e: Exception) {
+            notificationService.showBackupFailedNotification(e.message ?: "Erro desconhecido")
             Result.failure(e)
         } finally {
             if (tempFile.exists()) {
@@ -77,6 +84,7 @@ class BackupService(
     }
 
     suspend fun restoreFromCloudBackup(account: GoogleSignInAccount, fileId: String, fileName: String): Result<RestoreResult> = withContext(Dispatchers.IO) {
+        notificationService.showRestoreInProgressNotification()
         try {
             val driveService = getGoogleDriveService(account)
             val tempFile = File.createTempFile("restore_", ".json", context.cacheDir)
@@ -86,8 +94,15 @@ class BackupService(
 
             tempFile.delete()
 
+            if (result.isSuccess) {
+                notificationService.showRestoreCompleteNotification(fileName)
+            } else {
+                notificationService.showRestoreFailedNotification(result.exceptionOrNull()?.message ?: "Erro desconhecido")
+            }
+
             result
         } catch (e: Exception) {
+            notificationService.showRestoreFailedNotification(e.message ?: "Erro desconhecido")
             Result.failure(e)
         }
     }
@@ -113,10 +128,13 @@ class BackupService(
      * Gera um backup completo de todas as atividades e itens da lixeira usando SAF.
      */
     suspend fun createBackup(directoryUri: Uri): Result<String> = withContext(Dispatchers.IO) {
+        notificationService.showBackupInProgressNotification()
         try {
             val directory = DocumentFile.fromTreeUri(context, directoryUri)
             if (directory == null || !directory.canWrite()) {
-                return@withContext Result.failure(Exception("Permissão negada para escrever no diretório selecionado."))
+                val errorMessage = "Permissão negada para escrever no diretório selecionado."
+                notificationService.showBackupFailedNotification(errorMessage)
+                return@withContext Result.failure(Exception(errorMessage))
             }
 
             // Coletar dados para backup
@@ -134,7 +152,9 @@ class BackupService(
             // Criar arquivo de backup usando SAF
             val backupFile = directory.createFile("application/json", backupFileName)
             if (backupFile == null) {
-                return@withContext Result.failure(Exception("Falha ao criar arquivo de backup no diretório selecionado."))
+                val errorMessage = "Falha ao criar arquivo de backup no diretório selecionado."
+                notificationService.showBackupFailedNotification(errorMessage)
+                return@withContext Result.failure(Exception(errorMessage))
             }
 
             // Escrever no arquivo de backup
@@ -144,8 +164,10 @@ class BackupService(
                 }
             }
 
+            notificationService.showBackupCompleteNotification(backupFile.name ?: backupFileName)
             Result.success(backupFile.name ?: backupFileName)
         } catch (e: Exception) {
+            notificationService.showBackupFailedNotification(e.message ?: "Erro desconhecido")
             Result.failure(e)
         }
     }
@@ -344,17 +366,24 @@ class BackupService(
      * Restaura dados de um arquivo de backup usando SAF.
      */
     suspend fun restoreFromBackup(backupUri: Uri): Result<RestoreResult> = withContext(Dispatchers.IO) {
+        notificationService.showRestoreInProgressNotification()
         try {
             val content = context.contentResolver.openInputStream(backupUri)?.use { inputStream ->
                 inputStream.bufferedReader().use { it.readText() }
-            } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo de backup para restauração."))
+            } ?: run {
+                val errorMessage = "Não foi possível ler o arquivo de backup para restauração."
+                notificationService.showRestoreFailedNotification(errorMessage)
+                return@withContext Result.failure(Exception(errorMessage))
+            }
 
             val json = JSONObject(content)
 
             // Verificar versão do backup
             val backupVersion = json.optString("backupVersion", "1.0")
             if (backupVersion != "1.0") {
-                return@withContext Result.failure(Exception("Versão de backup não suportada: $backupVersion"))
+                val errorMessage = "Versão de backup não suportada: $backupVersion"
+                notificationService.showRestoreFailedNotification(errorMessage)
+                return@withContext Result.failure(Exception(errorMessage))
             }
 
             // Extrair atividades
@@ -407,9 +436,11 @@ class BackupService(
                 backupCreatedAt = json.optString("createdAt", "")
             )
 
+            notificationService.showRestoreCompleteNotification(result.backupFileName)
             Result.success(result)
 
         } catch (e: Exception) {
+            notificationService.showRestoreFailedNotification(e.message ?: "Erro desconhecido")
             Result.failure(e)
         }
     }
