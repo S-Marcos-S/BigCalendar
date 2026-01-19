@@ -198,7 +198,7 @@ private fun DayCell(
                     com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
                 }
                 day.isWeekend -> MaterialTheme.colorScheme.primary
-                day.isCurrentMonth -> MaterialTheme.colorScheme.onSurface
+                day.isCurrentMonth -> if (isSystemInDarkTheme() && !day.isWeekend) Color.White else MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             },
             modifier = Modifier.padding(top = 2.dp)
