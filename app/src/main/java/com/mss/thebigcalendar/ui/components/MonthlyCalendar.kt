@@ -150,6 +150,11 @@ private fun DayCell(
     verticalScale: Float = 1f
 ) {
     val context = LocalContext.current
+    val isDark = when (theme) {
+        com.mss.thebigcalendar.data.model.Theme.DARK -> true
+        com.mss.thebigcalendar.data.model.Theme.LIGHT -> false
+        com.mss.thebigcalendar.data.model.Theme.SYSTEM -> isSystemInDarkTheme()
+    }
     val cellModifier = modifier
         .padding(1.dp)
         // Ajuste correto: para verticalScale menor, a altura deve diminuir (modo compacto)
@@ -198,7 +203,7 @@ private fun DayCell(
                     com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
                 }
                 day.isWeekend -> MaterialTheme.colorScheme.primary
-                day.isCurrentMonth -> if (isSystemInDarkTheme() && !day.isWeekend) Color.White else MaterialTheme.colorScheme.onSurface
+                day.isCurrentMonth -> if (isDark) Color.White else Color.Black
                 else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             },
             modifier = Modifier.padding(top = 2.dp)
@@ -329,7 +334,7 @@ private fun DayCell(
                         Spacer(Modifier.width(3.dp))
                         Text(
                             text = task.title,
-                            color = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+                            color = if (isDark) Color.White else Color.Black,
                             fontSize = 9.sp,
                             lineHeight = 10.sp,
                             maxLines = allowedLinesForThisTask,

@@ -6,6 +6,12 @@
 
 Um aplicativo de calendário completo para Android.
 
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/Screenshot_20260119-141133_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141138_Big Calendar.png" width="260" height="480"> |
+| <img src="app/Screenshot_20260119-141146_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141159_Big Calendar.png" width="260" height="480"> |
+| <img src="app/Screenshot_20260119-141211_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141229_Big Calendar.png" width="260" height="480"> |
+
 ## ✨ Funcionalidades Principais
 
 ### 🗓️ **Calendário Visual**
