@@ -329,7 +329,7 @@ private fun DayCell(
                         Spacer(Modifier.width(3.dp))
                         Text(
                             text = task.title,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+                            color = if (isSystemInDarkTheme()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
                             fontSize = 9.sp,
                             lineHeight = 10.sp,
                             maxLines = allowedLinesForThisTask,
