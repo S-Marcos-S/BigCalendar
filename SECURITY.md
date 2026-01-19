@@ -17,6 +17,6 @@ Thank you for improving the security of our project. We appreciate your efforts 
 responsible disclosure and will make every effort to acknowledge your
 contributions.
 
-To report a security vulnerability, please email [smarcossdev@gmail.com](mailto:s.marcos.s@live.com) with a detailed description of the vulnerability.
+To report a security vulnerability, please email [smarcossdev@gmail.com](mailto:smarcossdev@gmail.com) with a detailed description of the vulnerability.
 
 You should receive a response within 48 hours. If you do not receive a response within that time, please follow up to ensure we received your original message.
