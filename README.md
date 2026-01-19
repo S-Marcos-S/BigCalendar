@@ -6,18 +6,16 @@
 
 Um aplicativo de calendário completo para Android.
 
-| | |
-|:-------------------------:|:-------------------------:|
-| <img src="app/Screenshot_20260119-141133_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141138_Big Calendar.png" width="260" height="480"> |
-| <img src="app/Screenshot_20260119-141146_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141159_Big Calendar.png" width="260" height="480"> |
-| <img src="app/Screenshot_20260119-141211_Big Calendar.png" width="260" height="480"> | <img src="app/Screenshot_20260119-141229_Big Calendar.png" width="260" height="480"> |
-
 ## ✨ Funcionalidades Principais
 
 ### 🗓️ **Calendário Visual**
 - Interface Material 3 com tema claro/escuro
 - Visualizações mensal e anual
 - Navegação lateral intuitiva
+
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/visual-calendar/Screenshot_20260119-141133_Big Calendar.png" width="260" height="480"> | <img src="app/visual-calendar/Screenshot_20260119-141138_Big Calendar.png" width="260" height="480"> |
 
 ### 📝 **Gestão de Atividades**
 - **Eventos**: Compromissos com horário
@@ -26,6 +24,10 @@ Um aplicativo de calendário completo para Android.
 - **Notas**: Anotações rápidas
 - Recorrência automática e categorização por cores
 
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/activity-management/Screenshot_20260119-142516_Big Calendar.png" width="260" height="480"> | <img src="app/activity-management/Screenshot_20260119-143700_Big Calendar.png" width="260" height="480"> |
+
 ### ⏰ **Sistema de Alarmes**
 - Alarmes independentes personalizáveis
 - Repetição semanal configurável
@@ -33,16 +35,28 @@ Um aplicativo de calendário completo para Android.
 - Snooze configurável (5-30 minutos)
 - Integração com Quick Settings do Android
 
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/alarm-system/Screenshot_20260119-143851_Big Calendar.png" width="260" height="480"> | <img src="app/alarm-system/Screenshot_20260119-143958_Big Calendar.png" width="260" height="480"> |
+
 ### 🔄 **Sincronização Google Calendar**
 - Sincronização bidirecional em tempo real
 - Autenticação segura via Google Sign-In
 - Backup automático dos dados
+
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/google-calendar-sync/Screenshot_20260119-141229_Big Calendar.png" width="260" height="480"> | <img src="app/google-calendar-sync/Screenshot_20260119-143310_Big Calendar.png" width="260" height="480"> |
 
 ### 🔍 **Busca e Organização**
 - Busca global em atividades e feriados
 - Filtros por tipo de atividade
 - Lixeira com recuperação de itens
 - Backup e restauração de dados
+
+| | |
+|:-------------------------:|:-------------------------:|
+| <img src="app/search-and-organization/Screenshot_20260119-142457_Big Calendar.png" width="260" height="480"> | <img src="app/search-and-organization/Screenshot_20260119-142532_Big Calendar.png" width="260" height="480"> |
 
 ## 🛠️ Tecnologias
 
