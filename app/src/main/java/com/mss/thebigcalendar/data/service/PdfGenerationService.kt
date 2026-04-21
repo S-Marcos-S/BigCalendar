@@ -53,7 +53,12 @@ class PdfGenerationService(private val context: Context) {
         jsonHolidays: List<JsonHoliday>,
         moonPhases: List<MoonPhase>
     ): File {
-        
+        // Redirecionar conforme o modelo selecionado
+        when (printOptions.selectedModel) {
+            "ideia1.jpeg" -> return generateIdea1Pdf(printOptions, activities, holidays, jsonHolidays, moonPhases)
+            "ideia2.jpeg" -> return generateIdea2Pdf(printOptions, activities, holidays, jsonHolidays, moonPhases)
+        }
+
         // Configurar página
         val pageSize = when (printOptions.pageSize) {
             CustomPageSize.A4 -> if (printOptions.orientation == PageOrientation.LANDSCAPE) 
@@ -912,6 +917,283 @@ class PdfGenerationService(private val context: Context) {
         
         // Limitar a 4 itens por dia para não sobrecarregar
         return dayContent.take(4)
+    }
+
+    private fun generateIdea1Pdf(
+        printOptions: PrintOptions,
+        activities: List<Activity>,
+        holidays: List<Holiday>,
+        jsonHolidays: List<JsonHoliday>,
+        moonPhases: List<MoonPhase>
+    ): File {
+        // Cores do Modelo
+        val peachColor = DeviceRgb(255, 235, 235) // Fundo geral suave
+        val accentPink = DeviceRgb(240, 178, 178) // Rosa do cabeçalho de metas e rodapé
+        val darkGrey = DeviceRgb(80, 80, 80)
+
+        // Configurar página (sempre paisagem para este modelo se basear na imagem)
+        val pageSize = if (printOptions.orientation == PageOrientation.LANDSCAPE)
+            PageSize.A4.rotate() else PageSize.A4
+
+        val downloadsDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
+        if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+        val fileName = "calendario_design1_${printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("yyyy_MM"))}.pdf"
+        val outputFile = File(downloadsDir, fileName)
+
+        val writer = PdfWriter(outputFile)
+        val pdf = PdfDocument(writer)
+        val document = Document(pdf, pageSize)
+        document.setMargins(20f, 20f, 20f, 20f)
+
+        // Fundo da página
+        pdf.addEventHandler(com.itextpdf.kernel.events.PdfDocumentEvent.END_PAGE) { event ->
+            val docEvent = event as com.itextpdf.kernel.events.PdfDocumentEvent
+            val page = docEvent.page
+            PdfCanvas(page.newContentStreamBefore(), page.resources, docEvent.document)
+                .saveState()
+                .setFillColor(peachColor)
+                .rectangle(page.pageSize.left.toDouble(), page.pageSize.bottom.toDouble(),
+                           page.pageSize.width.toDouble(), page.pageSize.height.toDouble())
+                .fill()
+                .restoreState()
+        }
+
+        try {
+            // Fontes
+            val scriptFontBytes = context.assets.open("fonts/Redressed.ttf").readBytes()
+            val scriptFont = PdfFontFactory.createFont(scriptFontBytes, com.itextpdf.io.font.PdfEncodings.IDENTITY_H, com.itextpdf.kernel.font.PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED)
+            val regularFont = PdfFontFactory.createFont()
+
+            // Layout principal: Coluna esquerda (25%) e Coluna direita (75%)
+            val mainTable = Table(UnitValue.createPercentArray(floatArrayOf(25f, 75f))).useAllAvailableWidth()
+                .setBorder(Border.NO_BORDER)
+
+            // COLUNA ESQUERDA
+            val leftCell = Cell().setBorder(Border.NO_BORDER).setPaddingRight(10f)
+
+            // Mês e Ano
+            val monthName = printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("MMMM", Locale("pt", "BR")))
+                .replaceFirstChar { it.uppercase() }
+            leftCell.add(Paragraph(monthName).setFont(scriptFont).setFontSize(45f).setFontColor(darkGrey).setMarginTop(10f))
+            leftCell.add(Paragraph(printOptions.selectedMonth.year.toString()).setFont(regularFont).setFontSize(14f).setFontColor(darkGrey).setMarginTop(-10f))
+
+            // Anotações
+            leftCell.add(Paragraph("Anotações").setFont(regularFont).setFontSize(12f).setBold().setMarginTop(30f).setFontColor(darkGrey))
+            for (i in 1..15) {
+                leftCell.add(Paragraph("..................................................").setFontSize(10f).setFontColor(ColorConstants.LIGHT_GRAY).setMarginTop(-2f))
+            }
+            mainTable.addCell(leftCell)
+
+            // COLUNA DIREITA
+            val rightCell = Cell().setBorder(Border.NO_BORDER)
+
+            // Metas Mensais
+            val goalsTable = Table(1).useAllAvailableWidth().setMarginBottom(10f)
+            val goalsHeader = Cell().add(Paragraph("METAS MENSAIS").setFontSize(10f).setBold().setFontColor(darkGrey))
+                .setBackgroundColor(accentPink)
+                .setBorder(Border.NO_BORDER)
+                .setPadding(5f)
+                .setPaddingLeft(15f)
+            goalsTable.addCell(goalsHeader)
+            rightCell.add(goalsTable)
+
+            // Grade do Calendário
+            val calendarTable = Table(UnitValue.createPercentArray(7)).useAllAvailableWidth()
+
+            // Dias da Semana
+            val weekDays = listOf("SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO")
+            weekDays.forEach { day ->
+                calendarTable.addCell(Cell().add(Paragraph(day).setFontSize(8f).setBold().setFontColor(darkGrey))
+                    .setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER))
+            }
+
+            // Lógica de dias (ajustado para começar na segunda conforme imagem)
+            val firstDayOfMonth = printOptions.selectedMonth.atDay(1)
+            // No iText/Java, 1=Segunda, 7=Domingo. Ajustamos o offset.
+            val dayOfWeekOffset = firstDayOfMonth.dayOfWeek.value - 1
+            val firstDateToShow = firstDayOfMonth.minusDays(dayOfWeekOffset.toLong())
+
+            for (i in 0..41) {
+                val currentDate = firstDateToShow.plusDays(i.toLong())
+                val isCurrentMonth = currentDate.month == printOptions.selectedMonth.month
+
+                val dayCell = Cell().setMinHeight(55f).setPadding(2f)
+
+                // Estilo da célula conforme imagem (fundo branco, bordas arredondadas simuladas com bordas normais finas)
+                dayCell.setBackgroundColor(ColorConstants.WHITE)
+                dayCell.setBorder(SolidBorder(ColorConstants.LIGHT_GRAY, 0.5f))
+
+                if (isCurrentMonth) {
+                    val dayHeader = Paragraph(currentDate.dayOfMonth.toString())
+                        .setFontSize(10f).setFontColor(accentPink).setTextAlignment(TextAlignment.RIGHT).setBold()
+                    dayCell.add(dayHeader)
+
+                    // Conteúdo do dia (feriados, etc)
+                    getDayContent(currentDate, activities, holidays, jsonHolidays, moonPhases, printOptions).forEach { content ->
+                        dayCell.add(Paragraph(content).setFontSize(6f).setFontColor(darkGrey).setMarginTop(0f))
+                    }
+                } else {
+                    dayCell.setBackgroundColor(peachColor)
+                }
+
+                calendarTable.addCell(dayCell)
+            }
+
+            rightCell.add(calendarTable)
+
+            // Rodapé rosa da grade (decorativo conforme imagem)
+            val footerPink = Table(1).useAllAvailableWidth().setMarginTop(-2f)
+            footerPink.addCell(Cell().setMinHeight(15f).setBackgroundColor(accentPink).setBorder(Border.NO_BORDER))
+            rightCell.add(footerPink)
+
+            mainTable.addCell(rightCell)
+            document.add(mainTable)
+
+        } finally {
+            document.close()
+        }
+        return outputFile
+    }
+
+    private fun generateIdea2Pdf(
+        printOptions: PrintOptions,
+        activities: List<Activity>,
+        holidays: List<Holiday>,
+        jsonHolidays: List<JsonHoliday>,
+        moonPhases: List<MoonPhase>
+    ): File {
+        // Cores do Modelo 2
+        val darkGreyBg = DeviceRgb(51, 51, 51) // #333333
+        val lightGreyLines = DeviceRgb(200, 200, 200)
+
+        val pageSize = if (printOptions.orientation == PageOrientation.LANDSCAPE)
+            PageSize.A4.rotate() else PageSize.A4
+
+        val downloadsDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
+        if (!downloadsDir.exists()) downloadsDir.mkdirs()
+
+        val fileName = "calendario_design2_${printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("yyyy_MM"))}.pdf"
+        val outputFile = File(downloadsDir, fileName)
+
+        val writer = PdfWriter(outputFile)
+        val pdf = PdfDocument(writer)
+        val document = Document(pdf, pageSize)
+        document.setMargins(15f, 15f, 15f, 15f)
+
+        // Fundo Escuro da Página
+        pdf.addEventHandler(com.itextpdf.kernel.events.PdfDocumentEvent.END_PAGE) { event ->
+            val docEvent = event as com.itextpdf.kernel.events.PdfDocumentEvent
+            val page = docEvent.page
+            PdfCanvas(page.newContentStreamBefore(), page.resources, docEvent.document)
+                .saveState()
+                .setFillColor(darkGreyBg)
+                .rectangle(page.pageSize.left.toDouble(), page.pageSize.bottom.toDouble(),
+                           page.pageSize.width.toDouble(), page.pageSize.height.toDouble())
+                .fill()
+                .restoreState()
+        }
+
+        try {
+            val regularFont = PdfFontFactory.createFont()
+            val boldFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD)
+
+            // Header: Mês e Ano no canto superior direito
+            val headerTable = Table(1).useAllAvailableWidth().setMarginBottom(10f)
+            val monthName = printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("MMMM", Locale("pt", "BR")))
+                .replaceFirstChar { it.uppercase() }
+            val year = printOptions.selectedMonth.year.toString()
+
+            headerTable.addCell(Cell().add(Paragraph("$monthName $year").setFont(regularFont).setFontSize(32f).setFontColor(ColorConstants.WHITE))
+                .setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT).setPaddingRight(20f))
+            document.add(headerTable)
+
+            // Layout principal: Grade (60%) e Anotações (40%)
+            val mainTable = Table(UnitValue.createPercentArray(floatArrayOf(60f, 40f))).useAllAvailableWidth()
+                .setBorder(Border.NO_BORDER)
+
+            // COLUNA ESQUERDA: Grade do Calendário
+            val leftCell = Cell().setBorder(Border.NO_BORDER).setPaddingRight(10f)
+            val calendarTable = Table(UnitValue.createPercentArray(7)).useAllAvailableWidth()
+
+            // Dias da Semana (D S T Q Q S S)
+            val weekDays = listOf("D", "S", "T", "Q", "Q", "S", "S")
+            weekDays.forEach { day ->
+                calendarTable.addCell(Cell().add(Paragraph(day).setFontSize(14f).setBold().setFontColor(ColorConstants.WHITE))
+                    .setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.CENTER).setPaddingBottom(5f))
+            }
+
+            // Lógica de dias (Domingo a Sábado)
+            val firstDayOfMonth = printOptions.selectedMonth.atDay(1)
+            val dayOfWeekOffset = firstDayOfMonth.dayOfWeek.value % 7
+            val firstDateToShow = firstDayOfMonth.minusDays(dayOfWeekOffset.toLong())
+
+            for (i in 0..41) {
+                val currentDate = firstDateToShow.plusDays(i.toLong())
+                val isCurrentMonth = currentDate.month == printOptions.selectedMonth.month
+
+                val dayCell = Cell().setMinHeight(45f).setPadding(3f)
+                dayCell.setBackgroundColor(ColorConstants.WHITE)
+                dayCell.setBorder(SolidBorder(darkGreyBg, 1f))
+
+                if (isCurrentMonth) {
+                    val dayHeader = Paragraph(currentDate.dayOfMonth.toString())
+                        .setFontSize(16f).setFontColor(darkGreyBg).setTextAlignment(TextAlignment.RIGHT)
+                    dayCell.add(dayHeader)
+
+                    // Feriados/Eventos compactos
+                    getDayContent(currentDate, activities, holidays, jsonHolidays, moonPhases, printOptions).take(2).forEach { content ->
+                        dayCell.add(Paragraph(content).setFontSize(6f).setFontColor(darkGreyBg).setMarginTop(0f))
+                    }
+                } else {
+                    dayCell.setBackgroundColor(darkGreyBg)
+                    dayCell.setBorder(Border.NO_BORDER)
+                }
+                calendarTable.addCell(dayCell)
+            }
+            leftCell.add(calendarTable)
+            mainTable.addCell(leftCell)
+
+            // COLUNA DIREITA: Anotações e Feriados
+            val rightCell = Cell().setBorder(Border.NO_BORDER)
+            val notesBox = Cell().setBackgroundColor(ColorConstants.WHITE).setPadding(15f).setMinHeight(335f)
+                .setBorder(Border.NO_BORDER)
+
+            notesBox.add(Paragraph("Anotações").setFont(regularFont).setFontSize(16f).setFontColor(darkGreyBg).setMarginBottom(10f))
+
+            // Linhas horizontais de anotações
+            for (i in 1..14) {
+                notesBox.add(Paragraph("").setBorderBottom(SolidBorder(lightGreyLines, 0.5f)).setMarginBottom(15f))
+            }
+
+            // Legenda de feriados no rodapé das anotações
+            val holidayList = mutableListOf<String>()
+            val currentMonthHolidays = holidays.filter {
+                try {
+                    java.time.LocalDate.parse(it.date).month == printOptions.selectedMonth.month
+                } catch(e: Exception) { false }
+            }
+            currentMonthHolidays.forEach { h ->
+                val date = java.time.LocalDate.parse(h.date)
+                holidayList.add("*${date.dayOfMonth} - ${h.name}")
+            }
+
+            if (holidayList.isNotEmpty()) {
+                notesBox.add(Paragraph("\nFeriados:").setFontSize(10f).setBold().setFontColor(darkGreyBg))
+                holidayList.forEach { h ->
+                    notesBox.add(Paragraph(h).setFontSize(8f).setFontColor(darkGreyBg))
+                }
+            }
+
+            rightCell.add(notesBox)
+            mainTable.addCell(rightCell)
+
+            document.add(mainTable)
+
+        } finally {
+            document.close()
+        }
+        return outputFile
     }
 
     private fun addNotesPage(document: Document, pdf: PdfDocument, pageSize: PageSize, titleFont: com.itextpdf.kernel.font.PdfFont) {

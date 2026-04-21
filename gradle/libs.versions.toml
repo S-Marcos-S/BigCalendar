@@ -23,6 +23,7 @@ material3 = "1.4.0"
 roomKtx = "2.8.3"
 firebaseCrashlyticsPlugin = "3.0.1"
 firebaseBom = "33.1.1"
+playServicesDrive = "17.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -55,6 +56,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics-ktx = { group = "com.google.firebase", name = "firebase-crashlytics-ktx" }
+play-services-drive = { group = "com.google.android.gms", name = "play-services-drive", version.ref = "playServicesDrive" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

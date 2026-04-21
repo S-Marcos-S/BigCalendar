@@ -717,6 +717,8 @@
     <string name="weekday_header_color_friday">Cor do cabeçalho (Sexta)</string>
     <string name="weekday_header_color_saturday">Cor do cabeçalho (Sábado)</string>
     <string name="invalid_date">Data inválida</string>
+    <string name="design_model">Modelo de Design</string>
+    <string name="no_design_model">Sem modelo</string>
 
     <!-- Auto Backup Settings -->
     <string name="auto_backup_settings_title">Backups Automáticos</string>

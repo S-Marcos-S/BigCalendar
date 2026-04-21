@@ -152,6 +152,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.play.services.drive)
 
     // Dependências de Teste
     testImplementation(libs.junit)
