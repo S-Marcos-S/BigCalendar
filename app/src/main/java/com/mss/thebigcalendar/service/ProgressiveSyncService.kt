@@ -33,25 +33,27 @@ class ProgressiveSyncService(
     
     /**
      * Sincronização progressiva: primeiro mês atual, depois resto do ano
+     * @param forceFullSync Se true, ignora o timestamp da última sincronização e busca tudo de novo
      */
     suspend fun syncProgressively(
         account: GoogleSignInAccount,
+        forceFullSync: Boolean = false,
         onProgressUpdate: (SyncProgress) -> Unit
     ): Result<Int> = withContext(Dispatchers.IO) {
         try {
             // Fase 1: Sincronização rápida (mês atual + próximo mês)
-            val quickSyncResult = performQuickSync(account, onProgressUpdate)
+            val quickSyncResult = performQuickSync(account, forceFullSync, onProgressUpdate)
             if (quickSyncResult.isFailure) {
                 return@withContext Result.failure(quickSyncResult.exceptionOrNull() ?: Exception("Falha na sincronização rápida"))
             }
             
             // Fase 2: Sincronização em background (resto do ano)
-            val backgroundSyncResult = performBackgroundSync(account, onProgressUpdate)
+            val backgroundSyncResult = performBackgroundSync(account, forceFullSync, onProgressUpdate)
             if (backgroundSyncResult.isFailure) {
                 Log.w(TAG, "⚠️ Sincronização em background falhou, mas sincronização rápida foi bem-sucedida")
             }
             
-            val totalEvents = quickSyncResult.getOrNull() ?: 0 + (backgroundSyncResult.getOrNull() ?: 0)
+            val totalEvents = (quickSyncResult.getOrNull() ?: 0) + (backgroundSyncResult.getOrNull() ?: 0)
             
             // Atualizar timestamp da última sincronização
             syncRepository.updateLastSyncTime(System.currentTimeMillis())
@@ -69,6 +71,7 @@ class ProgressiveSyncService(
      */
     private suspend fun performQuickSync(
         account: GoogleSignInAccount,
+        forceFullSync: Boolean,
         onProgressUpdate: (SyncProgress) -> Unit
     ): Result<Int> = withContext(Dispatchers.IO) {
         try {
@@ -85,8 +88,9 @@ class ProgressiveSyncService(
             val nextMonth = now.plusMonths(1)
             
             // Buscar eventos do mês atual e próximo com timeout
+            // Se forceFullSync for true, useIncrementalSync deve ser false
             val events = withTimeout(30.seconds) {
-                fetchEventsForPeriod(calendarService, now, nextMonth, useIncrementalSync = true)
+                fetchEventsForPeriod(calendarService, now, nextMonth, useIncrementalSync = !forceFullSync)
             }
             
             onProgressUpdate(SyncProgress(
@@ -120,14 +124,6 @@ class ProgressiveSyncService(
                 currentPhase = SyncPhase.QUICK_SYNC
             ))
             
-            onProgressUpdate(SyncProgress(
-                currentStep = "Sincronização rápida concluída",
-                progress = 70,
-                totalEvents = activities.size,
-                processedEvents = activities.size,
-                currentPhase = SyncPhase.QUICK_SYNC
-            ))
-            
             Result.success(activities.size)
             
         } catch (e: Exception) {
@@ -141,6 +137,7 @@ class ProgressiveSyncService(
      */
     private suspend fun performBackgroundSync(
         account: GoogleSignInAccount,
+        forceFullSync: Boolean,
         onProgressUpdate: (SyncProgress) -> Unit
     ): Result<Int> = withContext(Dispatchers.IO) {
         try {
@@ -157,8 +154,9 @@ class ProgressiveSyncService(
             val endOfYear = now.withMonth(12).withDayOfMonth(31)
             
             // Buscar eventos do resto do ano com timeout
+            // Se forceFullSync for true, useIncrementalSync deve ser false
             val events = withTimeout(60.seconds) {
-                fetchEventsForPeriod(calendarService, now.plusMonths(2), endOfYear, useIncrementalSync = true)
+                fetchEventsForPeriod(calendarService, now.plusMonths(2), endOfYear, useIncrementalSync = !forceFullSync)
             }
             
             onProgressUpdate(SyncProgress(
@@ -183,14 +181,6 @@ class ProgressiveSyncService(
             
             // Salvar todos os eventos de uma vez
             repository.saveAllActivities(activities)
-            
-            onProgressUpdate(SyncProgress(
-                currentStep = "Sincronização concluída",
-                progress = 100,
-                totalEvents = activities.size,
-                processedEvents = activities.size,
-                currentPhase = SyncPhase.BACKGROUND_SYNC
-            ))
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Sincronização concluída",
@@ -268,7 +258,9 @@ class ProgressiveSyncService(
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Erro ao buscar eventos para período", e)
-            emptyList()
+            // Em vez de retornar lista vazia e "fingir" sucesso, vamos propagar o erro
+            // para que a UI saiba que falhou.
+            throw e
         }
     }
     
@@ -312,7 +304,7 @@ class ProgressiveSyncService(
                     showInCalendar = true,
                     isFromGoogle = true,
                     excludedDates = emptyList(),
-                    wikipediaLink = null // Eventos do Google Calendar não têm links da Wikipedia
+                    wikipediaLink = null
                 )
                 
             } catch (e: Exception) {

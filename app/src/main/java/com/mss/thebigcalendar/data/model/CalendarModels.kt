@@ -106,6 +106,7 @@ data class CalendarUiState(
     val googleSignInAccount: GoogleSignInAccount? = null,
     val signInIntent: Intent? = null,
     val loginMessage: String? = null,
+    val isLoggingIn: Boolean = false,
     val isSyncing: Boolean = false,
     val syncErrorMessage: String? = null,
     val syncProgress: SyncProgress? = null,

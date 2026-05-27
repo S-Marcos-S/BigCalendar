@@ -230,6 +230,7 @@ class MainActivity : ComponentActivity() {
         ) {
                     if (showOnboarding) {
                         OnboardingFlow(
+                            isLoggingIn = uiState.isLoggingIn,
                             onComplete = {
                                 showOnboarding = false
                             },

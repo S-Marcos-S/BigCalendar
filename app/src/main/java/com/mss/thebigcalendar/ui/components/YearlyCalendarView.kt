@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,14 @@ fun YearlyCalendarView(
     onNavigateYear: (Int) -> Unit // Ação para mudar o ano (delta: -1 ou +1)
 ) {
     val months = Month.entries // Obtém todos os 12 meses do enum java.time.Month
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    
+    // Ajusta o número de colunas conforme a largura da tela
+    val columns = when {
+        screenWidth < 600.dp -> 2 // Telas estreitas (celulares em retrato)
+        else -> 3 // Telas largas (tablets ou landscape)
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -75,7 +84,7 @@ fun YearlyCalendarView(
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3), // 3 meses por linha
+            columns = GridCells.Fixed(columns),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)

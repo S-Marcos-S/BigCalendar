@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -144,6 +146,7 @@ class OnboardingManager(private val context: Context) {
  */
 @Composable
 fun WelcomeDialog(
+    isLoading: Boolean = false,
     onDismiss: () -> Unit,
     onGoogleSignIn: () -> Unit,
     onSkip: () -> Unit
@@ -206,6 +209,7 @@ fun WelcomeDialog(
                 // Botão conectar Google
                 Button(
                     onClick = onGoogleSignIn,
+                    enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
@@ -213,16 +217,25 @@ fun WelcomeDialog(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(
-                        text = stringResource(R.string.onboarding_connect_google),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.onboarding_connect_google),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
                 
                 // Botão pular
                 TextButton(
                     onClick = onSkip,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -336,6 +349,7 @@ fun NotificationPermissionDialog(
  */
 @Composable
 fun OnboardingFlow(
+    isLoggingIn: Boolean,
     onComplete: () -> Unit,
     onGoogleSignIn: () -> Unit,
     onRequestNotificationPermission: () -> Unit
@@ -345,6 +359,7 @@ fun OnboardingFlow(
 
     var showWelcome by remember { mutableStateOf(false) }
     var showNotificationPermission by remember { mutableStateOf(false) }
+    var wasLoggingIn by remember { mutableStateOf(false) }
     
     // Verificar se deve exibir onboarding
     LaunchedEffect(Unit) {
@@ -353,6 +368,20 @@ fun OnboardingFlow(
             onboardingManager.shouldShowNotificationPermission() -> showNotificationPermission = true
             else -> onComplete()
         }
+    }
+
+    // Monitorar finalização do login para avançar o onboarding
+    LaunchedEffect(isLoggingIn) {
+        if (wasLoggingIn && !isLoggingIn && showWelcome) {
+            showWelcome = false
+            onboardingManager.markWelcomeShown()
+            if (onboardingManager.shouldShowNotificationPermission()) {
+                showNotificationPermission = true
+            } else {
+                onComplete()
+            }
+        }
+        wasLoggingIn = isLoggingIn
     }
 
     // Tela de fundo com imagem - apenas quando há onboarding ativo
@@ -378,6 +407,7 @@ fun OnboardingFlow(
             // Janela de boas-vindas
             if (showWelcome) {
                 WelcomeDialog(
+                    isLoading = isLoggingIn,
                     onDismiss = {
                         showWelcome = false
                         onboardingManager.markWelcomeShown()
@@ -387,16 +417,7 @@ fun OnboardingFlow(
                             onComplete()
                         }
                     },
-                    onGoogleSignIn = {
-                        onGoogleSignIn()
-                        showWelcome = false
-                        onboardingManager.markWelcomeShown()
-                        if (onboardingManager.shouldShowNotificationPermission()) {
-                            showNotificationPermission = true
-                        } else {
-                            onComplete()
-                        }
-                    },
+                    onGoogleSignIn = onGoogleSignIn,
                     onSkip = {
                         showWelcome = false
                         onboardingManager.markWelcomeShown()

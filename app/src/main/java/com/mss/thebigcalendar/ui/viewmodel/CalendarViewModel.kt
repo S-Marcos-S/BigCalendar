@@ -351,7 +351,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun onSignInClicked() {
         val signInIntent = googleAuthService.getSignInIntent()
-        _uiState.update { it.copy(signInIntent = signInIntent) }
+        _uiState.update { it.copy(signInIntent = signInIntent, isLoggingIn = true) }
     }
 
     fun onSignInLaunched() {
@@ -363,6 +363,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         val loginSuccess = account != null
         _uiState.update { it.copy(
             googleSignInAccount = account,
+            isLoggingIn = false,
             loginMessage = if(loginSuccess) getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_success_message) else getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_failure_message)
         ) }
         if (loginSuccess) {
@@ -2829,32 +2830,32 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun onManualSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
-            performProgressiveSync(account)
+            // Sincronização manual sempre força uma busca completa para resolver problemas de inconsistência
+            performProgressiveSync(account, forceFullSync = true)
         }
     }
-    
-    private fun performProgressiveSync(account: GoogleSignInAccount) {
+
+    private fun performProgressiveSync(account: GoogleSignInAccount, forceFullSync: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null, syncProgress = null) }
-            
+
             try {
-                val result = progressiveSyncService.syncProgressively(account) { progress ->
+                val result = progressiveSyncService.syncProgressively(account, forceFullSync = forceFullSync) { progress ->
                     _uiState.update { it.copy(syncProgress = progress) }
                 }
-                
+
                 result.fold(
                     onSuccess = { totalEvents ->
                         _uiState.update { it.copy(
                             isSyncing = false,
                             lastGoogleSyncTime = System.currentTimeMillis()
                         ) }
-                        
+
                         // Agendar próxima sincronização automática
                         scheduleAutomaticSync()
-                        
+
                         updateAllDateDependentUI()
-                    },
-                    onFailure = { exception ->
+                    },                    onFailure = { exception ->
                         Log.e("CalendarViewModel", "❌ Erro na sincronização progressiva", exception)
                         _uiState.update { it.copy(
                             isSyncing = false,

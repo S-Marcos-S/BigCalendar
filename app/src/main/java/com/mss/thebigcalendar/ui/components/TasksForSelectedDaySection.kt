@@ -1,5 +1,6 @@
 package com.mss.thebigcalendar.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -137,94 +138,116 @@ fun TaskItem(
         }
     }
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .animateContentSize()
             .combinedClickable(
                 onClick = { onTaskLongClick(task.id) },
                 onLongClick = { onTaskClick(task) }
             )
-            .padding(start = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        val boxModifier = if (taskColor == Color.White) {
-            Modifier
-                .width(4.dp)
-                .height(36.dp)
-                .background(taskColor, shape = RoundedCornerShape(2.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp))
-        } else {
-            Modifier
-                .width(4.dp)
-                .height(36.dp)
-                .background(taskColor, shape = RoundedCornerShape(2.dp))
-        }
+        Row(
+            modifier = Modifier.padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val boxModifier = if (taskColor == Color.White) {
+                Modifier
+                    .width(4.dp)
+                    .height(36.dp)
+                    .background(taskColor, shape = RoundedCornerShape(2.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp))
+            } else {
+                Modifier
+                    .width(4.dp)
+                    .height(36.dp)
+                    .background(taskColor, shape = RoundedCornerShape(2.dp))
+            }
 
-        Box(modifier = boxModifier)
+            Box(modifier = boxModifier)
 
-        Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
-            Text(text = task.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            if (task.startTime != null) {
-                Text(
-                    text = stringResource(id = R.string.at_time, task.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
+                Text(text = task.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                if (task.startTime != null) {
+                    Text(
+                        text = stringResource(id = R.string.at_time, task.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
         if (deleteButtonVisible) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 8.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 16.dp, bottom = 12.dp)
             ) {
-                // Botão de concluir
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { onCompleteClick(task.id) }
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "OK",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                if (!task.description.isNullOrBlank()) {
+                    Text(
+                        text = task.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
                 }
                 
-                // Botão de deletar
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { onDeleteClick(task.id) }
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    // Botão de concluir
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .width(80.dp)
+                            .clickable { onCompleteClick(task.id) }
                     ) {
-                        Text(
-                            text = "DEL",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onError,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "OK",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    // Botão de deletar
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .width(80.dp)
+                            .clickable { onDeleteClick(task.id) }
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "DEL",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onError,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-
