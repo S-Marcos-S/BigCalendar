@@ -30,7 +30,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -61,8 +59,6 @@ fun TasksForSelectedDaySection(
     val dateFormat = stringResource(id = R.string.date_format_day_month)
     val dateFormatter = remember(dateFormat) { DateTimeFormatter.ofPattern(dateFormat, Locale.getDefault()) }
 
-    // NOTA: Não filtramos por showInCalendar aqui, pois queremos que todas as tarefas apareçam
-    // na seção de agendamentos, mesmo as que não são mostradas no calendário
     val visibleTasks = tasks
 
     Column(modifier = modifier) {
@@ -79,7 +75,6 @@ fun TasksForSelectedDaySection(
                 modifier = Modifier.weight(1f)
             )
             
-            // Botão para adicionar tarefa ou evento
             IconButton(
                 onClick = onAddTaskClick,
                 modifier = Modifier.size(32.dp)
@@ -128,16 +123,11 @@ fun TaskItem(
     modifier: Modifier = Modifier
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    val coroutineScope = rememberCoroutineScope()
 
-    // Quando o item for expandido, pedir para o sistema trazê-lo para a visualização
     LaunchedEffect(deleteButtonVisible) {
         if (deleteButtonVisible) {
-            // Pequeno delay para esperar a animação de expansão começar
-            delay(150)
-            coroutineScope.launch {
-                bringIntoViewRequester.bringIntoView()
-            }
+            delay(200)
+            bringIntoViewRequester.bringIntoView()
         }
     }
 
@@ -222,7 +212,6 @@ fun TaskItem(
                     horizontalArrangement = Arrangement.End,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Botão de concluir
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.primary,
@@ -246,7 +235,6 @@ fun TaskItem(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    // Botão de deletar
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.error,
