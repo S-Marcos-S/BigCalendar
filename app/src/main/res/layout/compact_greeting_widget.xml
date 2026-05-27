@@ -45,7 +45,7 @@
         android:layout_height="24dp"
         android:layout_gravity="end"
         android:src="@android:drawable/ic_popup_sync"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:background="@android:color/transparent"
         android:contentDescription="Refresh Widget"
         android:padding="4dp" />
 

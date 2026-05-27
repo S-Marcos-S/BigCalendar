@@ -68,11 +68,25 @@ class WidgetConfigurationActivity : ComponentActivity() {
             apply()
         }
 
-        val intent = Intent(this, com.mss.thebigcalendar.widget.GreetingWidgetProvider::class.java)
-        intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-        val ids = intArrayOf(appWidgetId)
-        intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-        sendBroadcast(intent)
+        // Identificar qual provedor de widget disparou a configuração
+        val appWidgetManager = AppWidgetManager.getInstance(this)
+        val appWidgetInfo = appWidgetManager.getAppWidgetInfo(appWidgetId)
+        val providerClass = appWidgetInfo?.provider?.className
+
+        if (providerClass != null) {
+            try {
+                val intent = Intent().setClassName(this.packageName, providerClass)
+                intent.action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                val ids = intArrayOf(appWidgetId)
+                intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                sendBroadcast(intent)
+            } catch (e: Exception) {
+                // Fallback caso falhe ao criar a intenção por classe
+                val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
+                intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))
+                sendBroadcast(intent)
+            }
+        }
 
         val resultValue = Intent()
         resultValue.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)

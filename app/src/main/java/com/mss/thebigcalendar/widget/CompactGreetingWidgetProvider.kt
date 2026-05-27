@@ -64,7 +64,9 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
         val dayMonthFormat = SimpleDateFormat("dd/MM", locale)
         val date = Date()
 
-        val dayOfWeekShort = dayOfWeekFormat.format(date).let { it.first().uppercase() + it.substring(1) }
+        val dayOfWeekShort = dayOfWeekFormat.format(date).let { 
+            if (it.isNotEmpty()) it.first().uppercase() + it.substring(1) else ""
+        }
         val dayMonth = dayMonthFormat.format(date)
 
         // Colocar o dia da semana primeiro e depois a data
