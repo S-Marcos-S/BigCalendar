@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.analytics.FirebaseAnalytics
 import com.mss.thebigcalendar.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,11 +24,12 @@ class TheBigCalendarApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Crashlytics based on user consent
+        // Initialize Crashlytics and Analytics based on user consent
         appScope.launch {
             val settingsRepository = SettingsRepository(this@TheBigCalendarApplication)
             val isEnabled = settingsRepository.isCrashlyticsEnabled.first()
             FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(isEnabled)
+            FirebaseAnalytics.getInstance(this@TheBigCalendarApplication).setAnalyticsCollectionEnabled(isEnabled)
         }
 
         // Agendar o RolloverWorker

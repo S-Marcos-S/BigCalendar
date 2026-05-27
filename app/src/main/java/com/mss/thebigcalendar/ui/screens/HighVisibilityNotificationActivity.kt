@@ -1,7 +1,6 @@
 package com.mss.thebigcalendar.ui.screens
 
 import android.annotation.SuppressLint
-import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -30,14 +29,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.service.HighVisibilityNotificationService
 import com.mss.thebigcalendar.service.NotificationService
 import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 

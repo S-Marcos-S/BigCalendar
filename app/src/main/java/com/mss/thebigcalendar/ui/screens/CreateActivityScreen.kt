@@ -3,11 +3,8 @@ package com.mss.thebigcalendar.ui.screens
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +42,8 @@ import com.mss.thebigcalendar.ui.components.NotificationSelector
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -263,12 +262,15 @@ fun CreateActivityScreen(
         ) {
             OutlinedTextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = { 
+                    title = if (it.isNotEmpty()) it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(java.util.Locale.getDefault()) else char.toString() } else it
+                },
                 label = { Text(stringResource(id = R.string.create_activity_modal_title)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -279,7 +281,8 @@ fun CreateActivityScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = false,
                 minLines = 3,
-                maxLines = 5
+                maxLines = 5,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
             )
             Spacer(modifier = Modifier.height(16.dp))
 
