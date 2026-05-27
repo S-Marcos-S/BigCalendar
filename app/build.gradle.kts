@@ -26,8 +26,8 @@ android {
         applicationId = "com.mss.thebigcalendar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "1.7.93"
+        versionCode = 37
+        versionName = "1.7.94"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -112,6 +112,7 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics.ktx)
+    implementation(libs.firebase.analytics)
 
     // Dependências de ViewModel e Ícones
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
