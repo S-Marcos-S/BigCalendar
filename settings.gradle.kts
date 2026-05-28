@@ -20,5 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "The Big Calendar"
+rootProject.name = "TheBigCalendar"
 include(":app")
+include(":shared")
+include(":desktop")
