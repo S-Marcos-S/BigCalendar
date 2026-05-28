@@ -5,10 +5,12 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.widget.RemoteViews
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
 import java.text.SimpleDateFormat
+import java.time.LocalTime
 import java.util.*
 
 class SimpleGreetingWidgetProvider : AppWidgetProvider() {
@@ -51,8 +53,17 @@ class SimpleGreetingWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.simple_greeting_widget)
 
         val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
-        val transparency = prefs.getFloat("transparency_$appWidgetId", 1.0f)
-        views.setFloat(R.id.widget_main_content, "setAlpha", transparency)
+        val transparency = prefs.getFloat("transparency_$appWidgetId", 0.0f)
+        
+        // Usar cor de fundo fixa para evitar problemas de tema no widget
+        val baseBackgroundColor = Color.parseColor("#202124")
+
+        // Calcular alpha (0.0 transparency = 255 alpha/opaco, 1.0 transparency = 0 alpha/transparente)
+        val alpha = ((1.0f - transparency) * 255).toInt().coerceIn(0, 255)
+        val colorWithAlpha = Color.argb(alpha, Color.red(baseBackgroundColor), Color.green(baseBackgroundColor), Color.blue(baseBackgroundColor))
+        
+        // Aplicar a cor de fundo ao widget_main_content
+        views.setInt(R.id.widget_main_content, "setBackgroundColor", colorWithAlpha)
 
         // Atualiza a saudação baseada no horário
         val greeting = getGreetingBasedOnTime(context)
@@ -97,7 +108,7 @@ class SimpleGreetingWidgetProvider : AppWidgetProvider() {
      * Obtém a saudação baseada no horário atual
      */
     private fun getGreetingBasedOnTime(context: Context): String {
-        val currentTime = java.time.LocalTime.now()
+        val currentTime = LocalTime.now()
         val hour = currentTime.hour
         
         return when (hour) {
@@ -131,4 +142,3 @@ class SimpleGreetingWidgetProvider : AppWidgetProvider() {
         return "$day de $month"
     }
 }
-

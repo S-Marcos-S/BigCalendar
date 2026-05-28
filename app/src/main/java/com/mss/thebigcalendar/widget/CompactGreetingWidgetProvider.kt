@@ -5,10 +5,23 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.util.Log
 import android.widget.RemoteViews
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
+import com.mss.thebigcalendar.data.model.Activity
+import com.mss.thebigcalendar.data.model.ActivityType
+import com.mss.thebigcalendar.data.repository.ActivityRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 class CompactGreetingWidgetProvider : AppWidgetProvider() {
@@ -51,8 +64,17 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.compact_greeting_widget)
 
         val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
-        val transparency = prefs.getFloat("transparency_$appWidgetId", 1.0f)
-        views.setFloat(R.id.widget_main_content, "setAlpha", transparency)
+        val transparency = prefs.getFloat("transparency_$appWidgetId", 0.0f)
+        
+        // Usar cor de fundo fixa para evitar problemas de tema no widget
+        val baseBackgroundColor = Color.parseColor("#202124")
+
+        // Calcular alpha (0.0 transparency = 255 alpha/opaco, 1.0 transparency = 0 alpha/transparente)
+        val alpha = ((1.0f - transparency) * 255).toInt().coerceIn(0, 255)
+        val colorWithAlpha = Color.argb(alpha, Color.red(baseBackgroundColor), Color.green(baseBackgroundColor), Color.blue(baseBackgroundColor))
+        
+        // Aplicar a cor de fundo ao widget_main_content
+        views.setInt(R.id.widget_main_content, "setBackgroundColor", colorWithAlpha)
 
         // Atualiza a saudação baseada no horário
         val greeting = getGreetingBasedOnTime(context)
@@ -72,6 +94,9 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
         // Colocar o dia da semana primeiro e depois a data
         val dayWithDate = "$dayOfWeekShort - $dayMonth"
         views.setTextViewText(R.id.compact_widget_day_of_week, dayWithDate)
+
+        // Resetar texto de tarefas
+        views.setTextViewText(R.id.compact_widget_tasks, context.getString(R.string.widget_loading_tasks_text))
 
         // Configurar clique para abrir o app
         val appIntent = Intent(context, MainActivity::class.java)
@@ -96,11 +121,11 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.compact_widget_refresh_button, refreshPendingIntent)
 
-        // Carregar tarefas do dia
-        loadTodayTasks(context, views, appWidgetManager, appWidgetId)
-
-        // Notify the AppWidgetManager to update the widget
+        // 1. Atualização IMEDIATA (fundo e data)
         appWidgetManager.updateAppWidget(appWidgetId, views)
+
+        // 2. Carregar tarefas em background
+        loadTodayTasks(context, views, appWidgetManager, appWidgetId)
     }
 
     private fun loadTodayTasks(
@@ -109,24 +134,51 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
-        // Carregar tarefas de forma simples e síncrona
-        try {
-            val tasksText = loadTasksSync(context)
-            views.setTextViewText(R.id.compact_widget_tasks, tasksText)
-        } catch (e: Exception) {
-            views.setTextViewText(R.id.compact_widget_tasks, context.getString(R.string.widget_no_tasks_today))
-        }
-    }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val repository = ActivityRepository(context)
+                val today = LocalDate.now()
+                
+                // Timeout para evitar travar o widget
+                val activities = withTimeoutOrNull(5000) {
+                    repository.activities.first()
+                } ?: emptyList()
+                
+                val todayTasks = activities.filter { activity ->
+                    try {
+                        val activityDate = LocalDate.parse(activity.date)
+                        
+                        // Verificar se é hoje (incluindo aniversários)
+                        if (activity.activityType == ActivityType.BIRTHDAY) {
+                            activityDate.month == today.month && activityDate.dayOfMonth == today.dayOfMonth
+                        } else {
+                            activityDate == today
+                        }
+                    } catch (e: Exception) {
+                        false
+                    }
+                }.sortedBy { it.startTime ?: LocalTime.MAX }
 
-    /**
-     * Carregamento síncrono de tarefas (simples e confiável)
-     */
-    private fun loadTasksSync(context: Context): String {
-        return try {
-            // Por enquanto, retornar texto simples para testar
-            context.getString(R.string.widget_test_tasks)
-        } catch (e: Exception) {
-            context.getString(R.string.widget_no_tasks_today)
+                val tasksText = if (todayTasks.isEmpty()) {
+                    context.getString(R.string.widget_no_tasks_today)
+                } else {
+                    todayTasks.take(3).joinToString("\n") { task ->
+                        val timePrefix = if (task.startTime != null) {
+                            "${task.startTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))} "
+                        } else ""
+                        "$timePrefix${task.title}"
+                    } + if (todayTasks.size > 3) "\n..." else ""
+                }
+
+                views.setTextViewText(R.id.compact_widget_tasks, tasksText)
+                
+                // Segunda atualização com tarefas
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                Log.e("CompactGreetingWidget", "Erro ao carregar tarefas", e)
+                views.setTextViewText(R.id.compact_widget_tasks, context.getString(R.string.widget_no_tasks_today))
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            }
         }
     }
 
@@ -134,7 +186,7 @@ class CompactGreetingWidgetProvider : AppWidgetProvider() {
      * Obtém a saudação baseada no horário atual
      */
     private fun getGreetingBasedOnTime(context: Context): String {
-        val currentTime = java.time.LocalTime.now()
+        val currentTime = LocalTime.now()
         val hour = currentTime.hour
         
         return when (hour) {

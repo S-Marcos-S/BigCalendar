@@ -6,6 +6,7 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity
+import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.service.RecurrenceService
 import kotlinx.coroutines.flow.firstOrNull
@@ -52,7 +53,7 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
                     }
 
                     if (!isExcluded) {
-                        if (activity.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                        if (activity.activityType == ActivityType.BIRTHDAY) {
                             if (activityDate.month == today.month && activityDate.dayOfMonth == today.dayOfMonth) {
                                 todayTasks.add(activity)
                             }
@@ -86,7 +87,7 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
 
             todayTasks.sortWith(
                 compareBy<Activity> { it.startTime ?: LocalTime.MAX }
-                    .thenByDescending { it.categoryColor?.toIntOrNull() ?: 0 }
+                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
             )
 
             val tomorrowTasks = if (isNightTime) {
@@ -102,7 +103,7 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
                         }
 
                         if (!isExcluded) {
-                            if (activity.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                            if (activity.activityType == ActivityType.BIRTHDAY) {
                                 if (activityDate.month == tomorrow.month && activityDate.dayOfMonth == tomorrow.dayOfMonth) {
                                     tomorrowTasksList.add(activity)
                                 }
@@ -168,7 +169,7 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
         val activity = activities[position]
         val views = RemoteViews(context.packageName, R.layout.event_list_widget_item)
 
-        val prefix = if (activity.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+        val prefix = if (activity.activityType == ActivityType.BIRTHDAY) {
             "🎂 " // Birthday icon
         } else if (activity.startTime != null) {
             "${activity.startTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))} "

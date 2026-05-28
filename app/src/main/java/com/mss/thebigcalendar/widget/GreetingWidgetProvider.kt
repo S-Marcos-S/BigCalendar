@@ -13,6 +13,8 @@ import android.widget.RemoteViews
 
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
+import com.mss.thebigcalendar.data.model.Activity
+import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.service.RecurrenceService
 import kotlinx.coroutines.CoroutineScope
@@ -46,25 +48,18 @@ class GreetingWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.greeting_widget)
 
         val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
-        val transparency = prefs.getFloat("transparency_$appWidgetId", 1.0f)
+        val transparency = prefs.getFloat("transparency_$appWidgetId", 0.0f) // 0.0 = opaco, 1.0 = transparente
         Log.d("GreetingWidgetProvider", "Updating widget $appWidgetId with transparency $transparency")
 
-        // Tentar resolver a cor de fundo com fallback seguro
-        val backgroundColor = try {
-            val typedValue = android.util.TypedValue()
-            if (context.theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)) {
-                typedValue.data
-            } else {
-                Color.BLACK // Fallback se o atributo não for encontrado
-            }
-        } catch (e: Exception) {
-            Color.BLACK // Fallback em caso de erro na resolução do tema
-        }
+        // Usar cor de fundo fixa para evitar problemas de tema no widget
+        val baseBackgroundColor = Color.parseColor("#202124") // Cinza escuro padrão
 
-        val alpha = (transparency * 255).toInt()
-        val colorWithAlpha = Color.argb(alpha, Color.red(backgroundColor), Color.green(backgroundColor), Color.blue(backgroundColor))
+        // Calcular alpha (0.0 transparency = 255 alpha/opaco, 1.0 transparency = 0 alpha/transparente)
+        val alpha = ((1.0f - transparency) * 255).toInt().coerceIn(0, 255)
+        val colorWithAlpha = Color.argb(alpha, Color.red(baseBackgroundColor), Color.green(baseBackgroundColor), Color.blue(baseBackgroundColor))
+        
+        // Aplicar a cor de fundo ao widget_root
         views.setInt(R.id.widget_root, "setBackgroundColor", colorWithAlpha)
-
 
         // Atualiza a saudação baseada no horário
         val greeting = getGreetingBasedOnTime(context)
@@ -85,6 +80,9 @@ class GreetingWidgetProvider : AppWidgetProvider() {
         val dayWithDate = "$dayOfWeekShort - $dayMonth"
         views.setTextViewText(R.id.widget_day_of_week, dayWithDate)
 
+        // Resetar o texto de tarefas para "Carregando..."
+        views.setTextViewText(R.id.widget_tasks, context.getString(R.string.widget_loading_tasks_text))
+
         // Configurar clique para abrir o app
         val intent = Intent(context, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -104,7 +102,10 @@ class GreetingWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshPendingIntent)
 
-        // Carregar tarefas do dia
+        // 1. Atualização IMEDIATA para mostrar fundo e data (síncrona)
+        appWidgetManager.updateAppWidget(appWidgetId, views)
+
+        // 2. Carregar tarefas do dia em background
         loadTodayTasks(context, views, appWidgetManager, appWidgetId)
     }
 
@@ -120,15 +121,15 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                 val today = LocalDate.now()
                 val tomorrow = today.plusDays(1)
                 val currentTime = LocalTime.now()
-                
-                // Verificar se está no período noturno (pôr do sol até meia-noite)
                 val isNightTime = isNightTime(currentTime)
                 
-                // Usamos first() em vez de collect() para evitar vazamento de memória e múltiplas atualizações
-                val activities = repository.activities.first()
+                // timeout de 5 segundos para não travar o widget
+                val activities = kotlinx.coroutines.withTimeoutOrNull(5000) {
+                    repository.activities.first()
+                } ?: emptyList()
                 
                 val recurrenceService = RecurrenceService()
-                val todayTasks = mutableListOf<com.mss.thebigcalendar.data.model.Activity>()
+                val todayTasks = mutableListOf<Activity>()
                 
                 activities.forEach { activity ->
                     try {
@@ -143,14 +144,14 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                         
                         if (!isExcluded) {
                             // Para aniversários, verificar se é o mesmo dia e mês (ignorando o ano)
-                            if (activity.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                            if (activity.activityType == ActivityType.BIRTHDAY) {
                                 if (activityDate.month == today.month && activityDate.dayOfMonth == today.dayOfMonth) {
                                     todayTasks.add(activity)
                                 }
                             } else {
                                 // Para atividades normais e recorrentes
                                 if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                                    // ✅ Verificar se a atividade base é para hoje
+                                    // Verificar se a atividade base é para hoje
                                     if (activityDate == today) {
                                         todayTasks.add(activity)
                                     }
@@ -177,15 +178,15 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                 
                 // Ordenar as tarefas de hoje por horário crescente
                 todayTasks.sortWith(
-                    compareBy<com.mss.thebigcalendar.data.model.Activity> { 
+                    compareBy<Activity> { 
                         it.startTime ?: LocalTime.MAX 
                     }.thenByDescending { 
-                        it.categoryColor?.toIntOrNull() ?: 0 
+                        it.categoryColor.toIntOrNull() ?: 0 
                     }
                 )
                 
                 val tomorrowTasks = if (isNightTime) {
-                    val tomorrowTasksList = mutableListOf<com.mss.thebigcalendar.data.model.Activity>()
+                    val tomorrowTasksList = mutableListOf<Activity>()
                     
                     activities.forEach { activity ->
                         try {
@@ -200,14 +201,14 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                             
                             if (!isExcluded) {
                                 // Para aniversários, verificar se é o mesmo dia e mês (ignorando o ano)
-                                if (activity.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                                if (activity.activityType == ActivityType.BIRTHDAY) {
                                     if (activityDate.month == tomorrow.month && activityDate.dayOfMonth == tomorrow.dayOfMonth) {
                                         tomorrowTasksList.add(activity)
                                     }
                                 } else {
                                     // Para atividades normais e recorrentes
                                     if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                                        // ✅ Verificar se a atividade base é para amanhã
+                                        // Verificar se a atividade base é para amanhã
                                         if (activityDate == tomorrow) {
                                             tomorrowTasksList.add(activity)
                                         }
@@ -234,10 +235,10 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                     
                     // Ordenar as tarefas de amanhã por horário crescente
                     tomorrowTasksList.sortWith(
-                        compareBy<com.mss.thebigcalendar.data.model.Activity> { 
+                        compareBy<Activity> { 
                             it.startTime ?: LocalTime.MAX 
                         }.thenByDescending { 
-                            it.categoryColor?.toIntOrNull() ?: 0 
+                            it.categoryColor.toIntOrNull() ?: 0 
                         }
                     )
                     
@@ -248,6 +249,8 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                 
                 val tasksText = buildTasksText(context, todayTasks, tomorrowTasks, isNightTime)
                 views.setTextViewText(R.id.widget_tasks, tasksText)
+                
+                // Segunda atualização com as tarefas prontas
                 appWidgetManager.updateAppWidget(appWidgetId, views)
 
             } catch (e: Exception) {
@@ -285,19 +288,19 @@ class GreetingWidgetProvider : AppWidgetProvider() {
      */
     private fun buildTasksText(
         context: Context,
-        todayTasks: List<com.mss.thebigcalendar.data.model.Activity>,
-        tomorrowTasks: List<com.mss.thebigcalendar.data.model.Activity>,
+        todayTasks: List<Activity>,
+        tomorrowTasks: List<Activity>,
         isNightTime: Boolean
     ): String {
         val maxTasksPerDay = 5 // Máximo de tarefas por dia para não sobrecarregar o widget
-        
+
         // Construir texto das tarefas de hoje
         val todayText = if (todayTasks.isEmpty()) {
             context.getString(R.string.widget_no_tasks_today)
         } else {
             val tasksToShow = todayTasks.take(maxTasksPerDay)
             tasksToShow.joinToString("\n") { task ->
-                val prefix = if (task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                val prefix = if (task.activityType == ActivityType.BIRTHDAY) {
                     "${context.getString(R.string.widget_birthday_icon)} " // Ícone de aniversário
                 } else if (task.startTime != null) {
                     "${task.startTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))} "
@@ -307,12 +310,12 @@ class GreetingWidgetProvider : AppWidgetProvider() {
                 "$prefix${task.title}"
             } + if (todayTasks.size > maxTasksPerDay) "\n..." else ""
         }
-        
+
         // Se não for noite ou não há tarefas de amanhã, retornar apenas as de hoje
         if (!isNightTime || tomorrowTasks.isEmpty()) {
             return todayText
         }
-        
+
         // Construir texto das tarefas de amanhã
         val tomorrowText = if (tomorrowTasks.isEmpty()) {
             ""
@@ -320,7 +323,7 @@ class GreetingWidgetProvider : AppWidgetProvider() {
             val tasksToShow = tomorrowTasks.take(maxTasksPerDay)
             val tomorrowHeader = "\n\n${context.getString(R.string.widget_tomorrow_header)}\n"
             val tasksList = tasksToShow.joinToString("\n") { task ->
-                val prefix = if (task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY) {
+                val prefix = if (task.activityType == ActivityType.BIRTHDAY) {
                     "${context.getString(R.string.widget_birthday_icon)} " // Ícone de aniversário
                 } else if (task.startTime != null) {
                     "${task.startTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))} "
@@ -331,19 +334,7 @@ class GreetingWidgetProvider : AppWidgetProvider() {
             }
             tomorrowHeader + tasksList + if (tomorrowTasks.size > maxTasksPerDay) "\n..." else ""
         }
-        
-        return todayText + tomorrowText
-    }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        
-        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val componentName = ComponentName(context, GreetingWidgetProvider::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            
-            onUpdate(context, appWidgetManager, appWidgetIds)
-        }
+        return todayText + tomorrowText
     }
 }

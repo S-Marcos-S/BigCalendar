@@ -42,10 +42,27 @@ class EventListWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.event_list_widget)
 
         val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
-        val transparency = prefs.getFloat("transparency_$appWidgetId", 1.0f)
-        views.setFloat(R.id.event_list_widget_layout, "setAlpha", transparency)
+        val transparency = prefs.getFloat("transparency_$appWidgetId", 0.0f)
 
-        // Set up the intent that points to the RemoteViewsService that will
+        // Tentar resolver a cor de fundo com fallback seguro
+        val backgroundColor = try {
+            val typedValue = android.util.TypedValue()
+            if (context.theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)) {
+                typedValue.data
+            } else {
+                android.graphics.Color.parseColor("#202124") // Fallback Dark Gray
+            }
+        } catch (e: Exception) {
+            android.graphics.Color.parseColor("#202124")
+        }
+
+        // Calcular alpha (0.0 transparency = 255 alpha/opaco, 1.0 transparency = 0 alpha/transparente)
+        val alpha = ((1.0f - transparency) * 255).toInt().coerceIn(0, 255)
+        val colorWithAlpha = android.graphics.Color.argb(alpha, android.graphics.Color.red(backgroundColor), android.graphics.Color.green(backgroundColor), android.graphics.Color.blue(backgroundColor))
+        views.setInt(R.id.event_list_widget_layout, "setBackgroundColor", colorWithAlpha)
+
+        // Set up the intent that points to the RemoteViewsService
+        // that will
         // provide the views for the ListView.
         val serviceIntent = Intent(context, EventListWidgetService::class.java).apply {
             putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)

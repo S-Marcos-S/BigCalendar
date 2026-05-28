@@ -64,7 +64,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
         val context = this
         val prefs = context.getSharedPreferences("widget_prefs", MODE_PRIVATE)
         with(prefs.edit()) {
-            putFloat("transparency_$appWidgetId", 1.0f - transparency)
+            putFloat("transparency_$appWidgetId", transparency)
             apply()
         }
 
@@ -111,7 +111,7 @@ fun WidgetConfigurationScreen(
     var transparency by remember(appWidgetId) {
         val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
         val storedTransparency = prefs.getFloat("transparency_$appWidgetId", 0f)
-        mutableStateOf(1.0f - storedTransparency)
+        mutableStateOf(storedTransparency)
     }
     
     Scaffold(
