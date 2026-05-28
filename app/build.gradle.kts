@@ -26,8 +26,8 @@ android {
         applicationId = "com.mss.thebigcalendar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.7.96"
+        versionCode = 40
+        versionName = "1.7.97"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
