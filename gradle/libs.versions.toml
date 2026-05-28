@@ -20,6 +20,7 @@ foundation = "1.9.1"
 ui = "1.9.1"
 uiText = "1.9.2"
 material3 = "1.4.0"
+slf4j = "1.7.36"
 roomKtx = "2.8.3"
 firebaseCrashlyticsPlugin = "3.0.1"
 firebaseBom = "33.1.1"
@@ -58,6 +59,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-crashlytics-ktx = { group = "com.google.firebase", name = "firebase-crashlytics-ktx" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics-ktx" }
 play-services-drive = { group = "com.google.android.gms", name = "play-services-drive", version.ref = "playServicesDrive" }
+slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

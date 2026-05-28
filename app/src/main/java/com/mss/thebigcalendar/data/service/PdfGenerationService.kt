@@ -67,8 +67,8 @@ class PdfGenerationService(private val context: Context) {
                 PageSize.A3.rotate() else PageSize.A3
         }
         
-        // Criar arquivo no diretório de Downloads
-        val downloadsDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
+        // Criar arquivo no diretório de Downloads (da própria aplicação para evitar problemas de permissão no Android 11+)
+        val downloadsDir = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
         if (!downloadsDir.exists()) {
             downloadsDir.mkdirs()
         }
@@ -935,7 +935,7 @@ class PdfGenerationService(private val context: Context) {
         val pageSize = if (printOptions.orientation == PageOrientation.LANDSCAPE)
             PageSize.A4.rotate() else PageSize.A4
 
-        val downloadsDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
+        val downloadsDir = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
         if (!downloadsDir.exists()) downloadsDir.mkdirs()
 
         val fileName = "calendario_design1_${printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("yyyy_MM"))}.pdf"
@@ -1070,7 +1070,7 @@ class PdfGenerationService(private val context: Context) {
         val pageSize = if (printOptions.orientation == PageOrientation.LANDSCAPE)
             PageSize.A4.rotate() else PageSize.A4
 
-        val downloadsDir = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
+        val downloadsDir = File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "TheBigCalendar")
         if (!downloadsDir.exists()) downloadsDir.mkdirs()
 
         val fileName = "calendario_design2_${printOptions.selectedMonth.format(DateTimeFormatter.ofPattern("yyyy_MM"))}.pdf"

@@ -150,6 +150,7 @@ dependencies {
     implementation("com.itextpdf:kernel:7.2.5")
     implementation("com.itextpdf:io:7.2.5")
     implementation("com.itextpdf:layout:7.2.5")
+    implementation(libs.slf4j.android)
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.room.ktx)
