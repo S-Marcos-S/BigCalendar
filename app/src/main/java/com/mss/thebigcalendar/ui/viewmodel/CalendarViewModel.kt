@@ -205,6 +205,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         
         // Registrar broadcast receiver para atualizações de notificações
         registerNotificationBroadcastReceiver()
+
+        // Observar mudanças no ano exibido para carregar os feriados nacionais dinamicamente
+        viewModelScope.launch {
+            var lastYear: Int? = null
+            _uiState.collect { state ->
+                val currentYear = state.displayedYearMonth.year
+                if (currentYear != lastYear) {
+                    lastYear = currentYear
+                    loadHolidaysForYear(currentYear)
+                }
+            }
+        }
     }
 
     fun setCalendarScale(scale: Float) {
@@ -816,19 +828,40 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun loadInitialHolidaysAndSaints() {
         viewModelScope.launch {
-            val nationalHolidaysList = holidayRepository.getNationalHolidays()
             val saintDaysList = withContext(Dispatchers.IO) { holidayRepository.getSaintDays() }
 
             _uiState.update { currentState ->
                 currentState.copy(
-                    nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) },
                     saintDays = saintDaysList.associateBy { it.date }
                 )
             }
             // Limpar cache quando os feriados mudam
             clearCalendarCache()
-            // Não chamar updateCalendarDays() aqui para evitar loop infinito
-            // updateCalendarDays() será chamado por updateAllDateDependentUI()
+        }
+    }
+
+    private var loadedHolidaysYear: Int? = null
+
+    private fun loadHolidaysForYear(year: Int) {
+        if (loadedHolidaysYear == year) return
+        loadedHolidaysYear = year
+        viewModelScope.launch {
+            try {
+                val nationalHolidaysList = mutableListOf<Holiday>().apply {
+                    addAll(holidayRepository.getNationalHolidays(year - 1))
+                    addAll(holidayRepository.getNationalHolidays(year))
+                    addAll(holidayRepository.getNationalHolidays(year + 1))
+                }
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) }
+                    )
+                }
+                clearCalendarCache()
+                updateAllDateDependentUI()
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao carregar feriados para o ano $year", e)
+            }
         }
     }
     

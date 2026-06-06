@@ -7,25 +7,52 @@ import com.mss.thebigcalendar.data.model.HolidayType
 import org.json.JSONArray
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.time.LocalDate
 
 class HolidayRepository(private val context: Context) {
 
-    fun getNationalHolidays(): List<Holiday> {
+    fun getNationalHolidays(year: Int): List<Holiday> {
+        val easter = getEasterDate(year)
+        val goodFriday = easter.minusDays(2)
+        val carnavalTuesday = easter.minusDays(47)
+        val carnavalMonday = easter.minusDays(48)
+        val corpusChristi = easter.plusDays(60)
+
+        val yearStr = year.toString()
+
         return listOf(
-            Holiday("Confraternização Universal", "2025-01-01", HolidayType.NATIONAL),
-            Holiday("Carnaval", "2025-03-03", HolidayType.NATIONAL),
-            Holiday("Carnaval", "2025-03-04", HolidayType.NATIONAL),
-            Holiday("Paixão de Cristo", "2025-04-18", HolidayType.NATIONAL),
-            Holiday("Tiradentes", "2025-04-21", HolidayType.NATIONAL),
-            Holiday("Dia do Trabalho", "2025-05-01", HolidayType.NATIONAL),
-            Holiday("Corpus Christi", "2025-06-19", HolidayType.NATIONAL),
-            Holiday("Independência do Brasil", "2025-09-07", HolidayType.NATIONAL),
-            Holiday("Nossa Sr.a Aparecida - Padroeira do Brasil", "2025-10-12", HolidayType.NATIONAL),
-            Holiday("Finados", "2025-11-02", HolidayType.NATIONAL),
-            Holiday("Proclamação da República", "2025-11-15", HolidayType.NATIONAL),
-            Holiday("Dia Nacional de Zumbi e da Consciência Negra", "2025-11-20", HolidayType.NATIONAL),
-            Holiday("Natal", "2025-12-25", HolidayType.NATIONAL)
+            Holiday("Confraternização Universal", "$yearStr-01-01", HolidayType.NATIONAL),
+            Holiday("Carnaval", carnavalMonday.toString(), HolidayType.NATIONAL),
+            Holiday("Carnaval", carnavalTuesday.toString(), HolidayType.NATIONAL),
+            Holiday("Paixão de Cristo", goodFriday.toString(), HolidayType.NATIONAL),
+            Holiday("Tiradentes", "$yearStr-04-21", HolidayType.NATIONAL),
+            Holiday("Dia do Trabalho", "$yearStr-05-01", HolidayType.NATIONAL),
+            Holiday("Corpus Christi", corpusChristi.toString(), HolidayType.NATIONAL),
+            Holiday("Independência do Brasil", "$yearStr-09-07", HolidayType.NATIONAL),
+            Holiday("Nossa Sr.a Aparecida - Padroeira do Brasil", "$yearStr-10-12", HolidayType.NATIONAL),
+            Holiday("Finados", "$yearStr-11-02", HolidayType.NATIONAL),
+            Holiday("Proclamação da República", "$yearStr-11-15", HolidayType.NATIONAL),
+            Holiday("Dia Nacional de Zumbi e da Consciência Negra", "$yearStr-11-20", HolidayType.NATIONAL),
+            Holiday("Natal", "$yearStr-12-25", HolidayType.NATIONAL)
         )
+    }
+
+    private fun getEasterDate(year: Int): LocalDate {
+        val a = year % 19
+        val b = year / 100
+        val c = year % 100
+        val d = b / 4
+        val e = b % 4
+        val f = (b + 8) / 25
+        val g = (b - f + 1) / 3
+        val h = (19 * a + b - d - g + 15) % 30
+        val i = c / 4
+        val k = c % 4
+        val l = (32 + 2 * e + 2 * i - h - k) % 7
+        val m = (a + 11 * h + 22 * l) / 451
+        val month = (h + l - 7 * m + 114) / 31
+        val day = ((h + l - 7 * m + 114) % 31) + 1
+        return LocalDate.of(year, month, day)
     }
 
     fun getSaintDays(): List<Holiday> {
