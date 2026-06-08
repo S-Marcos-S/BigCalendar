@@ -296,6 +296,7 @@ private fun DayCell(
 
 private fun resolveTaskColor(task: com.mss.thebigcalendar.data.model.Activity, fallback: Color): Color {
     return when {
+        task.activityType == ActivityType.COMMEMORATIVE -> Color(0xFFFF9800)
         task.activityType == ActivityType.BIRTHDAY -> Color(0xFFE91E63)
         task.activityType == ActivityType.NOTE -> Color(0xFF9C27B0)
         // No Linux, não temos acesso fácil aos recursos R.string do Android aqui sem abstração.

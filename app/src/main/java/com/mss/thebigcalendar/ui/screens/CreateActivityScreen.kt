@@ -177,6 +177,7 @@ fun CreateActivityScreen(
                                 ActivityType.EVENT -> stringResource(id = R.string.create_activity_modal_new_event)
                                 ActivityType.NOTE -> stringResource(id = R.string.create_activity_modal_new_note)
                                 ActivityType.BIRTHDAY -> stringResource(id = R.string.create_activity_modal_new_birthday)
+                                ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                             }
                         }
                         else -> {
@@ -185,6 +186,7 @@ fun CreateActivityScreen(
                                 ActivityType.EVENT -> stringResource(id = R.string.create_activity_modal_edit_event)
                                 ActivityType.NOTE -> stringResource(id = R.string.create_activity_modal_edit_note)
                                 ActivityType.BIRTHDAY -> stringResource(id = R.string.create_activity_modal_edit_birthday)
+                                ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                             }
                         }
                     }
@@ -306,6 +308,7 @@ fun CreateActivityScreen(
                             ActivityType.EVENT -> stringResource(id = R.string.event)
                             ActivityType.NOTE -> stringResource(id = R.string.note)
                             ActivityType.BIRTHDAY -> stringResource(id = R.string.birthday)
+                            ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                         }
                         Text(
                             text = text,

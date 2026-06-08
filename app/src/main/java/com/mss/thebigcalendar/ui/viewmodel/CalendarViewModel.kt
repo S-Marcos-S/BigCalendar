@@ -320,12 +320,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             append("${state.filterOptions.showTasks}_")
             append("${state.filterOptions.showNotes}_")
             append("${state.filterOptions.showBirthdays}_")
+            append("${state.filterOptions.showCommemorative}_")
             append("${state.showCompletedActivities}_")
             append("${state.showMoonPhases}_")
             append("${state.activities.size}_")
             append("${state.completedActivities.size}_")
             append("${state.nationalHolidays.size}_")
             append("${state.saintDays.size}_")
+            append("${state.commemorativeDates.size}_")
             append("${state.jsonHolidays.size}_")
             append("${state.jsonCalendars.size}")
         }
@@ -852,9 +854,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     addAll(holidayRepository.getNationalHolidays(year))
                     addAll(holidayRepository.getNationalHolidays(year + 1))
                 }
+                val commemorativeDatesList = mutableListOf<Holiday>().apply {
+                    addAll(holidayRepository.getCommemorativeDates(year - 1))
+                    addAll(holidayRepository.getCommemorativeDates(year))
+                    addAll(holidayRepository.getCommemorativeDates(year + 1))
+                }
                 _uiState.update { currentState ->
                     currentState.copy(
-                        nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) }
+                        nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) },
+                        commemorativeDates = commemorativeDatesList.associateBy { LocalDate.parse(it.date) }
                     )
                 }
                 clearCalendarCache()
@@ -889,7 +897,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 // Coletar todas as atividades para este dia (incluindo repetitivas)
                 val allActivitiesForThisDay = mutableListOf<Activity>()
                 
-                val tasksForThisDay = if (state.filterOptions.showTasks || state.filterOptions.showEvents || state.filterOptions.showNotes || state.filterOptions.showBirthdays) {
+                val tasksForThisDay = if (state.filterOptions.showTasks || state.filterOptions.showEvents || state.filterOptions.showNotes || state.filterOptions.showBirthdays || state.filterOptions.showCommemorative) {
                     
                     state.activities.forEach { activity ->
                         try {
@@ -964,6 +972,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                                 // Erro ao processar tarefa finalizada - continuar com outras
                             }
                         }
+                    }
+                    
+                    // Adicionar data comemorativa se aplicável
+                    val commemorativeDate = state.commemorativeDates[date]
+                    if (state.filterOptions.showCommemorative && commemorativeDate != null) {
+                        allActivitiesForThisDay.add(
+                            Activity(
+                                id = "commemorative_${commemorativeDate.name}_${date}",
+                                title = commemorativeDate.name,
+                                description = null,
+                                date = date.toString(),
+                                startTime = null,
+                                endTime = null,
+                                isAllDay = true,
+                                location = null,
+                                categoryColor = "#FF9800",
+                                activityType = ActivityType.COMMEMORATIVE,
+                                recurrenceRule = null
+                            )
+                        )
                     }
                     
                     // Incluir tarefas finalizadas na lista final se a opção estiver ativada
@@ -1132,6 +1160,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Erro ao processar tarefa finalizada - continuar com outras
                 }
             }
+        }
+
+        // Adicionar data comemorativa se aplicável
+        val commemorativeDate = state.commemorativeDates[state.selectedDate]
+        if (state.filterOptions.showCommemorative && commemorativeDate != null) {
+            allTasksForSelectedDate.add(
+                Activity(
+                    id = "commemorative_${commemorativeDate.name}_${state.selectedDate}",
+                    title = commemorativeDate.name,
+                    description = null,
+                    date = state.selectedDate.toString(),
+                    startTime = null,
+                    endTime = null,
+                    isAllDay = true,
+                    location = null,
+                    categoryColor = "#FF9800",
+                    activityType = ActivityType.COMMEMORATIVE,
+                    recurrenceRule = null
+                )
+            )
         }
         
         // Filtrar atividades JSON importadas da seção "Agendamentos para..."
@@ -1393,6 +1441,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         "showTasks" -> currentFilters.copy(showTasks = value)
                         "showNotes" -> currentFilters.copy(showNotes = value)
                         "showBirthdays" -> currentFilters.copy(showBirthdays = value)
+                        "showCommemorative" -> currentFilters.copy(showCommemorative = value)
                         else -> currentFilters
                     }
                     
@@ -2294,6 +2343,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             "showTasks" -> currentVisibility.copy(showTasks = !currentVisibility.showTasks)
             "showBirthdays" -> currentVisibility.copy(showBirthdays = !currentVisibility.showBirthdays)
             "showNotes" -> currentVisibility.copy(showNotes = !currentVisibility.showNotes)
+            "showCommemorative" -> currentVisibility.copy(showCommemorative = !currentVisibility.showCommemorative)
             "showCompletedActivities" -> currentVisibility.copy(showCompletedTasks = !currentVisibility.showCompletedTasks)
             "showMoonPhases" -> currentVisibility.copy(showMoonPhases = !currentVisibility.showMoonPhases)
             else -> currentVisibility
@@ -2307,6 +2357,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             "showTasks" -> !newVisibility.showTasks && currentVisibility.showTasks
             "showBirthdays" -> !newVisibility.showBirthdays && currentVisibility.showBirthdays
             "showNotes" -> !newVisibility.showNotes && currentVisibility.showNotes
+            "showCommemorative" -> !newVisibility.showCommemorative && currentVisibility.showCommemorative
             "showCompletedActivities" -> !newVisibility.showCompletedTasks && currentVisibility.showCompletedTasks
             "showMoonPhases" -> !newVisibility.showMoonPhases && currentVisibility.showMoonPhases
             else -> false

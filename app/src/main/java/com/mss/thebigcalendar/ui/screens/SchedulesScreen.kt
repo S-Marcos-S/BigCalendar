@@ -386,6 +386,7 @@ private fun getIconForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> Icons.Default.Assignment
     ActivityType.NOTE -> Icons.Default.Note
     ActivityType.BIRTHDAY -> Icons.Default.Cake
+    ActivityType.COMMEMORATIVE -> Icons.Default.Event
 }
 
 @Composable
@@ -394,6 +395,7 @@ private fun getTitleForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> stringResource(id = R.string.tasks_title)
     ActivityType.NOTE -> stringResource(id = R.string.notes_title)
     ActivityType.BIRTHDAY -> stringResource(id = R.string.birthdays_title)
+    ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
 }
 
 @Composable
@@ -402,6 +404,7 @@ private fun getCountTextForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> stringResource(id = R.string.tasks_count)
     ActivityType.NOTE -> stringResource(id = R.string.notes_count)
     ActivityType.BIRTHDAY -> stringResource(id = R.string.birthdays_count)
+    ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
 }
 
 private fun getColorForType(type: ActivityType) = when (type) {
@@ -409,4 +412,5 @@ private fun getColorForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Verde
     ActivityType.NOTE -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // Roxo
     ActivityType.BIRTHDAY -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Laranja
+    ActivityType.COMMEMORATIVE -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Laranja
 }

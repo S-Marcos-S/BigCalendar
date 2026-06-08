@@ -1026,6 +1026,7 @@ private fun getActivityTypeDisplayName(activityType: ActivityType): String {
         ActivityType.EVENT -> stringResource(id = R.string.activity_type_event)
         ActivityType.BIRTHDAY -> stringResource(id = R.string.activity_type_birthday)
         ActivityType.NOTE -> stringResource(id = R.string.activity_type_note)
+        ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
     }
 }
 

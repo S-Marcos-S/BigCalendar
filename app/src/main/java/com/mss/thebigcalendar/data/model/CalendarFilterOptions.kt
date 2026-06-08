@@ -6,5 +6,6 @@ data class CalendarFilterOptions(
     val showEvents: Boolean = true,
     val showTasks: Boolean = true,
     val showBirthdays: Boolean = true,
-    val showNotes: Boolean = true
+    val showNotes: Boolean = true,
+    val showCommemorative: Boolean = true
 )

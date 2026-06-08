@@ -35,6 +35,7 @@ fun Activity.toSearchResult(): SearchResult {
         ActivityType.TASK -> "Tarefa"
         ActivityType.BIRTHDAY -> "Aniversário"
         ActivityType.NOTE -> "Nota"
+        ActivityType.COMMEMORATIVE -> "Data Comemorativa"
     }
     
     return SearchResult(

@@ -295,6 +295,7 @@ class ActivityRepository(private val context: Context) {
             ActivityType.TASK -> ActivityTypeProto.TASK
             ActivityType.BIRTHDAY -> ActivityTypeProto.BIRTHDAY
             ActivityType.NOTE -> ActivityTypeProto.NOTE
+            ActivityType.COMMEMORATIVE -> ActivityTypeProto.EVENT
         }
     }
 

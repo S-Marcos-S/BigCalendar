@@ -17,7 +17,8 @@ enum class ActivityType {
     EVENT,
     TASK,
     NOTE,
-    BIRTHDAY
+    BIRTHDAY,
+    COMMEMORATIVE
 }
 
 enum class VisibilityLevel {

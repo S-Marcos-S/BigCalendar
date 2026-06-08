@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity
+import com.mss.thebigcalendar.data.model.ActivityType
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -156,6 +157,7 @@ fun TaskItem(
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .animateContentSize()
             .combinedClickable(
+                enabled = task.activityType != ActivityType.COMMEMORATIVE,
                 onClick = { onTaskLongClick(task.id) },
                 onLongClick = { onTaskClick(task) }
             )

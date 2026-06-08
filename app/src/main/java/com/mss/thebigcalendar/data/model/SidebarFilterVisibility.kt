@@ -8,6 +8,7 @@ data class SidebarFilterVisibility(
     val showBirthdays: Boolean = true,
     val showNotes: Boolean = true,
     val showCompletedTasks: Boolean = true,
-    val showMoonPhases: Boolean = true
+    val showMoonPhases: Boolean = true,
+    val showCommemorative: Boolean = true
 )
 

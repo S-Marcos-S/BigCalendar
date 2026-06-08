@@ -260,6 +260,7 @@ private fun DayCell(
             val taskDotColors = visibleTasks.map { task ->
                 remember(task.categoryColor, task.activityType) {
                     when {
+                        task.activityType == com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> Color(0xFFFF9800)
                         task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> Color(0xFFE91E63)
                         task.activityType == com.mss.thebigcalendar.data.model.ActivityType.NOTE -> Color(0xFF9C27B0)
                         task.categoryColor == context.getString(R.string.category_color_1) -> Color.White
@@ -304,6 +305,7 @@ private fun DayCell(
                     if (linesBudget <= 0) return@forEachIndexed
                     val taskColor = remember(task.categoryColor, task.activityType) {
                         when {
+                            task.activityType == com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> Color(0xFFFF9800) // Laranja para datas comemorativas
                             task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> Color(0xFFE91E63) // Rosa para aniversários
                             task.activityType == com.mss.thebigcalendar.data.model.ActivityType.NOTE -> Color(0xFF9C27B0) // Roxo para notas
                             task.categoryColor == context.getString(R.string.category_color_1) -> Color.White

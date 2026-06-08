@@ -77,17 +77,34 @@ class HolidayRepository(private val context: Context) {
         return saints
     }
 
-    fun getCommemorativeDates(): List<Holiday> {
-        return listOf(
-            Holiday("Dia Internacional da Mulher", "2024-03-08", HolidayType.COMMEMORATIVE),
-            Holiday("Dia das Mães", "2024-05-12", HolidayType.COMMEMORATIVE),
-            Holiday("Dia dos Namorados", "2024-06-12", HolidayType.COMMEMORATIVE),
-            Holiday("Dia do Amigo", "2024-07-20", HolidayType.COMMEMORATIVE),
-            Holiday("Dia dos Pais", "2024-08-11", HolidayType.COMMEMORATIVE),
-            Holiday("Dia das Crianças", "2024-10-12", HolidayType.COMMEMORATIVE),
+    fun getCommemorativeDates(year: Int): List<Holiday> {
+        val mothersDay = getMothersDay(year)
+        val fathersDay = getFathersDay(year)
+        val yearStr = year.toString()
 
-            Holiday("Dia Internacional da Mulher", "2025-03-08", HolidayType.COMMEMORATIVE),
-            Holiday("Dia das Mães", "2025-05-11", HolidayType.COMMEMORATIVE)
+        return listOf(
+            Holiday("Dia Internacional da Mulher", "$yearStr-03-08", HolidayType.COMMEMORATIVE),
+            Holiday("Dia das Mães", mothersDay.toString(), HolidayType.COMMEMORATIVE),
+            Holiday("Dia dos Namorados", "$yearStr-06-12", HolidayType.COMMEMORATIVE),
+            Holiday("Dia do Amigo", "$yearStr-07-20", HolidayType.COMMEMORATIVE),
+            Holiday("Dia dos Pais", fathersDay.toString(), HolidayType.COMMEMORATIVE),
+            Holiday("Dia das Crianças", "$yearStr-10-12", HolidayType.COMMEMORATIVE)
         )
+    }
+
+    private fun getMothersDay(year: Int): LocalDate {
+        var date = LocalDate.of(year, 5, 1)
+        while (date.dayOfWeek != java.time.DayOfWeek.SUNDAY) {
+            date = date.plusDays(1)
+        }
+        return date.plusDays(7)
+    }
+
+    private fun getFathersDay(year: Int): LocalDate {
+        var date = LocalDate.of(year, 8, 1)
+        while (date.dayOfWeek != java.time.DayOfWeek.SUNDAY) {
+            date = date.plusDays(1)
+        }
+        return date.plusDays(7)
     }
 }

@@ -62,7 +62,8 @@ private val filterItems = listOf(
     "showEvents" to R.string.events,
     "showTasks" to R.string.tasks,
     "showBirthdays" to R.string.birthday,
-    "showNotes" to R.string.note
+    "showNotes" to R.string.note,
+    "showCommemorative" to R.string.commemorative_dates
 )
 
 @Composable
@@ -210,6 +211,7 @@ fun Sidebar(
                     "showTasks" -> uiState.sidebarFilterVisibility.showTasks
                     "showBirthdays" -> uiState.sidebarFilterVisibility.showBirthdays
                     "showNotes" -> uiState.sidebarFilterVisibility.showNotes
+                    "showCommemorative" -> uiState.sidebarFilterVisibility.showCommemorative
                     else -> true
                 }
                 
@@ -221,6 +223,7 @@ fun Sidebar(
                         "showTasks" -> uiState.filterOptions.showTasks
                         "showBirthdays" -> uiState.filterOptions.showBirthdays
                         "showNotes" -> uiState.filterOptions.showNotes
+                        "showCommemorative" -> uiState.filterOptions.showCommemorative
                         else -> false
                     }
                     FilterCheckboxItem(

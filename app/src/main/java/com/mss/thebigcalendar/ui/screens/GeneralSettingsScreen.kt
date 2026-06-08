@@ -354,6 +354,7 @@ fun GeneralSettingsScreen(
                 "showTasks" to stringResource(id = R.string.tasks),
                 "showBirthdays" to stringResource(id = R.string.birthday),
                 "showNotes" to stringResource(id = R.string.note),
+                "showCommemorative" to stringResource(id = R.string.commemorative_dates),
                 "showCompletedActivities" to stringResource(id = R.string.completed_tasks_filter),
                 "showMoonPhases" to stringResource(id = R.string.moon_phases_filter)
             )
@@ -367,6 +368,7 @@ fun GeneralSettingsScreen(
                     "showTasks" -> !sidebarFilterVisibility.showTasks
                     "showBirthdays" -> !sidebarFilterVisibility.showBirthdays
                     "showNotes" -> !sidebarFilterVisibility.showNotes
+                    "showCommemorative" -> !sidebarFilterVisibility.showCommemorative
                     "showCompletedActivities" -> !sidebarFilterVisibility.showCompletedTasks
                     "showMoonPhases" -> !sidebarFilterVisibility.showMoonPhases
                     else -> false
@@ -391,6 +393,7 @@ fun GeneralSettingsScreen(
                         "showTasks" -> !sidebarFilterVisibility.showTasks
                         "showBirthdays" -> !sidebarFilterVisibility.showBirthdays
                         "showNotes" -> !sidebarFilterVisibility.showNotes
+                        "showCommemorative" -> !sidebarFilterVisibility.showCommemorative
                         "showCompletedActivities" -> !sidebarFilterVisibility.showCompletedTasks
                         "showMoonPhases" -> !sidebarFilterVisibility.showMoonPhases
                         else -> false

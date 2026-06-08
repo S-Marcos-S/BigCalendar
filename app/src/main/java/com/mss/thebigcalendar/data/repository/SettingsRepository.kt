@@ -30,6 +30,7 @@ class SettingsRepository(private val context: Context) {
         val SHOW_TASKS = booleanPreferencesKey("show_tasks")
         val SHOW_BIRTHDAYS = booleanPreferencesKey("show_birthdays")
         val SHOW_NOTES = booleanPreferencesKey("show_notes")
+        val SHOW_COMMEMORATIVE = booleanPreferencesKey("show_commemorative")
         val SHOW_MOON_PHASES = booleanPreferencesKey("show_moon_phases")
         val ANIMATION_TYPE = stringPreferencesKey("animation_type")
         val LANGUAGE = stringPreferencesKey("language")
@@ -47,6 +48,7 @@ class SettingsRepository(private val context: Context) {
         val SIDEBAR_SHOW_NOTES = booleanPreferencesKey("sidebar_show_notes")
         val SIDEBAR_SHOW_COMPLETED_TASKS = booleanPreferencesKey("sidebar_show_completed_tasks")
         val SIDEBAR_SHOW_MOON_PHASES = booleanPreferencesKey("sidebar_show_moon_phases")
+        val SIDEBAR_SHOW_COMMEMORATIVE = booleanPreferencesKey("sidebar_show_commemorative")
 
         // Auto Backup Settings
         val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
@@ -181,7 +183,8 @@ class SettingsRepository(private val context: Context) {
                 showBirthdays = preferences[PreferencesKeys.SIDEBAR_SHOW_BIRTHDAYS] ?: true,
                 showNotes = preferences[PreferencesKeys.SIDEBAR_SHOW_NOTES] ?: true,
                 showCompletedTasks = preferences[PreferencesKeys.SIDEBAR_SHOW_COMPLETED_TASKS] ?: true,
-                showMoonPhases = preferences[PreferencesKeys.SIDEBAR_SHOW_MOON_PHASES] ?: true
+                showMoonPhases = preferences[PreferencesKeys.SIDEBAR_SHOW_MOON_PHASES] ?: true,
+                showCommemorative = preferences[PreferencesKeys.SIDEBAR_SHOW_COMMEMORATIVE] ?: true
             )
         }
 
@@ -207,6 +210,7 @@ class SettingsRepository(private val context: Context) {
                 showTasks = preferences[PreferencesKeys.SHOW_TASKS] ?: true,
                 showBirthdays = preferences[PreferencesKeys.SHOW_BIRTHDAYS] ?: true,
                 showNotes = preferences[PreferencesKeys.SHOW_NOTES] ?: true,
+                showCommemorative = preferences[PreferencesKeys.SHOW_COMMEMORATIVE] ?: true
             )
         }
 
@@ -230,6 +234,7 @@ class SettingsRepository(private val context: Context) {
             preferences[PreferencesKeys.SHOW_TASKS] = filterOptions.showTasks
             preferences[PreferencesKeys.SHOW_BIRTHDAYS] = filterOptions.showBirthdays
             preferences[PreferencesKeys.SHOW_NOTES] = filterOptions.showNotes
+            preferences[PreferencesKeys.SHOW_COMMEMORATIVE] = filterOptions.showCommemorative
         }
     }
 
@@ -264,6 +269,7 @@ class SettingsRepository(private val context: Context) {
                 preferences[PreferencesKeys.SIDEBAR_SHOW_NOTES] = visibility.showNotes
                 preferences[PreferencesKeys.SIDEBAR_SHOW_COMPLETED_TASKS] = visibility.showCompletedTasks
                 preferences[PreferencesKeys.SIDEBAR_SHOW_MOON_PHASES] = visibility.showMoonPhases
+                preferences[PreferencesKeys.SIDEBAR_SHOW_COMMEMORATIVE] = visibility.showCommemorative
             }
         }
     

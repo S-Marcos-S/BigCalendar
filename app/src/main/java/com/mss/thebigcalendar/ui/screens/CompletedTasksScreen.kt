@@ -331,6 +331,7 @@ private fun getActivityTypeColor(activityType: ActivityType): Color {
         ActivityType.EVENT -> Color(0xFF2196F3) // Azul
         ActivityType.NOTE -> Color(0xFFFF9800) // Laranja
         ActivityType.BIRTHDAY -> Color(0xFFE91E63) // Rosa
+        ActivityType.COMMEMORATIVE -> Color(0xFFFF9800) // Laranja
     }
 }
 
@@ -340,6 +341,7 @@ private fun getActivityTypeIcon(activityType: ActivityType): androidx.compose.ui
         ActivityType.EVENT -> Icons.Filled.Event
         ActivityType.NOTE -> Icons.Filled.Note
         ActivityType.BIRTHDAY -> Icons.Filled.Cake
+        ActivityType.COMMEMORATIVE -> Icons.Filled.Event
     }
 }
 
