@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">dd/MM</string>
     <string name="appointments_for">Rendez-vous pour %1$s</string>
+    <string name="appointments_for_month">Rendez-vous pour le mois de %1$s</string>
+    <string name="select_a_day">Sélectionnez un jour sur le calendrier.</string>
     <string name="no_appointments">Rien de prévu.</string>
     <string name="no_tasks_or_events">Aucune tâche ou événement prévu.</string>
     <string name="at_time">À %1$s</string>

@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">MM/dd</string>
     <string name="appointments_for">%1$sの予定</string>
+    <string name="appointments_for_month">%1$sの予定</string>
+    <string name="select_a_day">カレンダーから日付を選択してください。</string>
     <string name="no_appointments">予定なし。</string>
     <string name="no_tasks_or_events">タスクやイベントの予定はありません。</string>
     <string name="at_time">%1$s</string>

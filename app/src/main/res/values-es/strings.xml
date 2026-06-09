@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">dd/MM</string>
     <string name="appointments_for">Agendamientos para %1$s</string>
+    <string name="appointments_for_month">Agendamientos para el mes de %1$s</string>
+    <string name="select_a_day">Seleccione un día en el calendario.</string>
     <string name="no_appointments">Nada agendado.</string>
     <string name="no_tasks_or_events">Ninguna tarea o evento agendado.</string>
     <string name="at_time">A las %1$s</string>

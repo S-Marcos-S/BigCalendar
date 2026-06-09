@@ -50,6 +50,7 @@ fun TasksForSelectedDaySection(
     modifier: Modifier = Modifier,
     tasks: List<Activity>,
     selectedDate: LocalDate,
+    displayedYearMonth: java.time.YearMonth,
     activityIdWithDeleteVisible: String?,
     onTaskClick: (Activity) -> Unit,
     onTaskLongClick: (String) -> Unit,
@@ -62,6 +63,17 @@ fun TasksForSelectedDaySection(
     val dateFormatter = remember(dateFormat) { DateTimeFormatter.ofPattern(dateFormat, Locale.getDefault()) }
 
     val visibleTasks = tasks
+    val isDifferentMonth = selectedDate.month != displayedYearMonth.month ||
+            selectedDate.year != displayedYearMonth.year
+
+    val headerText = if (isDifferentMonth) {
+        val monthName = displayedYearMonth.month
+            .getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault())
+            .replaceFirstChar { it.titlecase(Locale.getDefault()) }
+        stringResource(id = R.string.appointments_for_month, monthName)
+    } else {
+        stringResource(id = R.string.appointments_for, selectedDate.format(dateFormatter))
+    }
 
     Column(modifier = modifier) {
         Row(
@@ -71,7 +83,7 @@ fun TasksForSelectedDaySection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = stringResource(id = R.string.appointments_for, selectedDate.format(dateFormatter)),
+                text = headerText,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -90,7 +102,13 @@ fun TasksForSelectedDaySection(
             }
         }
 
-        if (visibleTasks.isEmpty()) {
+        if (isDifferentMonth) {
+            Text(
+                text = stringResource(id = R.string.select_a_day),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
+        } else if (visibleTasks.isEmpty()) {
             Text(
                 text = stringResource(id = R.string.no_appointments),
                 style = MaterialTheme.typography.bodyMedium,

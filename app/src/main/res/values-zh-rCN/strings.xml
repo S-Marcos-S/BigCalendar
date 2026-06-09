@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">MM/dd</string>
     <string name="appointments_for">%1$s的预约</string>
+    <string name="appointments_for_month">%1$s的预约</string>
+    <string name="select_a_day">请在日历上选择一个日期。</string>
     <string name="no_appointments">无安排。</string>
     <string name="no_tasks_or_events">没有安排任务或事件。</string>
     <string name="at_time">%1$s</string>

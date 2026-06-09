@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">dd.MM</string>
     <string name="appointments_for">Встречи на %1$s</string>
+    <string name="appointments_for_month">Встречи на месяц %1$s</string>
+    <string name="select_a_day">Выберите день на календаре.</string>
     <string name="no_appointments">Ничего не запланировано.</string>
     <string name="no_tasks_or_events">Нет запланированных задач или событий.</string>
     <string name="at_time">В %1$s</string>

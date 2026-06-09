@@ -632,6 +632,7 @@ fun MainCalendarView(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                             tasks = uiState.tasksForSelectedDate,
                             selectedDate = uiState.selectedDate,
+                            displayedYearMonth = uiState.displayedYearMonth,
                             activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
                             onTaskClick = {
                                 if (uiState.activityIdWithDeleteButtonVisible != null) {
