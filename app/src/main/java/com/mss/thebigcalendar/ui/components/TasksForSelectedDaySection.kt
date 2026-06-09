@@ -55,7 +55,8 @@ fun TasksForSelectedDaySection(
     onTaskLongClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
     onCompleteClick: (String) -> Unit,
-    onAddTaskClick: () -> Unit
+    onAddTaskClick: () -> Unit,
+    onCommemorativeClick: (Activity) -> Unit
 ) {
     val dateFormat = stringResource(id = R.string.date_format_day_month)
     val dateFormatter = remember(dateFormat) { DateTimeFormatter.ofPattern(dateFormat, Locale.getDefault()) }
@@ -104,7 +105,8 @@ fun TasksForSelectedDaySection(
                         onTaskClick = onTaskClick,
                         onTaskLongClick = onTaskLongClick,
                         onDeleteClick = onDeleteClick,
-                        onCompleteClick = onCompleteClick
+                        onCompleteClick = onCompleteClick,
+                        onCommemorativeClick = onCommemorativeClick
                     )
                 }
             }
@@ -121,6 +123,7 @@ fun TaskItem(
     onTaskLongClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
     onCompleteClick: (String) -> Unit,
+    onCommemorativeClick: (Activity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -157,9 +160,14 @@ fun TaskItem(
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .animateContentSize()
             .combinedClickable(
-                enabled = task.activityType != ActivityType.COMMEMORATIVE,
-                onClick = { onTaskLongClick(task.id) },
-                onLongClick = { onTaskClick(task) }
+                onClick = {
+                    if (task.activityType == ActivityType.COMMEMORATIVE) {
+                        onCommemorativeClick(task)
+                    } else {
+                        onTaskLongClick(task.id)
+                    }
+                },
+                onLongClick = if (task.activityType == ActivityType.COMMEMORATIVE) null else { { onTaskClick(task) } }
             )
     ) {
         Row(

@@ -541,7 +541,10 @@ fun MainCalendarView(
                         ) {
                             HolidaysForSelectedDaySection(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                holidays = uiState.holidaysForSelectedDate
+                                holidays = uiState.holidaysForSelectedDate,
+                                onHolidayClick = { holiday ->
+                                    viewModel.onSaintDayClick(holiday)
+                                }
                             )
                         }
                     }
@@ -624,7 +627,14 @@ fun MainCalendarView(
                             onTaskLongClick = { viewModel.onTaskLongPressed(it) },
                             onDeleteClick = { viewModel.requestDeleteActivity(it) },
                             onCompleteClick = { viewModel.markActivityAsCompleted(it) },
-                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) }
+                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
+                            onCommemorativeClick = { task ->
+                                val date = java.time.LocalDate.parse(task.date)
+                                val commemorativeHoliday = uiState.commemorativeDates[date]
+                                if (commemorativeHoliday != null) {
+                                    viewModel.onSaintDayClick(commemorativeHoliday)
+                                }
+                            }
                         )
                     }
                     
