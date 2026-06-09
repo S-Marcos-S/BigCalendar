@@ -104,6 +104,7 @@ data class CalendarUiState(
     val language: Language = Language.SYSTEM, // Idioma selecionado
     val holidaysForSelectedDate: List<Holiday> = emptyList(),
     val saintDaysForSelectedDate: List<Holiday> = emptyList(),
+    val commemorativeDatesForSelectedDate: List<Holiday> = emptyList(),
     val googleSignInAccount: GoogleSignInAccount? = null,
     val signInIntent: Intent? = null,
     val loginMessage: String? = null,

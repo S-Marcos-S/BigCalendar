@@ -1162,25 +1162,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Adicionar data comemorativa se aplicável
-        val commemorativeDate = state.commemorativeDates[state.selectedDate]
-        if (state.filterOptions.showCommemorative && commemorativeDate != null) {
-            allTasksForSelectedDate.add(
-                Activity(
-                    id = "commemorative_${commemorativeDate.name}_${state.selectedDate}",
-                    title = commemorativeDate.name,
-                    description = null,
-                    date = state.selectedDate.toString(),
-                    startTime = null,
-                    endTime = null,
-                    isAllDay = true,
-                    location = null,
-                    categoryColor = "#FF9800",
-                    activityType = ActivityType.COMMEMORATIVE,
-                    recurrenceRule = null
-                )
-            )
-        }
+
         
         // Filtrar atividades JSON importadas da seção "Agendamentos para..."
         val otherTasks = allTasksForSelectedDate
@@ -1230,6 +1212,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(saintDaysForSelectedDate = saints) }
     }
 
+    private fun updateCommemorativeDatesForSelectedDate() {
+        val state = _uiState.value
+        val commemoratives = if (state.filterOptions.showCommemorative) {
+            state.commemorativeDates[state.selectedDate]?.let { listOf(it) } ?: emptyList()
+        } else {
+            emptyList()
+        }
+        _uiState.update { it.copy(commemorativeDatesForSelectedDate = commemoratives) }
+    }
+
     private fun updateAllDateDependentUI() {
         // Cancelar atualização anterior se ainda estiver pendente
         updateJob?.cancel()
@@ -1241,6 +1233,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             updateTasksForSelectedDate()
             updateHolidaysForSelectedDate()
             updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
     }
 
@@ -1345,6 +1338,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
             updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
     }
     
@@ -1378,6 +1372,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
             updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
 
         if (shouldOpenModal) {

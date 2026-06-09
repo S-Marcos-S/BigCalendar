@@ -67,6 +67,7 @@ import com.mss.thebigcalendar.ui.components.CustomDrawer
 import com.mss.thebigcalendar.ui.components.DeleteConfirmationDialog
 import com.mss.thebigcalendar.ui.components.DeleteJsonCalendarDialog
 import com.mss.thebigcalendar.ui.components.HolidaysForSelectedDaySection
+import com.mss.thebigcalendar.ui.components.CommemorativeDatesForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.JsonCalendarForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.JsonHolidayInfoDialog
 import com.mss.thebigcalendar.ui.components.MonthlyCalendar
@@ -544,6 +545,21 @@ fun MainCalendarView(
                                 holidays = uiState.holidaysForSelectedDate,
                                 onHolidayClick = { holiday ->
                                     viewModel.onSaintDayClick(holiday)
+                                }
+                            )
+                        }
+                    }
+
+                    if (uiState.commemorativeDatesForSelectedDate.isNotEmpty()) {
+                        item(
+                            key = "commemoratives-${uiState.selectedDate}",
+                            contentType = "commemoratives"
+                        ) {
+                            CommemorativeDatesForSelectedDaySection(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                commemorativeDates = uiState.commemorativeDatesForSelectedDate,
+                                onCommemorativeClick = { commemorative ->
+                                    viewModel.onSaintDayClick(commemorative)
                                 }
                             )
                         }
