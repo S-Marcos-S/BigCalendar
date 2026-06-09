@@ -1041,6 +1041,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateTasksForSelectedDate() {
         val state = _uiState.value
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        
+        if (isDifferentMonth) {
+            _uiState.update { 
+                it.copy(
+                    tasksForSelectedDate = emptyList(),
+                    birthdaysForSelectedDate = emptyList(),
+                    notesForSelectedDate = emptyList()
+                ) 
+            }
+            updateJsonCalendarActivitiesForSelectedDate()
+            return
+        }
         
         // Separar aniversários das outras atividades usando cache
         val birthdays = if (state.filterOptions.showBirthdays) {
@@ -1193,7 +1207,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateHolidaysForSelectedDate() {
         val state = _uiState.value
-        val holidays = if (state.filterOptions.showHolidays) {
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        val holidays = if (state.filterOptions.showHolidays && !isDifferentMonth) {
             state.nationalHolidays[state.selectedDate]?.let { listOf(it) } ?: emptyList()
         } else {
             emptyList()
@@ -1203,7 +1219,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateSaintDaysForSelectedDate() {
         val state = _uiState.value
-        val saints = if (state.filterOptions.showSaintDays) {
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        val saints = if (state.filterOptions.showSaintDays && !isDifferentMonth) {
             val monthDay = state.selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"))
             state.saintDays[monthDay]?.let { listOf(it) } ?: emptyList()
         } else {
@@ -1214,7 +1232,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateCommemorativeDatesForSelectedDate() {
         val state = _uiState.value
-        val commemoratives = if (state.filterOptions.showCommemorative) {
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        val commemoratives = if (state.filterOptions.showCommemorative && !isDifferentMonth) {
             state.commemorativeDates[state.selectedDate]?.let { listOf(it) } ?: emptyList()
         } else {
             emptyList()
@@ -3599,6 +3619,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private fun updateJsonCalendarActivitiesForSelectedDate() {
         val currentState = _uiState.value
         val selectedDate = currentState.selectedDate
+        val isDifferentMonth = selectedDate.month != currentState.displayedYearMonth.month ||
+                selectedDate.year != currentState.displayedYearMonth.year
+        
+        if (isDifferentMonth) {
+            _uiState.update { 
+                it.copy(jsonCalendarActivitiesForSelectedDate = emptyMap()) 
+            }
+            return
+        }
         val visibleJsonCalendars = currentState.jsonCalendars.filter { it.isVisible }
         
         
