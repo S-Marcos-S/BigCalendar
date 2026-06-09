@@ -47,6 +47,9 @@ class NotificationService(
         const val ACTION_VIEW_ACTIVITY = "com.mss.thebigcalendar.VIEW_ACTIVITY"
         const val ACTION_SNOOZE = "com.mss.thebigcalendar.SNOOZE"
         const val ACTION_DISMISS = "com.mss.thebigcalendar.DISMISS"
+        const val ACTION_AUTO_BACKUP = "com.mss.thebigcalendar.ACTION_AUTO_BACKUP"
+        
+        const val AUTO_BACKUP_NOTIFICATION_ID = 9999
         
         // Extras para as notificações
         const val EXTRA_ACTIVITY_ID = "activity_id"
@@ -137,6 +140,21 @@ class NotificationService(
             .setContentText(error)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
         notificationManager.notify(1, builder.build())
+    }
+
+    fun showAutoBackupInProgressNotification() {
+        val builder = NotificationCompat.Builder(context, AUTO_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle("Realizando Backup Automático")
+            .setContentText("O backup agendado está sendo executado...")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setOngoing(true)
+            .setProgress(0, 0, true)
+        notificationManager.notify(AUTO_BACKUP_NOTIFICATION_ID, builder.build())
+    }
+
+    fun cancelAutoBackupInProgressNotification() {
+        notificationManager.cancel(AUTO_BACKUP_NOTIFICATION_ID)
     }
 
     fun showRestoreInProgressNotification() {
