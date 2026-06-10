@@ -34,8 +34,7 @@ import java.time.YearMonth
 fun YearlyCalendarView(
     modifier: Modifier = Modifier,
     year: Int,
-    onMonthClicked: (YearMonth) -> Unit, // Ação para quando um mês é clicado
-    onNavigateYear: (Int) -> Unit // Ação para mudar o ano (delta: -1 ou +1)
+    onMonthClicked: (YearMonth) -> Unit // Ação para quando um mês é clicado
 ) {
     val months = Month.entries // Obtém todos os 12 meses do enum java.time.Month
     val configuration = LocalConfiguration.current
@@ -51,38 +50,6 @@ fun YearlyCalendarView(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Cabeçalho de Navegação do Ano
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            IconButton(onClick = { onNavigateYear(-1) }) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack, 
-                    contentDescription = stringResource(id = R.string.previous_year_desc),
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            Text(
-                text = year.toString(),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-            IconButton(onClick = { onNavigateYear(1) }) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward, 
-                    contentDescription = stringResource(id = R.string.next_year_desc),
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),

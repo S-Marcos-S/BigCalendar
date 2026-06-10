@@ -694,10 +694,7 @@ fun MainCalendarView(
                 YearlyCalendarView(
                     modifier = Modifier.fillMaxSize(),
                     year = uiState.displayedYearMonth.year,
-                    onMonthClicked = { viewModel.onYearlyMonthClicked(it) },
-                    onNavigateYear = { delta ->
-                        if (delta > 0) viewModel.onNextYear() else viewModel.onPreviousYear()
-                    }
+                    onMonthClicked = { viewModel.onYearlyMonthClicked(it) }
                 )
             }
         }
