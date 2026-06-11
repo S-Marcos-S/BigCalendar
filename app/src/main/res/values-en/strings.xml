@@ -545,7 +545,7 @@
     <!-- GeneralSettingsScreen.kt -->
     <string name="sync_content_description">Sync</string>
     <string name="sync_progress_format">%1$d/%2$d events</string>
-    <string name="json_format_instructions">Create a JSON file with (Ex: Military Holidays in Brazil) in the year (Ex: 2025) following EXACTLY this format:</string>
+    <string name="json_format_instructions">Create a JSON file with (Ex: Military Holidays in Brazil) following EXACTLY this format:</string>
     <string name="json_structure_title">MANDATORY STRUCTURE:</string>
     <string name="json_example">{
   "name": "Name",

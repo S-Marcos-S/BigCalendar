@@ -1083,6 +1083,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             delay(100) // Debounce de 100ms
             updateCalendarDays()
             updateTasksForSelectedDate()
+            updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
             updateSaintDaysForSelectedDate()
             updateCommemorativeDatesForSelectedDate()
@@ -3455,17 +3456,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private fun updateJsonCalendarActivitiesForSelectedDate() {
         val currentState = _uiState.value
         val selectedDate = currentState.selectedDate
-        val isDifferentMonth = selectedDate.month != currentState.displayedYearMonth.month ||
-                selectedDate.year != currentState.displayedYearMonth.year
-        
-        if (isDifferentMonth) {
-            _uiState.update { 
-                it.copy(jsonCalendarActivitiesForSelectedDate = emptyMap()) 
-            }
-            return
-        }
         val visibleJsonCalendars = currentState.jsonCalendars.filter { it.isVisible }
-        
         
         val jsonCalendarActivities = mutableMapOf<String, List<Activity>>()
         
@@ -3474,7 +3465,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             // Filtrar atividades que pertencem a este calendário JSON
             val calendarActivities = currentState.activities.filter { activity ->
                 // Verificar se a atividade pertence a este calendário JSON
-                // Podemos identificar pela cor ou por algum campo específico
                 val activityColor = try {
                     Color(android.graphics.Color.parseColor(activity.categoryColor))
                 } catch (e: Exception) {
@@ -3488,9 +3478,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
                 
                 val isJsonImported = activity.location?.startsWith("JSON_IMPORTED_") == true
-                val dateMatches = activityDate?.isEqual(selectedDate) == true
+                val dateMatches = activityDate != null && 
+                                  activityDate.month == selectedDate.month && 
+                                  activityDate.dayOfMonth == selectedDate.dayOfMonth
                 val colorMatches = activityColor == jsonCalendar.color
-                
                 
                 dateMatches && colorMatches && activity.showInCalendar && isJsonImported
             }

@@ -574,7 +574,7 @@
     <!-- GeneralSettingsScreen.kt -->
     <string name="sync_content_description">Sincronizar</string>
     <string name="sync_progress_format">%1$d/%2$d eventos</string>
-    <string name="json_format_instructions">Crie um arquivo JSON com (Ex: Feriados Militares no Brasil) no ano de (Ex: 2025) seguindo EXATAMENTE este formato:</string>
+    <string name="json_format_instructions">Crie um arquivo JSON com (Ex: Feriados Militares no Brasil) seguindo EXATAMENTE este formato:</string>
     <string name="json_structure_title">ESTRUTURA OBRIGATÓRIA:</string>
     <string name="json_example">{
   "name": "Nome",
