@@ -228,17 +228,25 @@ fun AlarmsScreen(
         maxOf(state.collapsedFraction, state.overlappedFraction)
     } ?: 0f
 
-    val appBarContainerColor = lerp(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.surface,
-        transitionFraction
-    )
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
 
-    val appBarContentColor = lerp(
-        MaterialTheme.colorScheme.onPrimary,
-        MaterialTheme.colorScheme.onSurface,
-        transitionFraction
-    )
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
 
     val context = LocalContext.current
     val alarmRepository = remember { AlarmRepository(context) }
