@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.mss.thebigcalendar.data.model.Theme
 import com.mss.thebigcalendar.ui.onboarding.OnboardingFlow
 import com.mss.thebigcalendar.ui.screens.AlarmsScreen
@@ -231,6 +232,12 @@ class MainActivity : ComponentActivity() {
                     if (showOnboarding) {
                         OnboardingFlow(
                             isLoggingIn = uiState.isLoggingIn,
+                            googleSignInAccount = uiState.googleSignInAccount,
+                            cloudBackupFiles = uiState.cloudBackupFiles,
+                            isListingCloudBackups = uiState.isListingCloudBackups,
+                            isRestoring = uiState.isRestoring,
+                            onCheckBackup = { viewModel.listCloudBackups() },
+                            onRestoreBackup = { fileId, fileName -> viewModel.restoreFromCloudBackup(fileId, fileName) },
                             onComplete = {
                                 showOnboarding = false
                             },
