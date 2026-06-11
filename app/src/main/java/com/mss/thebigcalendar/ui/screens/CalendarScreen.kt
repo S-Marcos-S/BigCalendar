@@ -4,8 +4,10 @@ package com.mss.thebigcalendar.ui.screens
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,6 +15,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -533,22 +539,6 @@ fun MainCalendarView(
                                     color = MaterialTheme.colorScheme.outline,
                                     shape = MaterialTheme.shapes.medium
                                 )
-                                .pointerInput("calendar-resize") {
-                                    detectVerticalDragGestures(
-                                        onDragStart = { isZooming = true },
-                                        onVerticalDrag = { _, dragAmount ->
-                                            // Arrastar para baixo aumenta, para cima diminui
-                                            val delta = (dragAmount) / 800f
-                                            val newScale = (calendarScale + delta).coerceIn(0.5f, 1.22f)
-                                            if (newScale != calendarScale) {
-                                                calendarScale = newScale
-                                                viewModel.setCalendarScale(newScale)
-                                            }
-                                        },
-                                        onDragEnd = { isZooming = false },
-                                        onDragCancel = { isZooming = false }
-                                    )
-                                }
                                 .onGloballyPositioned { onCalendarReady(it) }
                         ) {
                             Column(
@@ -572,6 +562,40 @@ fun MainCalendarView(
                                     MoonPhasesComponent(
                                         yearMonth = uiState.displayedYearMonth,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 0.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(24.dp)
+                                        .pointerInput("calendar-resize") {
+                                            detectVerticalDragGestures(
+                                                onDragStart = { isZooming = true },
+                                                onVerticalDrag = { _, dragAmount ->
+                                                    // Arrastar para baixo aumenta, para cima diminui
+                                                    val delta = (dragAmount) / 800f
+                                                    val newScale = (calendarScale + delta).coerceIn(0.5f, 1.22f)
+                                                    if (newScale != calendarScale) {
+                                                        calendarScale = newScale
+                                                        viewModel.setCalendarScale(newScale)
+                                                    }
+                                                },
+                                                onDragEnd = { isZooming = false },
+                                                onDragCancel = { isZooming = false }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(40.dp)
+                                            .height(4.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.outlineVariant,
+                                                shape = CircleShape
+                                            )
                                     )
                                 }
                             }
