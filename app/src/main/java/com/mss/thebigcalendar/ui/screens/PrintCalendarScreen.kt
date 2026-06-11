@@ -46,6 +46,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -213,11 +216,40 @@ fun PrintCalendarScreen(
 
     val scrollState = rememberScrollState()
 
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = lerp(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.surface,
+        transitionFraction
+    )
+
+    val appBarContentColor = lerp(
+        MaterialTheme.colorScheme.onPrimary,
+        MaterialTheme.colorScheme.onSurface,
+        transitionFraction
+    )
+
     var isMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(id = R.string.print_calendar)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -230,7 +262,7 @@ fun PrintCalendarScreen(
                             Icon(
                                 Icons.Default.MoreVert,
                                 contentDescription = stringResource(id = R.string.more_options),
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = appBarContentColor
                             )
                         }
                         DropdownMenu(
@@ -251,9 +283,11 @@ fun PrintCalendarScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }

@@ -46,6 +46,9 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -86,6 +89,29 @@ fun BackupScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = lerp(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.surface,
+        transitionFraction
+    )
+
+    val appBarContentColor = lerp(
+        MaterialTheme.colorScheme.onPrimary,
+        MaterialTheme.colorScheme.onSurface,
+        transitionFraction
+    )
+
     var showRestoreConfirmation by remember { mutableStateOf<BackupInfo?>(null) }
     var showDeleteConfirmation by remember { mutableStateOf<BackupInfo?>(null) }
     var showCloudRestoreConfirmation by remember { mutableStateOf<DriveFile?>(null) }
@@ -121,8 +147,14 @@ fun BackupScreen(
     }
 
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.backup)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -130,9 +162,11 @@ fun BackupScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }

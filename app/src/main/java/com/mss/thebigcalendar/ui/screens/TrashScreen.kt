@@ -30,6 +30,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,9 +71,38 @@ fun TrashScreen(
         else -> deletedActivities.sortedByDescending { it.deletedAt }
     }
 
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = lerp(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.surface,
+        transitionFraction
+    )
+
+    val appBarContentColor = lerp(
+        MaterialTheme.colorScheme.onPrimary,
+        MaterialTheme.colorScheme.onSurface,
+        transitionFraction
+    )
+
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.trash)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -88,7 +120,7 @@ fun TrashScreen(
                         Icon(
                             Icons.Default.CheckCircle,
                             contentDescription = stringResource(R.string.completed_tasks_title),
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = appBarContentColor
                         )
                     }
                     
@@ -101,7 +133,7 @@ fun TrashScreen(
                                 Icon(
                                     Icons.Default.Sort,
                                     contentDescription = stringResource(R.string.sort_order),
-                                    tint = MaterialTheme.colorScheme.onPrimary
+                                    tint = appBarContentColor
                                 )
                             }
                             
@@ -134,15 +166,17 @@ fun TrashScreen(
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.empty_trash),
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = appBarContentColor
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }

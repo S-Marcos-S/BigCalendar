@@ -21,6 +21,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -54,6 +58,35 @@ fun CreateActivityScreen(
     isGoogleLoggedIn: Boolean
 ) {
     val currentActivity = activityToEdit ?: return
+
+    val viewModel = LocalViewModelStoreOwner.current?.let {
+        ViewModelProvider(it)[CalendarViewModel::class.java]
+    }
+    val uiState = viewModel?.uiState?.collectAsState()?.value
+    val unfixHeadersOnScroll = uiState?.unfixHeadersOnScroll ?: false
+
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = lerp(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.surface,
+        transitionFraction
+    )
+
+    val appBarContentColor = lerp(
+        MaterialTheme.colorScheme.onPrimary,
+        MaterialTheme.colorScheme.onSurface,
+        transitionFraction
+    )
 
     var title by remember(currentActivity.id) { mutableStateOf(currentActivity.title) }
     var description by remember(currentActivity.id) { mutableStateOf(currentActivity.description ?: "") }
@@ -167,8 +200,16 @@ fun CreateActivityScreen(
     }
 
     Scaffold(
+        modifier = Modifier.let { mod ->
+            if (scrollBehavior != null) {
+                mod.nestedScroll(scrollBehavior.nestedScrollConnection)
+            } else {
+                mod
+            }
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     val titleText = when {
                         currentActivity.id == "new" || currentActivity.id.isBlank() -> {
@@ -197,7 +238,7 @@ fun CreateActivityScreen(
                         Text(text = titleText)
                         Text(
                             text = selectedDate.format(formatter), // Usar selectedDate diretamente
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = appBarContentColor,
                             modifier = Modifier.clickable { showDatePicker = true }
                         )
                     }
@@ -242,16 +283,18 @@ fun CreateActivityScreen(
                         },
                         enabled = title.isNotBlank(),
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = appBarContentColor
                         )
                     ) {
                         Text(stringResource(id = R.string.create_activity_modal_save))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -605,7 +648,8 @@ fun CreateActivityScreen(
         AlarmScreen(
             onBackClick = { showAlarmScreen = false },
             onBackPressedDispatcher = backPressedDispatcher,
-            activityToEdit = currentActivity
+            activityToEdit = currentActivity,
+            unfixHeadersOnScroll = unfixHeadersOnScroll
         )
     }
     
@@ -615,11 +659,12 @@ fun CreateActivityScreen(
             onBackClick = { 
                 showCustomRepetitionScreen = false
             },
-            onSaveCustomRepetition = { customRule ->
-                customRepetitionRule = customRule
-                selectedRepetition = customRepetitionText
+            onSaveCustomRepetition = { rule ->
+                customRepetitionRule = rule
+                showCustomRepetitionScreen = false
             },
-            existingRule = if (selectedRepetition == customRepetitionText) customRepetitionRule else ""
+            existingRule = customRepetitionRule,
+            unfixHeadersOnScroll = unfixHeadersOnScroll
         )
     }
 }

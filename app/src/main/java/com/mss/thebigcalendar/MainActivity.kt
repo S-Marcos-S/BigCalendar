@@ -315,7 +315,8 @@ class MainActivity : ComponentActivity() {
                                 fileName = uiState.selectedJsonFileName,
                                 onBackClick = { viewModel.closeJsonConfigScreen() },
                                 onSaveClick = { title, color, jsonContent -> viewModel.saveJsonConfig(title, color, jsonContent) },
-                                onSelectFileClick = { openJsonFilePicker() }
+                                onSelectFileClick = { openJsonFilePicker() },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isCompletedTasksScreenOpen -> {
@@ -325,7 +326,8 @@ class MainActivity : ComponentActivity() {
                                 onBackPressedDispatcher = onBackPressedDispatcher,
                                 onDeleteCompletedActivity = { activityId ->
                                     viewModel.deleteCompletedActivity(activityId)
-                                }
+                                },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isPrintCalendarScreenOpen -> {
@@ -360,14 +362,16 @@ class MainActivity : ComponentActivity() {
                                 lastYearData = viewModel.getLastYearCompletedTasksData(),
                                 currentMonth = uiState.displayedYearMonth, // Added this line
                                 onNavigateToCompletedTasks = { viewModel.onCompletedTasksClick() },
-                                onBackPressedDispatcher = onBackPressedDispatcher
+                                onBackPressedDispatcher = onBackPressedDispatcher,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isNotesScreenOpen -> {
                             SchedulesScreen(
                                 onBackClick = { viewModel.closeNotesScreen() },
                                 activities = uiState.activities,
-                                onBackPressedDispatcher = onBackPressedDispatcher
+                                onBackPressedDispatcher = onBackPressedDispatcher,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isAlarmsScreenOpen -> {
@@ -405,7 +409,8 @@ class MainActivity : ComponentActivity() {
                                                                 },
                                                                 onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
                                                                 isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                                                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled
+                                                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
+                                                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                                                             )
                                                         }
                                                         uiState.isCalendarVisualizationSettingsOpen -> {

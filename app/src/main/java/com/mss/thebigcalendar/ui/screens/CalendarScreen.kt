@@ -38,6 +38,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -201,10 +204,40 @@ fun CalendarScreen(
                 Modifier
             }
 
+            val topAppBarState = rememberTopAppBarState()
+            val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+                TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+            } else {
+                null
+            }
+
+            val transitionFraction = scrollBehavior?.state?.let { state ->
+                maxOf(state.collapsedFraction, state.overlappedFraction)
+            } ?: 0f
+
+            val appBarContainerColor = lerp(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.surface,
+                transitionFraction
+            )
+
+            val appBarContentColor = lerp(
+                MaterialTheme.colorScheme.onPrimary,
+                MaterialTheme.colorScheme.onSurface,
+                transitionFraction
+            )
+
             Scaffold(
-                modifier = scaffoldModifier,
+                modifier = scaffoldModifier.let { modifier ->
+                    if (scrollBehavior != null) {
+                        modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    } else {
+                        modifier
+                    }
+                },
                 topBar = {
                     TopAppBar(
+                            scrollBehavior = scrollBehavior,
                             title = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     when (uiState.viewMode) {
@@ -227,7 +260,7 @@ fun CalendarScreen(
                                                 Text(
                                                     text = uiState.displayedYearMonth.year.toString(),
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                    color = appBarContentColor
                                                 )
                                             }
                                         }
@@ -249,7 +282,7 @@ fun CalendarScreen(
                                     Icon(
                                         Icons.Default.Menu,
                                         stringResource(id = R.string.open_close_menu),
-                                        tint = MaterialTheme.colorScheme.onPrimary
+                                        tint = appBarContentColor
                                     )
                                 }
                             },
@@ -269,7 +302,7 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Default.Search,
                                             stringResource(id = R.string.search),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -281,7 +314,7 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Default.Today,
                                             contentDescription = stringResource(id = R.string.go_to_today),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -293,7 +326,7 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Filled.BarChart,
                                             stringResource(id = R.string.chart),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -304,7 +337,7 @@ fun CalendarScreen(
                                             Icons.Filled.Add,
                                             contentDescription = stringResource(id = R.string.add_appointment),
                                             modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -317,7 +350,7 @@ fun CalendarScreen(
                                             Icons.Default.Delete,
                                             contentDescription = stringResource(id = R.string.trash),
                                             modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                 } else {
@@ -325,22 +358,24 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.AutoMirrored.Filled.ArrowBack,
                                             stringResource(id = R.string.previous),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(onClick = nextAction) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.ArrowForward,
                                             stringResource(id = R.string.next),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                                containerColor = appBarContainerColor,
+                                scrolledContainerColor = appBarContainerColor,
+                                titleContentColor = appBarContentColor,
+                                navigationIconContentColor = appBarContentColor,
+                                actionIconContentColor = appBarContentColor
                             )
                         )
                 },

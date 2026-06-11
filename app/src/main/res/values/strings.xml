@@ -652,6 +652,8 @@
     <string name="primary_color">Cor primária</string>
     <string name="primary_color_desc">Escolha a cor primária do aplicativo</string>
     <string name="changes_saved_automatically">As alterações são salvas automaticamente.</string>
+    <string name="unfix_headers_on_scroll">Desfixar cabeçalho ao rolar</string>
+    <string name="unfix_headers_on_scroll_desc">O cabeçalho rolará junto com o conteúdo da tela</string>
 
     <!-- MonthlyCalendar.kt - Category Colors -->
     <string name="category_color_1">1</string>

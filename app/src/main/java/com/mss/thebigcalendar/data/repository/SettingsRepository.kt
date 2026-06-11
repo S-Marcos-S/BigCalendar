@@ -38,6 +38,7 @@ class SettingsRepository(private val context: Context) {
         val HIDE_OTHER_MONTH_DAYS = booleanPreferencesKey("hide_other_month_days")
         val PURE_BLACK_THEME = booleanPreferencesKey("pure_black_theme")
         val PRIMARY_COLOR = stringPreferencesKey("primary_color")
+        val UNFIX_HEADERS_ON_SCROLL = booleanPreferencesKey("unfix_headers_on_scroll")
         
         // Sidebar filter visibility
         val SIDEBAR_SHOW_HOLIDAYS = booleanPreferencesKey("sidebar_show_holidays")
@@ -155,6 +156,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPureBlackTheme(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[PreferencesKeys.PURE_BLACK_THEME] = enabled
+        }
+    }
+
+    val unfixHeadersOnScroll: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.UNFIX_HEADERS_ON_SCROLL] ?: false
+        }
+
+    suspend fun setUnfixHeadersOnScroll(unfix: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.UNFIX_HEADERS_ON_SCROLL] = unfix
         }
     }
 

@@ -46,6 +46,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -212,6 +216,30 @@ fun AlarmsScreen(
     viewModel: CalendarViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = lerp(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.surface,
+        transitionFraction
+    )
+
+    val appBarContentColor = lerp(
+        MaterialTheme.colorScheme.onPrimary,
+        MaterialTheme.colorScheme.onSurface,
+        transitionFraction
+    )
+
     val context = LocalContext.current
     val alarmRepository = remember { AlarmRepository(context) }
     val alarmService = remember { 
@@ -557,8 +585,14 @@ fun AlarmsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            modifier = if (scrollBehavior != null) {
+                Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+            } else {
+                Modifier
+            },
             topBar = {
                 TopAppBar(
+                    scrollBehavior = scrollBehavior,
                     title = { 
                         Text(
                             text = stringResource(id = R.string.alarms),
@@ -585,10 +619,11 @@ fun AlarmsScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = appBarContainerColor,
+                        scrolledContainerColor = appBarContainerColor,
+                        titleContentColor = appBarContentColor,
+                        navigationIconContentColor = appBarContentColor,
+                        actionIconContentColor = appBarContentColor
                     )
                 )
             },
@@ -795,7 +830,8 @@ fun AlarmsScreen(
             },
             onBackPressedDispatcher = null,
             activityToEdit = null,
-            alarmToEdit = alarmToEdit
+            alarmToEdit = alarmToEdit,
+            unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
         )
     }
     
@@ -839,7 +875,8 @@ fun AlarmsScreen(
             },
             onBackPressedDispatcher = null,
             activityToEdit = null,
-            alarmToEdit = null // null para indicar que é uma criação, não edição
+            alarmToEdit = null, // null para indicar que é uma criação, não edição
+            unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
         )
     }
 }

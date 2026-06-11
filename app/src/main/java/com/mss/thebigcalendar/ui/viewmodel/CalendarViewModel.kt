@@ -247,6 +247,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setUnfixHeadersOnScroll(unfix: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setUnfixHeadersOnScroll(unfix)
+            _uiState.update { it.copy(unfixHeadersOnScroll = unfix) }
+        }
+    }
+
     fun setCrashlyticsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setCrashlyticsEnabled(enabled)
@@ -673,6 +680,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.primaryColor.collect { color ->
                 _uiState.update { it.copy(primaryColor = color) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.unfixHeadersOnScroll.collect { unfix ->
+                _uiState.update { it.copy(unfixHeadersOnScroll = unfix) }
             }
         }
         viewModelScope.launch {
