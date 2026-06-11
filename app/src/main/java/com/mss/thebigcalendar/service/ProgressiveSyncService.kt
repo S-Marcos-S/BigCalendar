@@ -85,24 +85,29 @@ class ProgressiveSyncService(
             
             val calendarService = googleCalendarService.getCalendarService(account)
             val now = LocalDate.now()
-            val nextMonth = now.plusMonths(1)
             
-            // Buscar eventos do mês atual e próximo com timeout
-            // Se forceFullSync for true, useIncrementalSync deve ser false
+            // Buscar eventos do mês anterior, atual e dois meses seguintes (sem lacunas)
             val events = withTimeout(30.seconds) {
-                fetchEventsForPeriod(calendarService, now, nextMonth, useIncrementalSync = !forceFullSync)
+                fetchEventsForPeriod(calendarService, now.minusMonths(1), now.plusMonths(2), useIncrementalSync = !forceFullSync)
             }
+            
+            // Buscar aniversários dos calendários especiais de contatos e aniversários
+            val birthdayEvents = withTimeout(15.seconds) {
+                fetchBirthdayEvents(calendarService)
+            }
+            
+            val allEvents = events + birthdayEvents
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Processando eventos...",
                 progress = 30,
-                totalEvents = events.size,
+                totalEvents = allEvents.size,
                 processedEvents = 0,
                 currentPhase = SyncPhase.QUICK_SYNC
             ))
             
             // Converter e salvar eventos em lote
-            val activities = convertEventsToActivities(events)
+            val activities = convertEventsToActivities(allEvents)
             val repository = ActivityRepository(context)
             
             onProgressUpdate(SyncProgress(
@@ -151,24 +156,29 @@ class ProgressiveSyncService(
             
             val calendarService = googleCalendarService.getCalendarService(account)
             val now = LocalDate.now()
-            val endOfYear = now.withMonth(12).withDayOfMonth(31)
             
-            // Buscar eventos do resto do ano com timeout
-            // Se forceFullSync for true, useIncrementalSync deve ser false
-            val events = withTimeout(60.seconds) {
-                fetchEventsForPeriod(calendarService, now.plusMonths(2), endOfYear, useIncrementalSync = !forceFullSync)
+            // Buscar eventos futuros (de 2 a 12 meses à frente)
+            val futureEvents = withTimeout(45.seconds) {
+                fetchEventsForPeriod(calendarService, now.plusMonths(2), now.plusMonths(12), useIncrementalSync = !forceFullSync)
             }
+            
+            // Buscar eventos passados (de 1 a 12 meses atrás)
+            val pastEvents = withTimeout(45.seconds) {
+                fetchEventsForPeriod(calendarService, now.minusMonths(12), now.minusMonths(1), useIncrementalSync = !forceFullSync)
+            }
+            
+            val allEvents = futureEvents + pastEvents
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Processando eventos restantes...",
                 progress = 80,
-                totalEvents = events.size,
+                totalEvents = allEvents.size,
                 processedEvents = 0,
                 currentPhase = SyncPhase.BACKGROUND_SYNC
             ))
             
             // Converter e salvar eventos em lote
-            val activities = convertEventsToActivities(events)
+            val activities = convertEventsToActivities(allEvents)
             val repository = ActivityRepository(context)
             
             onProgressUpdate(SyncProgress(
@@ -312,6 +322,31 @@ class ProgressiveSyncService(
                 null
             }
         }
+    }
+    
+    /**
+     * Busca aniversários nos calendários especiais de contatos e aniversários
+     */
+    private suspend fun fetchBirthdayEvents(calendarService: Calendar): List<com.google.api.services.calendar.model.Event> = withContext(Dispatchers.IO) {
+        val birthdayEvents = mutableListOf<com.google.api.services.calendar.model.Event>()
+        
+        // Calendário de contatos (contacts)
+        try {
+            val events = calendarService.events().list("contacts").execute()
+            events.items?.let { birthdayEvents.addAll(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Falha ao buscar calendário de contatos: ${e.message}")
+        }
+        
+        // Calendário de aniversários (birthdays)
+        try {
+            val events = calendarService.events().list("birthdays").execute()
+            events.items?.let { birthdayEvents.addAll(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Falha ao buscar calendário de aniversários: ${e.message}")
+        }
+        
+        birthdayEvents
     }
     
     /**
