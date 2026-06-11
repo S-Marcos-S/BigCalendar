@@ -82,6 +82,15 @@ class JsonCalendarRepository(private val context: Context) {
     }
     
     /**
+     * Sobrescreve todos os calendários JSON com uma nova lista (usado na restauração de backup)
+     */
+    suspend fun overwriteAllJsonCalendars(calendars: List<JsonCalendar>) {
+        context.dataStore.edit { preferences ->
+            preferences[stringPreferencesKey(JSON_CALENDARS_KEY)] = calendarsToJson(calendars)
+        }
+    }
+    
+    /**
      * Converte lista de calendários para JSON
      */
     private fun calendarsToJson(calendars: List<JsonCalendar>): String {
