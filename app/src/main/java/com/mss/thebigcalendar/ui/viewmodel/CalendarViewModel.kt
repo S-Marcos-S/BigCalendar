@@ -34,6 +34,7 @@ import com.mss.thebigcalendar.service.RecurrenceService
 import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
 import com.mss.thebigcalendar.data.repository.AlarmRepository
+import com.mss.thebigcalendar.data.repository.SyncRepository
 import com.mss.thebigcalendar.data.service.BackupService
 import com.mss.thebigcalendar.data.service.BackupInfo
 import com.mss.thebigcalendar.service.VisibilityService
@@ -91,6 +92,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val completedActivityRepository = CompletedActivityRepository(application)
     private val alarmRepository = AlarmRepository(application)
     private val jsonCalendarRepository = JsonCalendarRepository(application)
+    private val syncRepository = SyncRepository(application)
     
     // Services
     private val googleAuthService = GoogleAuthService(application)
@@ -364,7 +366,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         val account = googleAuthService.getLastSignedInAccount()
         if (account != null) {
             _uiState.update { it.copy(googleSignInAccount = account) }
-            fetchGoogleCalendarEvents(account)
+            // Sincronização automática na inicialização: usar sincronização progressiva e respeitar o limite de 24 horas
+            viewModelScope.launch {
+                val lastSync = syncRepository.getLastSyncTime()
+                val currentTime = System.currentTimeMillis()
+                val timeSinceLastSync = currentTime - lastSync
+                
+                // Apenas sincronizar se passou mais de 24 horas (diário)
+                if (timeSinceLastSync >= 24 * 60 * 60 * 1000) {
+                    performProgressiveSync(account, forceFullSync = false)
+                } else {
+                    // Atualizar o timestamp em memória para refletir a última sincronização conhecida
+                    _uiState.update { it.copy(lastGoogleSyncTime = lastSync) }
+                }
+            }
         }
     }
     
@@ -388,7 +403,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             loginMessage = if(loginSuccess) getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_success_message) else getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_failure_message)
         ) }
         if (loginSuccess) {
-            fetchGoogleCalendarEvents(account!!)
+            // No primeiro login, sempre fazemos uma sincronização progressiva completa para garantir que todos os dados sejam importados
+            performProgressiveSync(account!!, forceFullSync = true)
         } else {
             android.util.Log.w("CalendarViewModel", "Sign-in failed, not fetching events.")
         }
@@ -407,65 +423,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Detecta se um evento do Google Calendar é um aniversário baseado em características específicas
-     */
-    private fun detectBirthdayEvent(event: com.google.api.services.calendar.model.Event): Boolean {
-        val title = event.summary?.lowercase() ?: ""
-        val description = event.description?.lowercase() ?: ""
-        val isAllDay = event.start?.dateTime == null
-        val hasRecurrence = event.recurrence?.isNotEmpty() == true
-        
-        // Palavras-chave para detectar aniversários (em português e inglês)
-        val birthdayKeywords = listOf(
-            "birthday", "aniversário", "nascimento", "nasc", "bday", "b-day",
-            "feliz aniversário", "happy birthday", "completa anos", "turns",
-            "aniversariante", "birthday boy", "birthday girl", "aniversariantes",
-            "parabéns", "congratulations", "festa", "party", "celebration"
-        )
-        
-        // Verificar se o título ou descrição contém palavras-chave de aniversário
-        val hasBirthdayKeywords = birthdayKeywords.any { keyword ->
-            title.contains(keyword) || description.contains(keyword)
-        }
-        
-        // Verificar se é um evento recorrente anual (típico de aniversários)
-        val isYearlyRecurring = event.recurrence?.any { rule ->
-            rule.contains("FREQ=YEARLY") || rule.contains("RRULE:FREQ=YEARLY") ||
-            rule.contains("INTERVAL=1") && rule.contains("FREQ=YEARLY")
-        } == true
-        
-        // Verificar se é um evento de dia inteiro (aniversários geralmente são)
-        val isAllDayEvent = isAllDay
-        
-        // Verificar se tem configurações específicas de aniversário do Google
-        val hasBirthdaySettings = event.gadget?.preferences?.any { (key, value) ->
-            key == "googCalEventType" && value == "birthday"
-        } == true
-        
-        // Verificar se vem de um calendário específico de aniversários
-        val isFromBirthdayCalendar = event.organizer?.email?.contains("birthday") == true ||
-                                   event.creator?.email?.contains("birthday") == true
-        
-        // Verificar se tem padrões específicos de aniversário no título
-        val hasBirthdayPatterns = title.matches(Regex(".*\\b\\d{1,2}/\\d{1,2}\\b.*")) || // Padrão DD/MM
-                                 title.matches(Regex(".*\\b\\d{1,2}-\\d{1,2}\\b.*")) || // Padrão DD-MM
-                                 title.matches(Regex(".*\\b\\d{1,2}\\.\\d{1,2}\\b.*"))   // Padrão DD.MM
-        
-        // Um evento é considerado aniversário se:
-        // 1. Contém palavras-chave de aniversário, OU
-        // 2. É recorrente anual E é de dia inteiro, OU  
-        // 3. Tem configurações específicas de aniversário do Google, OU
-        // 4. Vem de um calendário de aniversários, OU
-        // 5. Tem padrões de data no título (típico de aniversários)
-        val result = hasBirthdayKeywords || 
-                    (isYearlyRecurring && isAllDayEvent) || 
-                    hasBirthdaySettings ||
-                    isFromBirthdayCalendar ||
-                    hasBirthdayPatterns
-        
-        return result
-    }
     
     /**
      * Cria aniversários de exemplo para teste se nenhum for detectado automaticamente
@@ -518,143 +475,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun fetchGoogleCalendarEvents(account: GoogleSignInAccount, forceSync: Boolean = false) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null) }
-            try {
-                val currentTime = System.currentTimeMillis()
-                val lastSync = _uiState.value.lastGoogleSyncTime
-                val timeSinceLastSync = currentTime - lastSync
-                
-                // Sincronização diária: só sincronizar se passou mais de 24 horas (a menos que seja forçada)
-                if (!forceSync && timeSinceLastSync < 24 * 60 * 60 * 1000) {
-                    _uiState.update { it.copy(isSyncing = false) }
-                    return@launch
-                }
-                
-                // NÃO deletar eventos existentes até os novos chegarem - isso evita o "flash"
-                // Os eventos antigos serão substituídos pelos novos ao final
-
-                // 2. Fetch new events from Google Calendar
-                val calendarService = googleCalendarService.getCalendarService(account)
-                
-                // Buscar eventos do calendário principal
-                val primaryEvents = withContext(Dispatchers.IO) {
-                    calendarService.events().list("primary").execute()
-                }
-                
-                // Buscar eventos de contatos (que contêm aniversários)
-                val contactEvents = withContext(Dispatchers.IO) {
-                    try {
-                        calendarService.events().list("contacts").execute()
-                    } catch (e: Exception) {
-                        // Se não conseguir acessar o calendário de contatos, usar lista vazia
-                        com.google.api.services.calendar.model.Events()
-                    }
-                }
-                
-                // Buscar eventos de aniversários específicos
-                val birthdayCalendarEvents = withContext(Dispatchers.IO) {
-                    try {
-                        calendarService.events().list("birthdays").execute()
-                    } catch (e: Exception) {
-                        // Se não conseguir acessar o calendário de aniversários, usar lista vazia
-                        com.google.api.services.calendar.model.Events()
-                    }
-                }
-                
-                // Combinar todos os eventos
-                val allEvents = mutableListOf<com.google.api.services.calendar.model.Event>()
-                allEvents.addAll(primaryEvents.items ?: emptyList())
-                allEvents.addAll(contactEvents.items ?: emptyList())
-                allEvents.addAll(birthdayCalendarEvents.items ?: emptyList())
-                
-                val events = com.google.api.services.calendar.model.Events().apply {
-                    items = allEvents
-                }
-
-                // 3. Map them to the app's Activity model
-                val activities = events.items.mapNotNull { event ->
-                    // Ignore events without a start date
-                    val start = event.start?.dateTime?.value ?: event.start?.date?.value ?: return@mapNotNull null
-                    val end = event.end?.dateTime?.value ?: event.end?.date?.value
-
-                    // Tratar eventos de dia inteiro (como aniversários) de forma diferente
-                    val startDate = if (event.start?.dateTime == null) {
-                        // Para eventos de dia inteiro, usar UTC para evitar problemas de fuso horário
-                        // O Google Calendar envia eventos de dia inteiro no início do dia UTC
-                        val utcDate = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDate()
-                        utcDate
-                    } else {
-                        // Para eventos com horário, usar fuso horário local
-                        val localDate = Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).toLocalDate()
-                        localDate
-                    }
-                    
-                    val startTime = if (event.start?.dateTime != null) Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).toLocalTime() else null
-                    val endTime = if (end != null && event.end?.dateTime != null) Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault()).toLocalTime() else null
-
-                    // Detectar se é um aniversário baseado em características específicas
-                    val isBirthday = detectBirthdayEvent(event)
-                    
-                    Activity(
-                        id = event.id ?: UUID.randomUUID().toString(),
-                        title = event.summary ?: getApplication<Application>().getString(com.mss.thebigcalendar.R.string.event_no_title),
-                        description = event.description,
-                        date = startDate.toString(),
-                        startTime = startTime,
-                        endTime = endTime,
-                        isAllDay = event.start?.dateTime == null,
-                        location = event.location,
-                        categoryColor = if (isBirthday) "#FF69B4" else "#4285F4", // Rosa para aniversários, Azul para eventos
-                        activityType = if (isBirthday) ActivityType.BIRTHDAY else ActivityType.EVENT,
-                        recurrenceRule = event.recurrence?.firstOrNull(),
-                        showInCalendar = true, // Por padrão, mostrar no calendário
-                        isFromGoogle = true,
-                        excludedDates = emptyList(),
-                        wikipediaLink = null // Eventos do Google Calendar não têm links da Wikipedia
-                    )
-                }
-                
-                // Log das estatísticas de sincronização
-                val totalEvents = activities.size
-                val birthdayEvents = activities.count { it.activityType == ActivityType.BIRTHDAY }
-                val regularEvents = activities.count { it.activityType == ActivityType.EVENT }
-                
-                // 4. Fazer merge dos eventos (manter existentes + adicionar novos)
-                val currentActivities = activityRepository.activities.first()
-                activities.forEach { newActivity ->
-                    // Verificar se já existe uma atividade com o mesmo ID
-                    val existingActivity = currentActivities.find { it.id == newActivity.id }
-                    if (existingActivity != null) {
-                        // Se já existe, preservar a cor personalizada do usuário
-                        val updatedActivity = newActivity.copy(categoryColor = existingActivity.categoryColor)
-                        activityRepository.saveActivity(updatedActivity)
-                    } else {
-                        // Se não existe, adicionar nova com cor padrão
-                        activityRepository.saveActivity(newActivity)
-                    }
-                }
-                
-                // 5. Atualizar a UI após salvar as atividades
-                updateAllDateDependentUI()
-                
-                // 6. Atualizar timestamp de última sincronização
-                _uiState.update { it.copy(lastGoogleSyncTime = currentTime) }
-                
-                // 7. Verificar se há aniversários e criar alguns de exemplo se necessário
-                if (birthdayEvents == 0) {
-                    createSampleBirthdays()
-                }
-
-            } catch (e: Exception) {
-                Log.e("CalendarViewModel", "Error fetching Google Calendar events", e)
-                _uiState.update { it.copy(syncErrorMessage = getApplication<Application>().getString(com.mss.thebigcalendar.R.string.sync_failure_message)) }
-            } finally {
-                _uiState.update { it.copy(isSyncing = false) }
-            }
-        }
-    }
 
     private fun loadSettings() {
         viewModelScope.launch {
@@ -2901,14 +2721,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun forceGoogleSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
-            fetchGoogleCalendarEvents(account, forceSync = true)
+            performProgressiveSync(account, forceFullSync = true)
         }
     }
     
     fun manualGoogleSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
-            fetchGoogleCalendarEvents(account, forceSync = true)
+            performProgressiveSync(account, forceFullSync = true)
         }
     }
     
