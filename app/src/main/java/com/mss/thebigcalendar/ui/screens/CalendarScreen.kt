@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -343,16 +343,18 @@ fun CalendarScreen(
                                             tint = appBarContentColor
                                         )
                                     }
-                                    IconButton(
-                                        onClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Add,
-                                            contentDescription = stringResource(id = R.string.add_appointment),
-                                            modifier = Modifier.size(20.dp),
-                                            tint = appBarContentColor
-                                        )
+                                    if (uiState.googleSignInAccount != null) {
+                                        IconButton(
+                                            onClick = { viewModel.syncGoogleCalendarSimple() },
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Sync,
+                                                contentDescription = stringResource(id = R.string.sync_now),
+                                                modifier = Modifier.size(20.dp),
+                                                tint = appBarContentColor
+                                            )
+                                        }
                                     }
                                     IconButton(
                                         onClick = { viewModel.onTrashIconClick() },

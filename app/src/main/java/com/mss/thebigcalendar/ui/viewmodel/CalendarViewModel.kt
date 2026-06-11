@@ -2732,6 +2732,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
     
+    fun syncGoogleCalendarSimple() {
+        val account = _uiState.value.googleSignInAccount
+        if (account != null) {
+            performProgressiveSync(account, forceFullSync = false)
+        }
+    }
+    
     fun onManualSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
