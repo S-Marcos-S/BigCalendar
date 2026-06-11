@@ -1,8 +1,10 @@
 package com.mss.thebigcalendar.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -124,8 +126,8 @@ fun BackupScreen(
     var showDeleteConfirmation by remember { mutableStateOf<BackupInfo?>(null) }
     var showCloudRestoreConfirmation by remember { mutableStateOf<DriveFile?>(null) }
     var showCloudDeleteConfirmation by remember { mutableStateOf<DriveFile?>(null) }
-    var isCloudBackupsExpanded by remember { mutableStateOf(true) }
-    var isLocalBackupsExpanded by remember { mutableStateOf(true) }
+    var isCloudBackupsExpanded by remember { mutableStateOf(false) }
+    var isLocalBackupsExpanded by remember { mutableStateOf(false) }
 
     val directoryPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
@@ -185,6 +187,102 @@ fun BackupScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+            item {
+                val directoryUri = uiState.backupDirectoryUri
+                if (directoryUri.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Storage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = stringResource(R.string.select_backup_folder_prompt),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            TextButton(
+                                onClick = { directoryPickerLauncher.launch(null) }
+                            ) {
+                                Text(stringResource(R.string.select_folder_button))
+                            }
+                        }
+                    }
+                } else {
+                    val displayName = remember(directoryUri) {
+                        try {
+                            val decoded = Uri.decode(directoryUri)
+                            val segment = decoded.substringAfterLast(":")
+                            if (segment.isNotBlank()) segment else decoded
+                        } catch (e: Exception) {
+                            directoryUri
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Storage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.backup_folder_selected),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                            TextButton(
+                                onClick = { directoryPickerLauncher.launch(null) }
+                            ) {
+                                Text(stringResource(R.string.change_folder_button))
+                            }
+                        }
+                    }
+                }
+            }
+
             item {
                 Text(
                     text = stringResource(R.string.backup_options),

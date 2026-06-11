@@ -2281,9 +2281,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
                 settingsRepository.saveBackupDirectoryUri(uri.toString())
                 _uiState.update { it.copy(needsBackupDirectorySelection = false) }
-
-                // Automatically trigger backup after directory is selected
-                onBackupRequest()
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Falha ao salvar o diretório de backup", e)
                 _uiState.update { it.copy(backupMessage = "Falha ao definir o diretório de backup.") }

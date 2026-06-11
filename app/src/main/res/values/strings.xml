@@ -150,6 +150,10 @@
     <string name="delete_backup_confirmation_title">Confirmar Exclusão</string>
     <string name="delete_backup_confirmation_message">Tem certeza que deseja excluir o backup \"%1$s\"?\n\nEsta ação não pode ser desfeita.</string>
     <string name="delete_backup_confirm">Excluir</string>
+    <string name="select_backup_folder_prompt">Por favor, escolha uma pasta para salvar seus backups locais</string>
+    <string name="select_folder_button">Escolher Pasta</string>
+    <string name="backup_folder_selected">Pasta de backup selecionada:</string>
+    <string name="change_folder_button">Alterar</string>
 
     <!-- Cloud Backup Strings -->
     <string name="cloud_backup_description">Faça backup dos seus dados no Google Drive.</string>
