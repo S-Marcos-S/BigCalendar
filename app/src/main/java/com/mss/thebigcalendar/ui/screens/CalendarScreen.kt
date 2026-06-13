@@ -82,7 +82,6 @@ import com.mss.thebigcalendar.ui.components.JsonHolidayInfoDialog
 import com.mss.thebigcalendar.ui.components.MonthlyCalendar
 import com.mss.thebigcalendar.ui.components.MoonPhasesComponent
 import com.mss.thebigcalendar.ui.components.NotesForSelectedDaySection
-import com.mss.thebigcalendar.ui.components.SaintDaysForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.SaintInfoDialog
 import com.mss.thebigcalendar.ui.components.Sidebar
 import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
@@ -468,7 +467,7 @@ fun MainCalendarView(
     drawerState: androidx.compose.material3.DrawerState,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE,
+    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.SLIDE,
     onCalendarReady: (LayoutCoordinates) -> Unit
 ) {
     var horizontalDragOffset by remember { mutableFloatStateOf(0f) }
@@ -634,19 +633,7 @@ fun MainCalendarView(
                         }
                     }
 
-                    if (uiState.saintDaysForSelectedDate.isNotEmpty()) {
-                        item(
-                            key = "saints-${uiState.selectedDate}",
-                            contentType = "saints"
-                        ) {
-                            SaintDaysForSelectedDaySection(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                saints = uiState.saintDaysForSelectedDate,
-                                onSaintClick = { viewModel.onSaintDayClick(it) }
-                            )
-                        }
-                    }
-                    
+
                     item(
                         key = "birthdays-${uiState.selectedDate}",
                         contentType = "birthdays"
@@ -797,7 +784,7 @@ fun AnimatedMonthlyCalendar(
     onNextMonth: () -> Unit,
     isAnimating: Boolean,
     animationDirection: Float,
-    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE,
+    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.SLIDE,
     verticalScale: Float = 1f,
     hideOtherMonthDays: Boolean = false
 ) {

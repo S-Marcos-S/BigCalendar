@@ -118,7 +118,6 @@ fun PrintCalendarScreen(
     var selectedMonth by remember { mutableStateOf(java.time.YearMonth.now()) }
     var includeTasks by remember { mutableStateOf(uiState.filterOptions.showTasks) }
     var includeHolidays by remember { mutableStateOf(uiState.filterOptions.showHolidays) }
-    var includeSaintDays by remember { mutableStateOf(uiState.filterOptions.showSaintDays) }
     var includeEvents by remember { mutableStateOf(uiState.filterOptions.showEvents) }
     var includeBirthdays by remember { mutableStateOf(uiState.filterOptions.showBirthdays) }
     var includeNotes by remember { mutableStateOf(uiState.filterOptions.showNotes) }
@@ -551,27 +550,6 @@ fun PrintCalendarScreen(
                                                 borderColor = if (includeHolidays) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                                 selectedBorderColor = MaterialTheme.colorScheme.primary,
                                                 borderWidth = if (includeHolidays) 2.dp else 1.dp,
-                                                selectedBorderWidth = 2.dp
-                                            )
-                                        )
-                                        FilterChip(
-                                            selected = includeSaintDays,
-                                            onClick = { includeSaintDays = !includeSaintDays },
-                                            label = { Text(stringResource(id = R.string.catholic_saint_days)) },
-                                            leadingIcon = if (includeSaintDays) {
-                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                                            } else null,
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                            ),
-                                            border = FilterChipDefaults.filterChipBorder(
-                                                enabled = true,
-                                                selected = includeSaintDays,
-                                                borderColor = if (includeSaintDays) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                                borderWidth = if (includeSaintDays) 2.dp else 1.dp,
                                                 selectedBorderWidth = 2.dp
                                             )
                                         )
@@ -2144,7 +2122,6 @@ fun PrintCalendarScreen(
                             selectedMonth = selectedMonth,
                             includeTasks = includeTasks,
                             includeHolidays = includeHolidays,
-                            includeSaintDays = includeSaintDays,
                             includeEvents = includeEvents,
                             includeBirthdays = includeBirthdays,
                             includeNotes = includeNotes,
@@ -2230,7 +2207,6 @@ data class PrintOptions(
     val selectedMonth: java.time.YearMonth,
     val includeTasks: Boolean,
     val includeHolidays: Boolean,
-    val includeSaintDays: Boolean,
     val includeEvents: Boolean,
     val includeBirthdays: Boolean,
     val includeNotes: Boolean,

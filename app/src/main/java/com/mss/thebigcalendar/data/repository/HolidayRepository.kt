@@ -133,27 +133,7 @@ class HolidayRepository(private val context: Context) {
         return LocalDate.of(year, month, day)
     }
 
-    fun getSaintDays(): List<Holiday> {
-        val inputStream = context.resources.openRawResource(R.raw.saints_data)
-        val reader = BufferedReader(InputStreamReader(inputStream))
-        val jsonString = reader.readText()
-        val jsonArray = JSONArray(jsonString)
-        val saints = mutableListOf<Holiday>()
-
-        for (i in 0 until jsonArray.length()) {
-            val jsonObject = jsonArray.getJSONObject(i)
-            saints.add(
-                Holiday(
-                    name = jsonObject.getString("name"),
-                    date = jsonObject.getString("date"),
-                    type = HolidayType.SAINT,
-                    summary = jsonObject.optString("summary"),
-                    wikipediaLink = jsonObject.optString("wikipediaLink")
-                )
-            )
-        }
-        return saints
-    }
+    
 
     fun getCommemorativeDates(year: Int): List<Holiday> {
         val mothersDay = getMothersDay(year)

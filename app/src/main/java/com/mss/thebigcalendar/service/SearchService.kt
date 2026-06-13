@@ -19,7 +19,6 @@ class SearchService {
         query: String,
         activities: List<Activity>,
         nationalHolidays: Map<LocalDate, Holiday>,
-        saintDays: Map<String, Holiday>,
         commemorativeDates: Map<LocalDate, Holiday>
     ): List<SearchResult> {
         if (query.isBlank()) return emptyList()
@@ -34,10 +33,6 @@ class SearchService {
         // Pesquisar em feriados nacionais
         val holidayResults = searchHolidays(nationalHolidays, normalizedQuery)
         results.addAll(holidayResults)
-        
-        // Pesquisar em dias de santos
-        val saintResults = searchSaintDays(saintDays, normalizedQuery)
-        results.addAll(saintResults)
         
         // Pesquisar em datas comemorativas
         val commemorativeResults = searchCommemorativeDates(commemorativeDates, normalizedQuery)
@@ -90,19 +85,6 @@ class SearchService {
     }
     
     /**
-     * Pesquisa em dias de santos
-     */
-    private fun searchSaintDays(
-        saintDays: Map<String, Holiday>,
-        query: String
-    ): List<SearchResult> {
-        return saintDays.values.filter { saint ->
-            saint.name.lowercase(Locale.getDefault()).contains(query) ||
-            (saint.summary?.lowercase(Locale.getDefault())?.contains(query) == true)
-        }.map { it.toSearchResult() }
-    }
-    
-    /**
      * Pesquisa em datas comemorativas
      */
     private fun searchCommemorativeDates(
@@ -122,7 +104,6 @@ class SearchService {
         dateQuery: String,
         activities: List<Activity>,
         nationalHolidays: Map<LocalDate, Holiday>,
-        saintDays: Map<String, Holiday>,
         commemorativeDates: Map<LocalDate, Holiday>
     ): List<SearchResult> {
         val results = mutableListOf<SearchResult>()

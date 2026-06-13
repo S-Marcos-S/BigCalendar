@@ -197,11 +197,6 @@ private fun DayCell(
             color = when {
                 day.isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                 day.isNationalHoliday -> Color.Red
-                day.isSaintDay -> when (theme) {
-                    com.mss.thebigcalendar.data.model.Theme.DARK -> Color.Yellow
-                    com.mss.thebigcalendar.data.model.Theme.LIGHT -> Color.Blue
-                    com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
-                }
                 day.isWeekend -> MaterialTheme.colorScheme.primary
                 day.isCurrentMonth -> if (isDark) Color.White else Color.Black
                 else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -211,26 +206,18 @@ private fun DayCell(
         var linesBudget = 4
 
         if (!isCompact && day.holiday != null && linesBudget > 0) {
-            val isSaintDay = day.isSaintDay
             val isNationalHoliday = day.isNationalHoliday
             Text(
                 text = day.holiday.name,
                 color = when {
                     isNationalHoliday -> Color.Red
-                    isSaintDay -> {
-                        when (theme) {
-                            com.mss.thebigcalendar.data.model.Theme.DARK -> Color.Yellow
-                            com.mss.thebigcalendar.data.model.Theme.LIGHT -> Color.Blue
-                            com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
-                        }
-                    }
                     else -> MaterialTheme.colorScheme.secondary
                 },
-                fontSize = if (isSaintDay) 7.sp else 8.sp,
+                fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 1.dp),
-                fontWeight = if (isSaintDay || isNationalHoliday) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isNationalHoliday) FontWeight.Bold else FontWeight.Normal
             )
             linesBudget -= 1
         }

@@ -314,7 +314,6 @@ fun SearchResultItem(
                     when (result.type) {
                         SearchResult.Type.ACTIVITY -> MaterialTheme.colorScheme.primaryContainer
                         SearchResult.Type.HOLIDAY -> MaterialTheme.colorScheme.secondaryContainer
-                        SearchResult.Type.SAINT_DAY -> MaterialTheme.colorScheme.tertiaryContainer
                     }
                 ),
             contentAlignment = Alignment.Center
@@ -323,7 +322,6 @@ fun SearchResultItem(
                 text = when (result.type) {
                     SearchResult.Type.ACTIVITY -> "📅"
                     SearchResult.Type.HOLIDAY -> "🎉"
-                    SearchResult.Type.SAINT_DAY -> "⛪"
                 },
                 style = MaterialTheme.typography.titleMedium
             )

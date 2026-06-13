@@ -753,6 +753,8 @@
 
     <!-- DeleteJsonCalendarDialog.kt -->
     <string name="delete_json_calendar_title">🗑️ Remover Calendário</string>
+    <string name="remove_predefined_calendar_title">❌ Remover do Menu Lateral</string>
+    <string name="remove_predefined_calendar_message">Deseja remover o calendário \"%1$s\" do menu lateral do aplicativo?\n\nEle poderá ser adicionado novamente através da tela de configurações gerais.</string>
     <string name="remove">Remover</string>
 
     <!-- LanguageSelectionDialog.kt -->
@@ -815,6 +817,21 @@
     <string name="onboarding_restore_skip">Não, iniciar do zero</string>
     <string name="onboarding_restore_loading">Restaurando backup...</string>
     <string name="onboarding_checking_backup">Buscando backups...</string>
+    <!-- Onboarding Local Backup Restore -->
+    <string name="onboarding_restore_local_title">Restaurar Backup Local</string>
+    <string name="onboarding_restore_local_desc">Você possui algum backup local do calendário que deseja restaurar?</string>
+    <string name="onboarding_restore_local_choose_folder">Escolher Pasta</string>
+    <string name="onboarding_restore_local_deny">Não, obrigado</string>
+    <string name="onboarding_restore_local_no_backups">Nenhum Backup Encontrado</string>
+    <string name="onboarding_restore_local_no_backups_desc">Não encontramos nenhum arquivo de backup compatível na pasta selecionada.</string>
+    <string name="onboarding_restore_local_choose_other">Escolher outra pasta</string>
+    <string name="onboarding_restore_local_finish">Concluir</string>
+    <string name="onboarding_restore_local_found">Backups Encontrados</string>
+    <string name="onboarding_restore_local_found_desc">Selecione um arquivo de backup para restaurar seus dados:</string>
+    <string name="onboarding_restore_local_restore">Restaurar</string>
+    <string name="onboarding_restore_local_select_other">Selecionar outra pasta</string>
+    <string name="onboarding_restore_local_skip">Concluir sem restaurar</string>
+    <string name="onboarding_restore_local_activities_size">Atividades: %1$d • %2$d KB</string>
     <string name="more_options">Mais opções</string>
     <string name="change_download_location">Mudar local de download</string>
 </resources>

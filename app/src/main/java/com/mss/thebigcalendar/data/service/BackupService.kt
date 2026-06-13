@@ -213,7 +213,6 @@ class BackupService(
                 put("theme", settingsRepository.theme.first().name)
                 put("welcomeName", settingsRepository.welcomeName.first())
                 put("showHolidays", filterOptionsVal.showHolidays)
-                put("showSaintDays", filterOptionsVal.showSaintDays)
                 put("showEvents", filterOptionsVal.showEvents)
                 put("showTasks", filterOptionsVal.showTasks)
                 put("showBirthdays", filterOptionsVal.showBirthdays)
@@ -228,9 +227,7 @@ class BackupService(
                 put("primaryColor", settingsRepository.primaryColor.first())
                 put("unfixHeadersOnScroll", settingsRepository.unfixHeadersOnScroll.first())
                 
-                // Sidebar
                 put("sidebarShowHolidays", sidebarFilterVal.showHolidays)
-                put("sidebarShowSaintDays", sidebarFilterVal.showSaintDays)
                 put("sidebarShowEvents", sidebarFilterVal.showEvents)
                 put("sidebarShowTasks", sidebarFilterVal.showTasks)
                 put("sidebarShowBirthdays", sidebarFilterVal.showBirthdays)
@@ -529,7 +526,6 @@ class BackupService(
                     
                     val filterOptions = CalendarFilterOptions(
                         showHolidays = settingsJson.optBoolean("showHolidays", true),
-                        showSaintDays = settingsJson.optBoolean("showSaintDays", false),
                         showEvents = settingsJson.optBoolean("showEvents", true),
                         showTasks = settingsJson.optBoolean("showTasks", true),
                         showBirthdays = settingsJson.optBoolean("showBirthdays", true),
@@ -565,7 +561,6 @@ class BackupService(
                     // Sidebar
                     val sidebarFilter = SidebarFilterVisibility(
                         showHolidays = settingsJson.optBoolean("sidebarShowHolidays", true),
-                        showSaintDays = settingsJson.optBoolean("sidebarShowSaintDays", false),
                         showEvents = settingsJson.optBoolean("sidebarShowEvents", true),
                         showTasks = settingsJson.optBoolean("sidebarShowTasks", true),
                         showBirthdays = settingsJson.optBoolean("sidebarShowBirthdays", true),

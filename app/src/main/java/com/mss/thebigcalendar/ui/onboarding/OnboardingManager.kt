@@ -2,11 +2,18 @@ package com.mss.thebigcalendar.ui.onboarding
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.api.services.drive.model.File as DriveFile
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.text.style.TextOverflow
+import com.mss.thebigcalendar.data.service.BackupInfo
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -357,6 +364,7 @@ enum class OnboardingStep {
     NOTIFICATION_PERMISSION,
     CHECK_BACKUP,
     RESTORE_BACKUP_PROMPT,
+    RESTORE_LOCAL_BACKUP_PROMPT,
     COMPLETED
 }
 
@@ -474,6 +482,233 @@ fun RestoreCloudBackupDialog(
 }
 
 /**
+ * Composable para a janela de prompt de backup local
+ */
+@Composable
+fun RestoreLocalBackupPromptDialog(
+    backupDirectoryUri: String?,
+    backupFiles: List<BackupInfo>,
+    isRestoring: Boolean,
+    onSelectFolder: () -> Unit,
+    onRestoreBackup: (String) -> Unit,
+    onSkip: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onSkip,
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Ícone de pasta/armazenamento
+                Text(
+                    text = "📂",
+                    fontSize = 48.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                if (backupDirectoryUri.isNullOrBlank()) {
+                    // Título
+                    Text(
+                        text = stringResource(R.string.onboarding_restore_local_title),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // Descrição
+                    Text(
+                        text = stringResource(R.string.onboarding_restore_local_desc),
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+                    
+                    // Botão Escolher Pasta
+                    Button(
+                        onClick = onSelectFolder,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_choose_folder),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    
+                    // Botão Negar/Cancelar
+                    TextButton(
+                        onClick = onSkip,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_deny),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    // Pasta já foi selecionada
+                    if (backupFiles.isEmpty()) {
+                        // Título
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_no_backups),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Descrição
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_no_backups_desc),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+                        
+                        // Botão Escolher Outra Pasta
+                        Button(
+                            onClick = onSelectFolder,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Text(stringResource(R.string.onboarding_restore_local_choose_other))
+                        }
+                        
+                        // Botão Concluir
+                        TextButton(
+                            onClick = onSkip,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.onboarding_restore_local_finish), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        // Título
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_found),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Descrição
+                        Text(
+                            text = stringResource(R.string.onboarding_restore_local_found_desc),
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        // Lista de Backups
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 24.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            backupFiles.take(3).forEach { backupInfo ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = backupInfo.fileName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            val sizeKb = backupInfo.fileSize / 1024
+                                            Text(
+                                                text = stringResource(
+                                                    R.string.onboarding_restore_local_activities_size,
+                                                    backupInfo.totalActivities,
+                                                    sizeKb
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Button(
+                                            onClick = { onRestoreBackup(backupInfo.uri) },
+                                            enabled = !isRestoring,
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            if (isRestoring) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            } else {
+                                                Text(stringResource(R.string.onboarding_restore_local_restore), fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Botão Escolher Outra Pasta
+                        TextButton(
+                            onClick = onSelectFolder,
+                            enabled = !isRestoring,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.onboarding_restore_local_select_other))
+                        }
+                        
+                        // Botão Pular / Concluir
+                        TextButton(
+                            onClick = onSkip,
+                            enabled = !isRestoring,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.onboarding_restore_local_skip), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * Composable para gerenciar o fluxo de onboarding
  */
 @Composable
@@ -487,7 +722,13 @@ fun OnboardingFlow(
     onRestoreBackup: (String, String) -> Unit,
     onComplete: () -> Unit,
     onGoogleSignIn: () -> Unit,
-    onRequestNotificationPermission: () -> Unit
+    onRequestNotificationPermission: () -> Unit,
+    backupDirectoryUri: String? = null,
+    backupFiles: List<BackupInfo> = emptyList(),
+    isRestoringLocalBackup: Boolean = false,
+    onBackupDirectorySelected: (Uri) -> Unit = {},
+    onRestoreLocalBackup: (String) -> Unit = {},
+    onLoadLocalBackups: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val onboardingManager = remember { OnboardingManager(context) }
@@ -497,6 +738,16 @@ fun OnboardingFlow(
     var hasCheckedBackup by remember { mutableStateOf(false) }
     var wasListingBackups by remember { mutableStateOf(false) }
     var wasRestoring by remember { mutableStateOf(false) }
+    var wasRestoringLocal by remember { mutableStateOf(false) }
+    
+    val directoryPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            if (uri != null) {
+                onBackupDirectorySelected(uri)
+            }
+        }
+    )
     
     // Inicializar o passo correto
     LaunchedEffect(Unit) {
@@ -511,6 +762,13 @@ fun OnboardingFlow(
         }
     }
 
+    // Monitorar seleção de diretório local
+    LaunchedEffect(backupDirectoryUri) {
+        if (!backupDirectoryUri.isNullOrBlank()) {
+            onLoadLocalBackups()
+        }
+    }
+
     // Monitorar finalização do login no passo WELCOME
     LaunchedEffect(isLoggingIn) {
         if (wasLoggingIn && !isLoggingIn && currentStep == OnboardingStep.WELCOME) {
@@ -518,7 +776,7 @@ fun OnboardingFlow(
             currentStep = when {
                 onboardingManager.shouldShowNotificationPermission() -> OnboardingStep.NOTIFICATION_PERMISSION
                 googleSignInAccount != null -> OnboardingStep.CHECK_BACKUP
-                else -> OnboardingStep.COMPLETED
+                else -> OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
             }
             if (currentStep == OnboardingStep.COMPLETED) {
                 onboardingManager.markOnboardingCompleted()
@@ -560,6 +818,16 @@ fun OnboardingFlow(
         wasRestoring = isRestoring
     }
 
+    // Monitorar a restauração do backup local
+    LaunchedEffect(isRestoringLocalBackup) {
+        if (wasRestoringLocal && !isRestoringLocalBackup && currentStep == OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT) {
+            currentStep = OnboardingStep.COMPLETED
+            onboardingManager.markOnboardingCompleted()
+            onComplete()
+        }
+        wasRestoringLocal = isRestoringLocalBackup
+    }
+
     val latestBackupFile = remember(cloudBackupFiles) {
         cloudBackupFiles.maxByOrNull { it.createdTime?.value ?: 0L }
     }
@@ -593,7 +861,7 @@ fun OnboardingFlow(
                         currentStep = when {
                             onboardingManager.shouldShowNotificationPermission() -> OnboardingStep.NOTIFICATION_PERMISSION
                             googleSignInAccount != null -> OnboardingStep.CHECK_BACKUP
-                            else -> OnboardingStep.COMPLETED
+                            else -> OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         }
                         if (currentStep == OnboardingStep.COMPLETED) {
                             onboardingManager.markOnboardingCompleted()
@@ -605,7 +873,7 @@ fun OnboardingFlow(
                         onboardingManager.markWelcomeShown()
                         currentStep = when {
                             onboardingManager.shouldShowNotificationPermission() -> OnboardingStep.NOTIFICATION_PERMISSION
-                            else -> OnboardingStep.COMPLETED
+                            else -> OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         }
                         if (currentStep == OnboardingStep.COMPLETED) {
                             onboardingManager.markOnboardingCompleted()
@@ -623,7 +891,7 @@ fun OnboardingFlow(
                         currentStep = if (googleSignInAccount != null) {
                             OnboardingStep.CHECK_BACKUP
                         } else {
-                            OnboardingStep.COMPLETED
+                            OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         }
                         if (currentStep == OnboardingStep.COMPLETED) {
                             onboardingManager.markOnboardingCompleted()
@@ -636,7 +904,7 @@ fun OnboardingFlow(
                         currentStep = if (googleSignInAccount != null) {
                             OnboardingStep.CHECK_BACKUP
                         } else {
-                            OnboardingStep.COMPLETED
+                            OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         }
                         if (currentStep == OnboardingStep.COMPLETED) {
                             onboardingManager.markOnboardingCompleted()
@@ -648,7 +916,7 @@ fun OnboardingFlow(
                         currentStep = if (googleSignInAccount != null) {
                             OnboardingStep.CHECK_BACKUP
                         } else {
-                            OnboardingStep.COMPLETED
+                            OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         }
                         if (currentStep == OnboardingStep.COMPLETED) {
                             onboardingManager.markOnboardingCompleted()
@@ -699,6 +967,24 @@ fun OnboardingFlow(
                     onRestore = {
                         onRestoreBackup(latestBackupFile.id, latestBackupFile.name)
                     },
+                    onSkip = {
+                        currentStep = OnboardingStep.COMPLETED
+                        onboardingManager.markOnboardingCompleted()
+                        onComplete()
+                    }
+                )
+            }
+
+            // Janela de restauração de backup local
+            if (currentStep == OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT) {
+                RestoreLocalBackupPromptDialog(
+                    backupDirectoryUri = backupDirectoryUri,
+                    backupFiles = backupFiles,
+                    isRestoring = isRestoringLocalBackup,
+                    onSelectFolder = {
+                        directoryPickerLauncher.launch(null)
+                    },
+                    onRestoreBackup = onRestoreLocalBackup,
                     onSkip = {
                         currentStep = OnboardingStep.COMPLETED
                         onboardingManager.markOnboardingCompleted()

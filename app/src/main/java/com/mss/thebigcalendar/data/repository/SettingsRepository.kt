@@ -25,7 +25,6 @@ class SettingsRepository(private val context: Context) {
         val THEME = stringPreferencesKey("theme")
         val WELCOME_NAME = stringPreferencesKey("welcome_name")
         val SHOW_HOLIDAYS = booleanPreferencesKey("show_holidays")
-        val SHOW_SAINT_DAYS = booleanPreferencesKey("show_saint_days")
         val SHOW_EVENTS = booleanPreferencesKey("show_events")
         val SHOW_TASKS = booleanPreferencesKey("show_tasks")
         val SHOW_BIRTHDAYS = booleanPreferencesKey("show_birthdays")
@@ -42,7 +41,6 @@ class SettingsRepository(private val context: Context) {
         
         // Sidebar filter visibility
         val SIDEBAR_SHOW_HOLIDAYS = booleanPreferencesKey("sidebar_show_holidays")
-        val SIDEBAR_SHOW_SAINT_DAYS = booleanPreferencesKey("sidebar_show_saint_days")
         val SIDEBAR_SHOW_EVENTS = booleanPreferencesKey("sidebar_show_events")
         val SIDEBAR_SHOW_TASKS = booleanPreferencesKey("sidebar_show_tasks")
         val SIDEBAR_SHOW_BIRTHDAYS = booleanPreferencesKey("sidebar_show_birthdays")
@@ -114,7 +112,7 @@ class SettingsRepository(private val context: Context) {
 
     val animationType: Flow<AnimationType> = context.dataStore.data
         .map { preferences ->
-            val animationName = preferences[PreferencesKeys.ANIMATION_TYPE] ?: AnimationType.NONE.name
+            val animationName = preferences[PreferencesKeys.ANIMATION_TYPE] ?: AnimationType.SLIDE.name
             AnimationType.valueOf(animationName)
         }
 
@@ -189,7 +187,6 @@ class SettingsRepository(private val context: Context) {
         .map { preferences ->
             SidebarFilterVisibility(
                 showHolidays = preferences[PreferencesKeys.SIDEBAR_SHOW_HOLIDAYS] ?: true,
-                showSaintDays = preferences[PreferencesKeys.SIDEBAR_SHOW_SAINT_DAYS] ?: false, // Desativado por padrão
                 showEvents = preferences[PreferencesKeys.SIDEBAR_SHOW_EVENTS] ?: true,
                 showTasks = preferences[PreferencesKeys.SIDEBAR_SHOW_TASKS] ?: true,
                 showBirthdays = preferences[PreferencesKeys.SIDEBAR_SHOW_BIRTHDAYS] ?: true,
@@ -217,7 +214,6 @@ class SettingsRepository(private val context: Context) {
         .map { preferences ->
             CalendarFilterOptions(
                 showHolidays = preferences[PreferencesKeys.SHOW_HOLIDAYS] ?: true,
-                showSaintDays = preferences[PreferencesKeys.SHOW_SAINT_DAYS] ?: false, // Desativado por padrão na primeira inicialização
                 showEvents = preferences[PreferencesKeys.SHOW_EVENTS] ?: true,
                 showTasks = preferences[PreferencesKeys.SHOW_TASKS] ?: true,
                 showBirthdays = preferences[PreferencesKeys.SHOW_BIRTHDAYS] ?: true,
@@ -241,7 +237,6 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveFilterOptions(filterOptions: CalendarFilterOptions) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SHOW_HOLIDAYS] = filterOptions.showHolidays
-            preferences[PreferencesKeys.SHOW_SAINT_DAYS] = filterOptions.showSaintDays
             preferences[PreferencesKeys.SHOW_EVENTS] = filterOptions.showEvents
             preferences[PreferencesKeys.SHOW_TASKS] = filterOptions.showTasks
             preferences[PreferencesKeys.SHOW_BIRTHDAYS] = filterOptions.showBirthdays
@@ -274,7 +269,6 @@ class SettingsRepository(private val context: Context) {
             suspend fun saveSidebarFilterVisibility(visibility: SidebarFilterVisibility) {
             context.dataStore.edit { preferences ->
                 preferences[PreferencesKeys.SIDEBAR_SHOW_HOLIDAYS] = visibility.showHolidays
-                preferences[PreferencesKeys.SIDEBAR_SHOW_SAINT_DAYS] = visibility.showSaintDays
                 preferences[PreferencesKeys.SIDEBAR_SHOW_EVENTS] = visibility.showEvents
                 preferences[PreferencesKeys.SIDEBAR_SHOW_TASKS] = visibility.showTasks
                 preferences[PreferencesKeys.SIDEBAR_SHOW_BIRTHDAYS] = visibility.showBirthdays

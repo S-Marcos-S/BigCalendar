@@ -251,7 +251,13 @@ class MainActivity : ComponentActivity() {
                                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 }
-                            }
+                            },
+                            backupDirectoryUri = uiState.backupDirectoryUri,
+                            backupFiles = uiState.backupFiles,
+                            isRestoringLocalBackup = uiState.isRestoringBackup,
+                            onBackupDirectorySelected = { uri -> viewModel.onBackupDirectorySelected(uri) },
+                            onRestoreLocalBackup = { uriString -> viewModel.restoreFromBackup(uriString) },
+                            onLoadLocalBackups = { viewModel.loadBackupFiles() }
                         )
                     } else {
 //... existing code ...
@@ -410,6 +416,9 @@ class MainActivity : ComponentActivity() {
                                 jsonCalendars = uiState.jsonCalendars,
                                 onImportPredefinedMilitaryCalendar = {
                                     viewModel.importPredefinedMilitaryCalendar()
+                                },
+                                onImportPredefinedSaintsCalendar = {
+                                    viewModel.importPredefinedSaintsCalendar()
                                 },
                                 currentLanguage = uiState.language,
                                                                 onLanguageChange = { language ->

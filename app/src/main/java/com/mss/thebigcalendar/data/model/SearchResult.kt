@@ -15,8 +15,7 @@ data class SearchResult(
 ) {
     enum class Type {
         ACTIVITY,    // Eventos, tarefas, aniversários
-        HOLIDAY,     // Feriados nacionais
-        SAINT_DAY    // Dias de santos
+        HOLIDAY      // Feriados nacionais
     }
 }
 
@@ -24,10 +23,24 @@ data class SearchResult(
  * Extensões para converter diferentes tipos de dados em SearchResult
  */
 fun Activity.toSearchResult(): SearchResult {
-    val date = try {
+    var date = try {
         LocalDate.parse(this.date)
     } catch (e: Exception) {
         null
+    }
+    
+    // Se for um agendamento JSON importado, ajustar o ano para o ano atual para exibição e navegação correta
+    if (date != null && this.location?.startsWith("JSON_IMPORTED_") == true) {
+        val currentYear = LocalDate.now().year
+        date = try {
+            date.withYear(currentYear)
+        } catch (e: Exception) {
+            if (date.monthValue == 2 && date.dayOfMonth == 29) {
+                LocalDate.of(currentYear, 2, 28)
+            } else {
+                date
+            }
+        }
     }
     
     val subtitle = when (this.activityType) {
@@ -53,7 +66,6 @@ fun Holiday.toSearchResult(): SearchResult {
     val subtitle = when (this.type) {
         HolidayType.NATIONAL -> "Feriado Nacional"
         HolidayType.COMMEMORATIVE -> "Data Comemorativa"
-        HolidayType.SAINT -> "Dia de Santo"
         HolidayType.JSON_IMPORT -> "Agendamento Importado"
     }
     
@@ -62,7 +74,7 @@ fun Holiday.toSearchResult(): SearchResult {
         title = this.name,
         subtitle = subtitle,
         date = date,
-        type = if (this.type == HolidayType.SAINT) SearchResult.Type.SAINT_DAY else SearchResult.Type.HOLIDAY,
+        type = SearchResult.Type.HOLIDAY,
         originalData = this
     )
 }
@@ -73,27 +85,8 @@ fun Holiday.toSearchResult(): SearchResult {
  */
 private fun parseHolidayDate(dateString: String, type: HolidayType): LocalDate? {
     return try {
-        when (type) {
-            HolidayType.SAINT -> {
-                // Para dias de santos, o formato é MM-dd
-                if (dateString.matches(Regex("\\d{2}-\\d{2}"))) {
-                    val parts = dateString.split("-")
-                    val month = parts[0].toInt()
-                    val day = parts[1].toInt()
-                    val currentYear = java.time.LocalDate.now().year
-                    java.time.LocalDate.of(currentYear, month, day)
-                } else {
-                    // Tentar formato ISO padrão
-                    java.time.LocalDate.parse(dateString)
-                }
-            }
-            else -> {
-                // Para outros tipos, usar formato ISO padrão
-                java.time.LocalDate.parse(dateString)
-            }
-        }
+        java.time.LocalDate.parse(dateString)
     } catch (e: Exception) {
-        // Se falhar o parsing, retornar null
         null
     }
 }

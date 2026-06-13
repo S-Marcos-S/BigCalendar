@@ -77,7 +77,8 @@ fun GeneralSettingsScreen(
     onCrashlyticsToggle: (Boolean) -> Unit,
     unfixHeadersOnScroll: Boolean = false,
     jsonCalendars: List<com.mss.thebigcalendar.data.model.JsonCalendar> = emptyList(),
-    onImportPredefinedMilitaryCalendar: () -> Unit = {}
+    onImportPredefinedMilitaryCalendar: () -> Unit = {},
+    onImportPredefinedSaintsCalendar: () -> Unit = {}
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
     Log.d("GeneralSettingsScreen", "🌐 Idioma atual: ${currentLanguage.displayName} (${currentLanguage.code})")
@@ -393,9 +394,12 @@ fun GeneralSettingsScreen(
 
             // Lista de filtros que podem ser adicionados ao menu
             val hasMilitaryImported = jsonCalendars.any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+            val hasSaintsImported = jsonCalendars.any { it.id == "PREDEFINED_SAINTS" }
             val hiddenFilters = buildList {
                 add("showHolidays" to stringResource(id = R.string.national_holidays))
-                add("showSaintDays" to stringResource(id = R.string.catholic_saint_days))
+                if (!hasSaintsImported) {
+                    add("saintsCalendar" to stringResource(id = R.string.catholic_saint_days))
+                }
                 if (!hasMilitaryImported) {
                     add("militaryHolidays" to stringResource(id = R.string.military_holidays))
                 }
@@ -412,7 +416,7 @@ fun GeneralSettingsScreen(
             val hasHiddenFilters = hiddenFilters.any { (key, _) ->
                 when (key) {
                     "showHolidays" -> !sidebarFilterVisibility.showHolidays
-                    "showSaintDays" -> !sidebarFilterVisibility.showSaintDays
+                    "saintsCalendar" -> true
                     "militaryHolidays" -> true
                     "showEvents" -> !sidebarFilterVisibility.showEvents
                     "showTasks" -> !sidebarFilterVisibility.showTasks
@@ -438,7 +442,7 @@ fun GeneralSettingsScreen(
                 hiddenFilters.forEach { (key, label) ->
                     val isHidden = when (key) {
                         "showHolidays" -> !sidebarFilterVisibility.showHolidays
-                        "showSaintDays" -> !sidebarFilterVisibility.showSaintDays
+                        "saintsCalendar" -> true
                         "militaryHolidays" -> true
                         "showEvents" -> !sidebarFilterVisibility.showEvents
                         "showTasks" -> !sidebarFilterVisibility.showTasks
@@ -458,6 +462,8 @@ fun GeneralSettingsScreen(
                                 .clickable { 
                                     if (key == "militaryHolidays") {
                                         onImportPredefinedMilitaryCalendar()
+                                    } else if (key == "saintsCalendar") {
+                                        onImportPredefinedSaintsCalendar()
                                     } else {
                                         onToggleSidebarFilterVisibility(key) 
                                     }

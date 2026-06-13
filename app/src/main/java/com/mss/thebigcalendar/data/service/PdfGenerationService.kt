@@ -706,11 +706,7 @@ class PdfGenerationService(private val context: Context) {
             }
         }
         
-        // Verificar dias de santos (segunda prioridade)
-        if (printOptions.includeSaintDays) {
-            // TODO: Adicionar lógica quando dias de santos estiverem disponíveis
-            // Por enquanto, vamos usar uma verificação placeholder
-        }
+        
         
         // Verificar aniversários
         if (printOptions.includeBirthdays) {
@@ -847,10 +843,7 @@ class PdfGenerationService(private val context: Context) {
             }
         }
         
-        // Dias de Santos
-        if (printOptions.includeSaintDays) {
-            // TODO: Implementar quando disponível
-        }
+        
         
         // Tarefas
         if (printOptions.includeTasks) {
