@@ -815,6 +815,7 @@
     <string name="onboarding_restore_desc">Encontramos um backup de %1$s na sua conta do Google Drive com %2$d atividades. Deseja restaurar essas informações?</string>
     <string name="onboarding_restore_btn">Restaurar Backup</string>
     <string name="onboarding_restore_skip">Não, iniciar do zero</string>
+    <string name="onboarding_restore_local_search_btn">Buscar Backup Local</string>
     <string name="onboarding_restore_loading">Restaurando backup...</string>
     <string name="onboarding_checking_backup">Buscando backups...</string>
     <!-- Onboarding Local Backup Restore -->

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -376,6 +377,7 @@ fun RestoreCloudBackupDialog(
     isLoading: Boolean,
     backupFile: DriveFile?,
     onRestore: () -> Unit,
+    onSelectLocalBackup: () -> Unit,
     onSkip: () -> Unit
 ) {
     if (backupFile == null) return
@@ -445,7 +447,7 @@ fun RestoreCloudBackupDialog(
                     enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -463,6 +465,21 @@ fun RestoreCloudBackupDialog(
                             fontWeight = FontWeight.Medium
                         )
                     }
+                }
+                
+                // Botão Buscar Backup Local
+                OutlinedButton(
+                    onClick = onSelectLocalBackup,
+                    enabled = !isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_restore_local_search_btn),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
                 
                 // Botão Pular / Iniciar do zero
@@ -988,6 +1005,10 @@ fun OnboardingFlow(
                     onRestore = {
                         onRestoreBackup(latestBackupFile.id, latestBackupFile.name)
                     },
+                    onSelectLocalBackup = {
+                        currentStep = OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
+                        directoryPickerLauncher.launch(null)
+                    },
                     onSkip = {
                         currentStep = OnboardingStep.COMPLETED
                         onboardingManager.markOnboardingCompleted()
@@ -1014,6 +1035,39 @@ fun OnboardingFlow(
                         onComplete()
                     }
                 )
+            }
+
+            // Janela de carregamento ao restaurar backup local
+            if (isRestoringLocalBackup) {
+                Dialog(
+                    onDismissRequest = {},
+                    properties = DialogProperties(
+                        dismissOnBackPress = false,
+                        dismissOnClickOutside = false
+                    )
+                ) {
+                    Card(
+                        modifier = Modifier.padding(16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = stringResource(R.string.onboarding_restore_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
             }
         }
     }
