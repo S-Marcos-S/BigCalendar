@@ -3146,23 +3146,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 val uri = currentState.selectedJsonUri
                 
                 if (fileName != null && uri != null) {
-                    // Criar e salvar o calendário JSON
-                    val jsonCalendar = JsonCalendar(
-                        id = UUID.randomUUID().toString(),
-                        title = title,
-                        color = color,
-                        fileName = fileName,
-                        importDate = System.currentTimeMillis(),
-                        isVisible = true
-                    )
-                    
-                    // Salvar o calendário JSON
-                    jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
-                    
-                    // Processar o arquivo JSON
+                    // Processar o arquivo JSON (salva atividades e depois o calendário)
                     processJsonFile(fileName, uri, title, color)
                 } else if (jsonContent.isNotBlank()) {
-                    // Processar conteúdo JSON digitado diretamente
+                    // Processar conteúdo JSON digitado diretamente (salva atividades e depois o calendário)
                     processJsonContent(jsonContent, title, color)
                 } else {
                     Log.e(TAG, "Nem arquivo nem conteúdo JSON fornecidos")
@@ -3234,11 +3221,19 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 jsonSchedule.toActivity(2025, calendarTitle, calendarColor)
             }
             
-            // Salvar no banco de dados
-            activities.forEach { activity ->
-                activityRepository.saveActivity(activity)
-            }
+            // 1. Salvar no banco de dados primeiro!
+            activityRepository.saveAllActivities(activities)
             
+            // 2. Criar e salvar o calendário JSON depois, para que ao disparar o collect as atividades já existam
+            val jsonCalendar = JsonCalendar(
+                id = UUID.randomUUID().toString(),
+                title = calendarTitle,
+                color = calendarColor,
+                fileName = fileName,
+                importDate = System.currentTimeMillis(),
+                isVisible = true
+            )
+            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Recarregar atividades para atualizar a UI
             loadActivitiesForCurrentMonth()
@@ -3260,18 +3255,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private suspend fun processJsonContent(jsonContent: String, calendarTitle: String, calendarColor: androidx.compose.ui.graphics.Color) {
         try {
             
-            // Criar e salvar o calendário JSON
-            val jsonCalendar = JsonCalendar(
-                id = UUID.randomUUID().toString(),
-                title = calendarTitle,
-                color = calendarColor,
-                fileName = "conteudo_digitado.json",
-                importDate = System.currentTimeMillis(),
-                isVisible = true
-            )
             
-            // Salvar o calendário JSON
-            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Fazer parse do JSON
             Log.d(TAG, "JSON string length: ${jsonContent.length}")
@@ -3318,11 +3302,19 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 jsonSchedule.toActivity(2025, calendarTitle, calendarColor)
             }
             
-            // Salvar no banco de dados
-            activities.forEach { activity ->
-                activityRepository.saveActivity(activity)
-            }
+            // 1. Salvar no banco de dados primeiro!
+            activityRepository.saveAllActivities(activities)
             
+            // 2. Criar e salvar o calendário JSON depois
+            val jsonCalendar = JsonCalendar(
+                id = UUID.randomUUID().toString(),
+                title = calendarTitle,
+                color = calendarColor,
+                fileName = "conteudo_digitado.json",
+                importDate = System.currentTimeMillis(),
+                isVisible = true
+            )
+            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Recarregar atividades para atualizar a UI
             loadActivitiesForCurrentMonth()
@@ -3415,6 +3407,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
         
         _uiState.update { it.copy(jsonHolidays = jsonHolidaysMap) }
+        updateAllDateDependentUI()
     }
     
     /**
@@ -3436,10 +3429,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         return@filter false
                     }
                     
-                    // Comparar cores usando strings para evitar problemas de precisão
+                    // Comparar por título/location (preferencial) ou cor
+                    val matchesLocation = activity.location == "JSON_IMPORTED_${calendar.title}"
                     val activityColorString = activity.categoryColor
                     val calendarColorString = String.format("#%08X", calendar.color.toArgb())
-                    activityColorString == calendarColorString
+                    val matchesColor = activityColorString.equals(calendarColorString, ignoreCase = true)
+                    
+                    matchesLocation || matchesColor
                 } catch (e: Exception) {
                     false
                 }
@@ -3580,6 +3576,75 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             
         } catch (e: Exception) {
             Log.e("CalendarViewModel", "Erro ao limpar atividades JSON antigas", e)
+        }
+    }
+
+    fun importPredefinedMilitaryCalendar() {
+        viewModelScope.launch {
+            try {
+                val alreadyImported = jsonCalendarRepository.getAllJsonCalendars().first().any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+                if (alreadyImported) return@launch
+                
+                val context = getApplication<Application>()
+                val rawId = context.resources.getIdentifier("military_holidays", "raw", context.packageName)
+                if (rawId == 0) {
+                    Log.e(TAG, "Recurso raw/military_holidays não encontrado")
+                    return@launch
+                }
+                val inputStream = context.resources.openRawResource(rawId)
+                val jsonString = inputStream.use { it.bufferedReader().readText() }
+                
+                val calendarTitle = getApplication<Application>().getString(R.string.military_holidays)
+                val calendarColor = androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                
+                val jsonArray = JSONArray(jsonString)
+                val schedules = mutableListOf<JsonSchedule>()
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val name = jsonObject.getString("name")
+                    val date = jsonObject.getString("date")
+                    val summary = try {
+                        jsonObject.optString("summary", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val wikipediaLink = try {
+                        jsonObject.optString("wikipediaLink", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    schedules.add(JsonSchedule(name, date, summary, wikipediaLink))
+                }
+                
+                val activities = schedules.map { jsonSchedule ->
+                    jsonSchedule.toActivity(2025, calendarTitle, calendarColor)
+                }
+                
+                // 1. Salvar no banco de dados primeiro!
+                activityRepository.saveAllActivities(activities)
+                
+                // 2. Salvar o calendário depois
+                val jsonCalendar = JsonCalendar(
+                    id = "PREDEFINED_MILITARY_HOLIDAYS",
+                    title = calendarTitle,
+                    color = calendarColor,
+                    fileName = "military_holidays.json",
+                    importDate = System.currentTimeMillis(),
+                    isVisible = true
+                )
+                jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
+                
+                // Recarregar atividades para atualizar a UI
+                loadActivitiesForCurrentMonth()
+                updateJsonCalendarActivitiesForSelectedDate()
+                
+                viewModelScope.launch {
+                    delay(500)
+                    notifyWidgetsDataChanged()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao importar feriados militares predefinidos", e)
+            }
         }
     }
 

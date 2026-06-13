@@ -75,7 +75,9 @@ fun GeneralSettingsScreen(
     onOpenCalendarVisualization: () -> Unit = {},
     isCrashlyticsEnabled: Boolean,
     onCrashlyticsToggle: (Boolean) -> Unit,
-    unfixHeadersOnScroll: Boolean = false
+    unfixHeadersOnScroll: Boolean = false,
+    jsonCalendars: List<com.mss.thebigcalendar.data.model.JsonCalendar> = emptyList(),
+    onImportPredefinedMilitaryCalendar: () -> Unit = {}
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
     Log.d("GeneralSettingsScreen", "🌐 Idioma atual: ${currentLanguage.displayName} (${currentLanguage.code})")
@@ -390,23 +392,28 @@ fun GeneralSettingsScreen(
 
 
             // Lista de filtros que podem ser adicionados ao menu
-            val hiddenFilters = listOf(
-                "showHolidays" to stringResource(id = R.string.national_holidays),
-                "showSaintDays" to stringResource(id = R.string.catholic_saint_days),
-                "showEvents" to stringResource(id = R.string.events),
-                "showTasks" to stringResource(id = R.string.tasks),
-                "showBirthdays" to stringResource(id = R.string.birthday),
-                "showNotes" to stringResource(id = R.string.note),
-                "showCommemorative" to stringResource(id = R.string.commemorative_dates),
-                "showCompletedActivities" to stringResource(id = R.string.completed_tasks_filter),
-                "showMoonPhases" to stringResource(id = R.string.moon_phases_filter)
-            )
+            val hasMilitaryImported = jsonCalendars.any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+            val hiddenFilters = buildList {
+                add("showHolidays" to stringResource(id = R.string.national_holidays))
+                add("showSaintDays" to stringResource(id = R.string.catholic_saint_days))
+                if (!hasMilitaryImported) {
+                    add("militaryHolidays" to stringResource(id = R.string.military_holidays))
+                }
+                add("showEvents" to stringResource(id = R.string.events))
+                add("showTasks" to stringResource(id = R.string.tasks))
+                add("showBirthdays" to stringResource(id = R.string.birthday))
+                add("showNotes" to stringResource(id = R.string.note))
+                add("showCommemorative" to stringResource(id = R.string.commemorative_dates))
+                add("showCompletedActivities" to stringResource(id = R.string.completed_tasks_filter))
+                add("showMoonPhases" to stringResource(id = R.string.moon_phases_filter))
+            }
             
             // Verificar se há filtros ocultos
             val hasHiddenFilters = hiddenFilters.any { (key, _) ->
                 when (key) {
                     "showHolidays" -> !sidebarFilterVisibility.showHolidays
                     "showSaintDays" -> !sidebarFilterVisibility.showSaintDays
+                    "militaryHolidays" -> true
                     "showEvents" -> !sidebarFilterVisibility.showEvents
                     "showTasks" -> !sidebarFilterVisibility.showTasks
                     "showBirthdays" -> !sidebarFilterVisibility.showBirthdays
@@ -432,6 +439,7 @@ fun GeneralSettingsScreen(
                     val isHidden = when (key) {
                         "showHolidays" -> !sidebarFilterVisibility.showHolidays
                         "showSaintDays" -> !sidebarFilterVisibility.showSaintDays
+                        "militaryHolidays" -> true
                         "showEvents" -> !sidebarFilterVisibility.showEvents
                         "showTasks" -> !sidebarFilterVisibility.showTasks
                         "showBirthdays" -> !sidebarFilterVisibility.showBirthdays
@@ -447,7 +455,13 @@ fun GeneralSettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onToggleSidebarFilterVisibility(key) }
+                                .clickable { 
+                                    if (key == "militaryHolidays") {
+                                        onImportPredefinedMilitaryCalendar()
+                                    } else {
+                                        onToggleSidebarFilterVisibility(key) 
+                                    }
+                                }
                                 .padding(vertical = 8.dp)
                         ) {
                             Text(

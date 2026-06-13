@@ -407,6 +407,10 @@ class MainActivity : ComponentActivity() {
                                 onToggleSidebarFilterVisibility = { filterKey ->
                                     viewModel.toggleSidebarFilterVisibility(filterKey)
                                 },
+                                jsonCalendars = uiState.jsonCalendars,
+                                onImportPredefinedMilitaryCalendar = {
+                                    viewModel.importPredefinedMilitaryCalendar()
+                                },
                                 currentLanguage = uiState.language,
                                                                 onLanguageChange = { language ->
                                                                     lifecycleScope.launch {
