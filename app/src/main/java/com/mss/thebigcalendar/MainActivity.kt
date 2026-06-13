@@ -2,8 +2,11 @@ package com.mss.thebigcalendar
 
 import android.Manifest
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import com.mss.thebigcalendar.data.model.AppIconMode
+import android.util.Log
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -423,20 +426,22 @@ class MainActivity : ComponentActivity() {
                                     viewModel.importPredefinedSaintsCalendar()
                                 },
                                 currentLanguage = uiState.language,
-                                                                onLanguageChange = { language ->
-                                                                    lifecycleScope.launch {
-                                                                        viewModel.onLanguageChange(language)
-                                                                        recreate()
-                                                                    }
-                                                                },
-                                                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
-                                                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                                                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
-                                                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
-                                                            )
-                                                        }
-                                                        uiState.isCalendarVisualizationSettingsOpen -> {
-                                                            CalendarVisualizationSettingsScreen(
+                                onLanguageChange = { language ->
+                                    lifecycleScope.launch {
+                                        viewModel.onLanguageChange(language)
+                                        recreate()
+                                    }
+                                },
+                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
+                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
+                                appIconMode = uiState.appIconMode,
+                                onAppIconModeChange = { viewModel.onAppIconModeChange(it) }
+                            )
+                        }
+                        uiState.isCalendarVisualizationSettingsOpen -> {
+                            CalendarVisualizationSettingsScreen(
                                 onBackClick = { viewModel.closeCalendarVisualizationSettings() }
                             )
                         }
@@ -510,6 +515,70 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         // ✅ Marcar que o app ainda está em execução (mas não ativo)
         setAppRunningState(true)
+        applyAppIconSettingsOnExit()
+    }
+
+    private fun applyAppIconSettingsOnExit() {
+        val uiState = viewModel.uiState.value
+        val mode = uiState.appIconMode
+        val theme = uiState.theme
+        
+        val targetAlias = when (mode) {
+            AppIconMode.WHITE -> "com.mss.thebigcalendar.MainActivityAliasWhite"
+            AppIconMode.BLACK -> "com.mss.thebigcalendar.MainActivityAliasBlack"
+            AppIconMode.DYNAMIC -> {
+                val isDarkMode = when (theme) {
+                    Theme.LIGHT -> false
+                    Theme.DARK -> true
+                    Theme.SYSTEM -> {
+                        val nightModeFlags = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                        nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    }
+                }
+                if (isDarkMode) {
+                    "com.mss.thebigcalendar.MainActivityAliasBlack"
+                } else {
+                    "com.mss.thebigcalendar.MainActivityAliasWhite"
+                }
+            }
+        }
+
+        val packageManager = packageManager
+        val whiteComponent = ComponentName(this, "com.mss.thebigcalendar.MainActivityAliasWhite")
+        val blackComponent = ComponentName(this, "com.mss.thebigcalendar.MainActivityAliasBlack")
+
+        try {
+            val currentWhiteState = packageManager.getComponentEnabledSetting(whiteComponent)
+            val currentBlackState = packageManager.getComponentEnabledSetting(blackComponent)
+
+            val targetWhiteState = if (targetAlias == "com.mss.thebigcalendar.MainActivityAliasWhite") {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+
+            val targetBlackState = if (targetAlias == "com.mss.thebigcalendar.MainActivityAliasBlack") {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+
+            if (currentWhiteState != targetWhiteState || currentBlackState != targetBlackState) {
+                Log.d("MainActivity", "🔄 Alternando ícone do launcher: Branco=$targetWhiteState, Preto=$targetBlackState")
+                packageManager.setComponentEnabledSetting(
+                    whiteComponent,
+                    targetWhiteState,
+                    PackageManager.DONT_KILL_APP
+                )
+                packageManager.setComponentEnabledSetting(
+                    blackComponent,
+                    targetBlackState,
+                    PackageManager.DONT_KILL_APP
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Erro ao configurar componentes de ícone do app", e)
+        }
     }
     
     override fun onDestroy() {

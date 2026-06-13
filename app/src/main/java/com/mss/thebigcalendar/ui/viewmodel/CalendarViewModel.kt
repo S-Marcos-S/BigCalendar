@@ -16,6 +16,7 @@ import com.mss.thebigcalendar.data.model.CalendarUiState
 import com.mss.thebigcalendar.data.model.Holiday
 import com.mss.thebigcalendar.data.model.SearchResult
 import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.AppIconMode
 import com.mss.thebigcalendar.data.model.ViewMode
 import com.mss.thebigcalendar.data.model.JsonSchedule
 import com.mss.thebigcalendar.data.model.toActivity
@@ -557,6 +558,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.hasSeenMainOnboarding.collect { seen ->
                 _uiState.update { it.copy(hasSeenMainOnboarding = seen) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.appIconMode.collect { mode ->
+                _uiState.update { it.copy(appIconMode = mode) }
             }
         }
         viewModelScope.launch {
@@ -1277,6 +1283,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun onThemeChange(newTheme: Theme) {
         viewModelScope.launch {
             settingsRepository.saveTheme(newTheme)
+        }
+    }
+
+    fun onAppIconModeChange(mode: AppIconMode) {
+        viewModelScope.launch {
+            settingsRepository.saveAppIconMode(mode)
         }
     }
 

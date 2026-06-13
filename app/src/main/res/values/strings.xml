@@ -833,6 +833,12 @@
     <string name="onboarding_restore_local_select_other">Selecionar outra pasta</string>
     <string name="onboarding_restore_local_skip">Concluir sem restaurar</string>
     <string name="onboarding_restore_local_activities_size">Atividades: %1$d • %2$d KB</string>
+    <!-- App Icon Settings -->
+    <string name="settings_app_icon_title">Ícone do Aplicativo</string>
+    <string name="settings_app_icon_mode_dynamic">Dinâmico (conforme o tema)</string>
+    <string name="settings_app_icon_mode_white">Branco</string>
+    <string name="settings_app_icon_mode_black">Preto</string>
+    <string name="settings_app_icon_dialog_title">Selecione o Ícone</string>
     <string name="more_options">Mais opções</string>
     <string name="change_download_location">Mudar local de download</string>
 </resources>

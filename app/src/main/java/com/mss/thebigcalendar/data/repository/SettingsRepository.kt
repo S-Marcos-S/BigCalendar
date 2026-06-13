@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.mss.thebigcalendar.data.model.CalendarFilterOptions
 import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.AppIconMode
 import com.mss.thebigcalendar.data.model.AnimationType
 import com.mss.thebigcalendar.data.model.SidebarFilterVisibility
 import com.mss.thebigcalendar.data.model.Language
@@ -23,6 +24,7 @@ class SettingsRepository(private val context: Context) {
 
     private object PreferencesKeys {
         val THEME = stringPreferencesKey("theme")
+        val APP_ICON_MODE = stringPreferencesKey("app_icon_mode")
         val WELCOME_NAME = stringPreferencesKey("welcome_name")
         val SHOW_HOLIDAYS = booleanPreferencesKey("show_holidays")
         val SHOW_EVENTS = booleanPreferencesKey("show_events")
@@ -98,6 +100,16 @@ class SettingsRepository(private val context: Context) {
         .map { preferences ->
             val themeName = preferences[PreferencesKeys.THEME] ?: Theme.SYSTEM.name
             Theme.valueOf(themeName)
+        }
+
+    val appIconMode: Flow<AppIconMode> = context.dataStore.data
+        .map { preferences ->
+            val iconModeName = preferences[PreferencesKeys.APP_ICON_MODE] ?: AppIconMode.DYNAMIC.name
+            try {
+                AppIconMode.valueOf(iconModeName)
+            } catch (e: Exception) {
+                AppIconMode.DYNAMIC
+            }
         }
 
     val welcomeName: Flow<String> = context.dataStore.data
@@ -225,6 +237,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveTheme(theme: Theme) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.THEME] = theme.name
+        }
+    }
+
+    suspend fun saveAppIconMode(mode: AppIconMode) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.APP_ICON_MODE] = mode.name
         }
     }
 

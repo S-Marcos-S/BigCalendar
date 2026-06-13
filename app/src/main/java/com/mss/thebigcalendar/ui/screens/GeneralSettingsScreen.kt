@@ -50,6 +50,9 @@ import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Language
 import com.mss.thebigcalendar.data.model.Theme
 import com.mss.thebigcalendar.ui.components.LanguageSelectionDialog
+import com.mss.thebigcalendar.data.model.AppIconMode
+import com.mss.thebigcalendar.ui.components.AppIconSelectionDialog
+import androidx.compose.material.icons.filled.Android
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,7 +81,9 @@ fun GeneralSettingsScreen(
     unfixHeadersOnScroll: Boolean = false,
     jsonCalendars: List<com.mss.thebigcalendar.data.model.JsonCalendar> = emptyList(),
     onImportPredefinedMilitaryCalendar: () -> Unit = {},
-    onImportPredefinedSaintsCalendar: () -> Unit = {}
+    onImportPredefinedSaintsCalendar: () -> Unit = {},
+    appIconMode: AppIconMode = AppIconMode.DYNAMIC,
+    onAppIconModeChange: (AppIconMode) -> Unit = {}
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
     Log.d("GeneralSettingsScreen", "🌐 Idioma atual: ${currentLanguage.displayName} (${currentLanguage.code})")
@@ -86,6 +91,7 @@ fun GeneralSettingsScreen(
     val scope = rememberCoroutineScope()
     var welcomeNameInput by remember { mutableStateOf(welcomeName) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showAppIconDialog by remember { mutableStateOf(false) }
 
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = if (unfixHeadersOnScroll) {
@@ -358,6 +364,49 @@ fun GeneralSettingsScreen(
                 }
             }
 
+            // Configuração do ícone do aplicativo
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Android,
+                    contentDescription = stringResource(id = R.string.settings_app_icon_title),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(id = R.string.settings_app_icon_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { 
+                        showAppIconDialog = true 
+                    },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    val modeLabel = when (appIconMode) {
+                        AppIconMode.DYNAMIC -> stringResource(id = R.string.settings_app_icon_mode_dynamic)
+                        AppIconMode.WHITE -> stringResource(id = R.string.settings_app_icon_mode_white)
+                        AppIconMode.BLACK -> stringResource(id = R.string.settings_app_icon_mode_black)
+                    }
+                    val iconText = when (appIconMode) {
+                        AppIconMode.DYNAMIC -> "🔄"
+                        AppIconMode.WHITE -> "⚪"
+                        AppIconMode.BLACK -> "⚫"
+                    }
+                    Text(
+                        text = "$iconText $modeLabel",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
             // Crashlytics Opt-in
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -504,6 +553,15 @@ fun GeneralSettingsScreen(
                 Log.d("GeneralSettingsScreen", "❌ Diálogo de idioma fechado")
                 showLanguageDialog = false 
             }
+        )
+    }
+
+    // Dialog de seleção de ícone
+    if (showAppIconDialog) {
+        AppIconSelectionDialog(
+            currentMode = appIconMode,
+            onModeSelected = onAppIconModeChange,
+            onDismiss = { showAppIconDialog = false }
         )
     }
 }

@@ -129,6 +129,7 @@ data class CalendarUiState(
     val backupDirectoryUri: String? = null,
     val backupFiles: List<BackupInfo> = emptyList(),
     val isListingLocalBackups: Boolean = false,
+    val appIconMode: AppIconMode = AppIconMode.DYNAMIC,
     val showCompletedActivities: Boolean = false,
     val completedActivities: List<Activity> = emptyList(),
     val trashSortOrder: String = "newest_first",
@@ -173,6 +174,7 @@ data class CalendarUiState(
 )
 
 enum class Theme { LIGHT, DARK, SYSTEM }
+enum class AppIconMode { DYNAMIC, WHITE, BLACK }
 enum class ViewMode { MONTHLY, YEARLY }
 enum class HolidayType { NATIONAL, COMMEMORATIVE, JSON_IMPORT }
 @Immutable
