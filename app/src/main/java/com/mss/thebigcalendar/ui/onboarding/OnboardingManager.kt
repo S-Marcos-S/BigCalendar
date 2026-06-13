@@ -488,7 +488,9 @@ fun RestoreCloudBackupDialog(
 fun RestoreLocalBackupPromptDialog(
     backupDirectoryUri: String?,
     backupFiles: List<BackupInfo>,
+    isListing: Boolean,
     isRestoring: Boolean,
+    localBackupUriBeingRestored: String?,
     onSelectFolder: () -> Unit,
     onRestoreBackup: (String) -> Unit,
     onSkip: () -> Unit
@@ -566,7 +568,23 @@ fun RestoreLocalBackupPromptDialog(
                     }
                 } else {
                     // Pasta já foi selecionada
-                    if (backupFiles.isEmpty()) {
+                    if (isListing) {
+                        // Título / Estado de busca
+                        Text(
+                            text = stringResource(R.string.onboarding_checking_backup),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+                    } else if (backupFiles.isEmpty()) {
                         // Título
                         Text(
                             text = stringResource(R.string.onboarding_restore_local_no_backups),
@@ -669,7 +687,8 @@ fun RestoreLocalBackupPromptDialog(
                                             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
                                             modifier = Modifier.height(32.dp)
                                         ) {
-                                            if (isRestoring) {
+                                            val isThisItemRestoring = isRestoring && localBackupUriBeingRestored == backupInfo.uri
+                                            if (isThisItemRestoring) {
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(16.dp),
                                                     strokeWidth = 2.dp,
@@ -725,7 +744,9 @@ fun OnboardingFlow(
     onRequestNotificationPermission: () -> Unit,
     backupDirectoryUri: String? = null,
     backupFiles: List<BackupInfo> = emptyList(),
+    isListingLocalBackups: Boolean = false,
     isRestoringLocalBackup: Boolean = false,
+    localBackupUriBeingRestored: String? = null,
     onBackupDirectorySelected: (Uri) -> Unit = {},
     onRestoreLocalBackup: (String) -> Unit = {},
     onLoadLocalBackups: () -> Unit = {}
@@ -980,7 +1001,9 @@ fun OnboardingFlow(
                 RestoreLocalBackupPromptDialog(
                     backupDirectoryUri = backupDirectoryUri,
                     backupFiles = backupFiles,
+                    isListing = isListingLocalBackups,
                     isRestoring = isRestoringLocalBackup,
+                    localBackupUriBeingRestored = localBackupUriBeingRestored,
                     onSelectFolder = {
                         directoryPickerLauncher.launch(null)
                     },

@@ -2954,20 +2954,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val directoryUriString = _uiState.value.backupDirectoryUri
             if (directoryUriString.isNullOrBlank()) {
-                _uiState.update { it.copy(backupFiles = emptyList()) }
+                _uiState.update { it.copy(backupFiles = emptyList(), isListingLocalBackups = false) }
                 return@launch
             }
 
+            _uiState.update { it.copy(isListingLocalBackups = true) }
             try {
                 val directoryUri = Uri.parse(directoryUriString)
                 val backupDocumentFiles = backupService.listBackupFiles(directoryUri)
                 val backupInfos = backupDocumentFiles.mapNotNull { file ->
                     backupService.getBackupInfo(file).getOrNull()
                 }
-                _uiState.update { it.copy(backupFiles = backupInfos) }
+                _uiState.update { it.copy(backupFiles = backupInfos, isListingLocalBackups = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro ao carregar arquivos de backup via SAF", e)
-                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.") }
+                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.", isListingLocalBackups = false) }
             }
         }
     }
@@ -2993,6 +2994,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(
                     backupMessage = null,
                     isRestoringBackup = true,
+                    localBackupUriBeingRestored = backupUri,
                     restoreProgress = 0f
                 ) }
 
@@ -3023,13 +3025,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         viewModelScope.launch {
                             delay(500)
                             notifyWidgetsDataChanged()
-                            _uiState.update { it.copy(isRestoringBackup = false, restoreProgress = 1f) }
+                            _uiState.update { it.copy(
+                                isRestoringBackup = false,
+                                localBackupUriBeingRestored = null,
+                                restoreProgress = 1f
+                            ) }
                         }
                     },
                     onFailure = { exception ->
                         _uiState.update { it.copy(
                             backupMessage = "Erro ao restaurar backup: ${exception.message}",
-                            isRestoringBackup = false
+                            isRestoringBackup = false,
+                            localBackupUriBeingRestored = null
                         ) }
                     }
                 )
@@ -3037,7 +3044,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 _uiState.update { it.copy(
                     backupMessage = "Erro inesperado: ${e.message}",
-                    isRestoringBackup = false
+                    isRestoringBackup = false,
+                    localBackupUriBeingRestored = null
                 ) }
             }
         }

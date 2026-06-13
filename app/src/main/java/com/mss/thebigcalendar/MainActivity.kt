@@ -254,7 +254,9 @@ class MainActivity : ComponentActivity() {
                             },
                             backupDirectoryUri = uiState.backupDirectoryUri,
                             backupFiles = uiState.backupFiles,
+                            isListingLocalBackups = uiState.isListingLocalBackups,
                             isRestoringLocalBackup = uiState.isRestoringBackup,
+                            localBackupUriBeingRestored = uiState.localBackupUriBeingRestored,
                             onBackupDirectorySelected = { uri -> viewModel.onBackupDirectorySelected(uri) },
                             onRestoreLocalBackup = { uriString -> viewModel.restoreFromBackup(uriString) },
                             onLoadLocalBackups = { viewModel.loadBackupFiles() }
