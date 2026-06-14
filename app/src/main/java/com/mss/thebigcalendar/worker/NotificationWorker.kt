@@ -42,6 +42,24 @@ class NotificationWorker(
                 if (activity.notificationSettings.isEnabled && 
                     activity.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE) {
                     
+                    // Se for recorrente, verificar se a ocorrência atual está excluída (concluída/excluída)
+                    val isCurrentOccurrenceExcluded = if (activity.recurrenceRule?.isNotEmpty() == true) {
+                        if (activity.recurrenceRule.startsWith("FREQ=HOURLY")) {
+                            val timeString = activity.startTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                            val instanceId = if (timeString != null) "${activity.id}_${activity.date}_$timeString" else "${activity.id}_${activity.date}"
+                            activity.excludedInstances.contains(instanceId)
+                        } else {
+                            activity.excludedDates.contains(activity.date)
+                        }
+                    } else {
+                        false
+                    }
+                    
+                    if (isCurrentOccurrenceExcluded) {
+                        Log.d(TAG, "🔔 NotificationWorker - Ocorrência atual da atividade recorrente ${activity.title} (${activity.id}) está excluída/concluída. Pulando.")
+                        return@forEach
+                    }
+                    
                     // Calcular quando a notificação deveria ter sido enviada
                     val triggerTime = getTriggerTimeWithNotificationType(activity)
                     

@@ -2252,6 +2252,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     
                         // Atualizar a atividade base com a nova lista de exclusões
                         activityRepository.saveActivity(updatedBaseActivity)
+                        
+                        // Cancelar a notificação para a instância específica concluída
+                        val notificationService = NotificationService(getApplication())
+                        notificationService.cancelNotification(activityId)
+                        
                         // Atualizar a UI
                         updateAllDateDependentUI()
                         
@@ -2297,6 +2302,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         
                         // Atualizar a atividade base com a nova lista de exclusões
                         activityRepository.saveActivity(updatedBaseActivity)
+
+                        // Cancelar a notificação para a primeira instância recorrente
+                        val notificationService = NotificationService(getApplication())
+                        val timeString = activityToComplete.startTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                        val instanceId = if (activityToComplete.recurrenceRule?.startsWith("FREQ=HOURLY") == true && timeString != null) {
+                            "${activityToComplete.id}_${activityToComplete.date}_$timeString"
+                        } else {
+                            "${activityToComplete.id}_${activityToComplete.date}"
+                        }
+                        notificationService.cancelNotification(instanceId)
 
                         // Atualizar a UI
                         updateAllDateDependentUI()

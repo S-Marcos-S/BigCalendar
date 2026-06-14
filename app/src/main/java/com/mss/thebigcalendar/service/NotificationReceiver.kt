@@ -89,6 +89,32 @@ class NotificationReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 
+                // ✅ Verificar se a instância específica foi excluída ou concluída
+                val isExcluded = if (activityId != null && activityId.contains("_")) {
+                    val parts = activityId.split("_")
+                    val baseId = parts[0]
+                    val instanceDate = parts.getOrNull(1)
+                    val baseActivity = activities.find { it.id == baseId }
+                    if (baseActivity != null) {
+                        if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true) {
+                            baseActivity.excludedInstances.contains(activityId)
+                        } else {
+                            instanceDate != null && baseActivity.excludedDates.contains(instanceDate)
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+                
+                if (isExcluded) {
+                    Log.d(TAG, "🔔 Instância $activityId foi marcada como concluída/excluída - cancelando notificação sem exibir")
+                    val notificationService = NotificationService(context)
+                    notificationService.cancelNotification(activityId ?: "")
+                    return@launch
+                }
+                
                 Log.d(TAG, "🔔 Atividade $activityId ainda existe - processando notificação")
                 
                 Log.d(TAG, "🔔 Buscando atividade com ID: $activityId")

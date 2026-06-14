@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import com.mss.thebigcalendar.MainActivity
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.service.HighVisibilityNotificationService
@@ -433,53 +434,56 @@ private fun HighVisibilityNotificationScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp),
             modifier = Modifier.padding(32.dp)
         ) {
-            // Título da notificação
-            Text(
-                text = stringResource(id = R.string.high_visibility_notification_title),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Red
-            )
-            
-            // Título da atividade
+            // Nome do agendamento na parte superior da tela
             Text(
                 text = activityTitle,
-                fontSize = 28.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
+                textAlign = TextAlign.Center
             )
             
-            // Descrição da atividade
+            // Data e horário da atividade (sem segundos) abaixo do nome
+            val formattedDate = activityDate?.let {
+                try {
+                    val parsed = java.time.LocalDate.parse(it)
+                    parsed.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                } catch (e: Exception) {
+                    it
+                }
+            }
+            val formattedTime = activityTime?.let {
+                try {
+                    val parsed = java.time.LocalTime.parse(it)
+                    parsed.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                } catch (e: Exception) {
+                    if (it.length >= 5) it.substring(0, 5) else it
+                }
+            }
+            if (formattedDate != null || formattedTime != null) {
+                val dateTimeText = buildString {
+                    formattedDate?.let { append(it) }
+                    if (formattedDate != null && formattedTime != null) append(" | ")
+                    formattedTime?.let { append(it) }
+                }
+                
+                Text(
+                    text = dateTimeText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.LightGray
+                )
+            }
+            
+            // Descrição da atividade abaixo da data e hora
             activityDescription?.let { description ->
                 Text(
                     text = description,
                     fontSize = 16.sp,
                     color = Color.Gray,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-            
-            // Horário atual
-            Text(
-                text = currentTime.format(DateTimeFormatter.ofPattern("HH:mm:ss")),
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            
-            // Data e horário da atividade
-            if (activityDate != null || activityTime != null) {
-                val dateTimeText = buildString {
-                    activityDate?.let { append(stringResource(id = R.string.high_visibility_date_label, it)) }
-                    if (activityDate != null && activityTime != null) append(stringResource(id = R.string.high_visibility_date_time_separator))
-                    activityTime?.let { append(stringResource(id = R.string.high_visibility_time_label, it)) }
-                }
-                
-                Text(
-                    text = dateTimeText,
-                    fontSize = 14.sp,
-                    color = Color.Gray
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    textAlign = TextAlign.Center
                 )
             }
             
@@ -490,24 +494,6 @@ private fun HighVisibilityNotificationScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Botão para abrir o app
-                Button(
-                    onClick = onOpenApp,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Blue
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                ) {
-                    Text(
-                        text = "ABRIR APP",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
                 // Botões de adiamento
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
