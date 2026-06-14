@@ -50,6 +50,7 @@ import com.mss.thebigcalendar.ui.screens.GeneralSettingsScreen
 import com.mss.thebigcalendar.ui.screens.JsonConfigScreen
 import com.mss.thebigcalendar.ui.screens.PrintCalendarScreen
 import com.mss.thebigcalendar.ui.screens.SchedulesScreen
+import com.mss.thebigcalendar.ui.screens.SyncSettingsScreen
 import com.mss.thebigcalendar.ui.screens.SearchScreen
 import com.mss.thebigcalendar.ui.screens.TrashScreen
 import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
@@ -186,6 +187,7 @@ class MainActivity : ComponentActivity() {
                     state.activityToEdit != null -> viewModel.closeCreateActivityModal()
                     state.isSidebarOpen -> viewModel.closeSidebar()
                     state.isCalendarVisualizationSettingsOpen -> viewModel.closeCalendarVisualizationSettings()
+                    state.isSyncScreenOpen -> viewModel.closeSyncSettings()
                     state.isSettingsScreenOpen -> viewModel.closeSettingsScreen()
                     state.isSearchScreenOpen -> viewModel.closeSearchScreen()
                     state.isChartScreenOpen -> viewModel.closeChartScreen()
@@ -330,12 +332,21 @@ class MainActivity : ComponentActivity() {
                         } else {
                             when {
                         uiState.isJsonConfigScreenOpen -> {
+                            val hasMilitaryImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+                            val hasSaintsImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_SAINTS" }
+                            val hasProfessionalImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_PROFESSIONAL_DAYS" }
                             JsonConfigScreen(
                                 fileName = uiState.selectedJsonFileName,
                                 onBackClick = { viewModel.closeJsonConfigScreen() },
                                 onSaveClick = { title, color, jsonContent -> viewModel.saveJsonConfig(title, color, jsonContent) },
                                 onSelectFileClick = { openJsonFilePicker() },
-                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
+                                hasMilitaryImported = hasMilitaryImported,
+                                hasSaintsImported = hasSaintsImported,
+                                hasProfessionalImported = hasProfessionalImported,
+                                onImportPredefinedMilitaryCalendar = { viewModel.importPredefinedMilitaryCalendar() },
+                                onImportPredefinedSaintsCalendar = { viewModel.importPredefinedSaintsCalendar() },
+                                onImportPredefinedProfessionalDaysCalendar = { viewModel.importPredefinedProfessionalDaysCalendar() }
                             )
                         }
                         uiState.isCompletedTasksScreenOpen -> {
@@ -403,37 +414,21 @@ class MainActivity : ComponentActivity() {
                             GeneralSettingsScreen(
                                 currentTheme = uiState.theme,
                                 onThemeChange = { viewModel.onThemeChange(it) },
-                                welcomeName = uiState.welcomeName,
-                                onWelcomeNameChange = { newName ->
-                                    viewModel.onWelcomeNameChange(newName)
-                                },
-                                googleAccount = uiState.googleSignInAccount,
-                                onSignInClicked = { viewModel.onSignInClicked() },
-                                onSignOutClicked = { viewModel.signOut() },
-                                isSyncing = uiState.isSyncing,
-                                onManualSync = { viewModel.onManualSync() },
-                                syncProgress = uiState.syncProgress,
                                 onBackClick = { viewModel.closeSettingsScreen() },
                                 onImportJsonClick = { viewModel.openJsonConfigScreen() },
                                 sidebarFilterVisibility = uiState.sidebarFilterVisibility,
                                 onToggleSidebarFilterVisibility = { filterKey ->
                                     viewModel.toggleSidebarFilterVisibility(filterKey)
                                 },
-                                jsonCalendars = uiState.jsonCalendars,
-                                onImportPredefinedMilitaryCalendar = {
-                                    viewModel.importPredefinedMilitaryCalendar()
-                                },
-                                onImportPredefinedSaintsCalendar = {
-                                    viewModel.importPredefinedSaintsCalendar()
-                                },
                                 onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
-                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
+                                onOpenSyncSettings = { viewModel.openSyncSettings() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isCalendarVisualizationSettingsOpen -> {
                             CalendarVisualizationSettingsScreen(
+                                welcomeName = uiState.welcomeName,
+                                onWelcomeNameChange = { viewModel.onWelcomeNameChange(it) },
                                 onBackClick = { viewModel.closeCalendarVisualizationSettings() },
                                 onLanguageChange = { language ->
                                     lifecycleScope.launch {
@@ -441,6 +436,20 @@ class MainActivity : ComponentActivity() {
                                         recreate()
                                     }
                                 }
+                            )
+                        }
+                        uiState.isSyncScreenOpen -> {
+                            SyncSettingsScreen(
+                                googleAccount = uiState.googleSignInAccount,
+                                onSignInClicked = { viewModel.onSignInClicked() },
+                                onSignOutClicked = { viewModel.signOut() },
+                                isSyncing = uiState.isSyncing,
+                                onManualSync = { viewModel.onManualSync() },
+                                syncProgress = uiState.syncProgress,
+                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                                onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) },
+                                onBackClick = { viewModel.closeSyncSettings() },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isBackupScreenOpen -> {

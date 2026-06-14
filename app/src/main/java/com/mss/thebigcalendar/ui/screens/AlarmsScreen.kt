@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -76,6 +78,7 @@ import com.mss.thebigcalendar.service.NotificationService
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -84,7 +87,8 @@ import java.util.Locale
 private fun IndependentAlarmCard(
     alarm: AlarmSettings,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onSkipClick: () -> Unit
 ) {
     val isEnabled = alarm.isEnabled
     
@@ -107,7 +111,7 @@ private fun IndependentAlarmCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -132,18 +136,56 @@ private fun IndependentAlarmCard(
                     )
                 }
                 
-                // Status indicator
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isEnabled)
-                                MaterialTheme.colorScheme.primary
+                // Botões de ação no canto superior direito
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Botão Pular Próxima Ocorrência
+                    IconButton(onClick = onSkipClick) {
+                        Icon(
+                            imageVector = Icons.Default.SkipNext,
+                            contentDescription = stringResource(id = R.string.alarm_skip_next_occurrence),
+                            tint = if (alarm.skippedDate != null)
+                                MaterialTheme.colorScheme.error
                             else 
-                                MaterialTheme.colorScheme.outline
+                                if (isEnabled) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
-                )
+                    }
+
+                    // Botão Editar
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(id = R.string.edit_alarm),
+                            tint = if (isEnabled) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                    
+                    // Botão Excluir
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(id = R.string.alarm_delete_content_description),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.width(4.dp))
+                    
+                    // Status indicator
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isEnabled)
+                                    MaterialTheme.colorScheme.primary
+                                else 
+                                    MaterialTheme.colorScheme.outline
+                            )
+                    )
+                }
             }
             
             // Dias de repetição se houver
@@ -185,26 +227,16 @@ private fun IndependentAlarmCard(
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
-            
-            // Botões de ação
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(onClick = onEditClick) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = stringResource(id = R.string.edit_alarm)
-                    )
-                }
-                
-                IconButton(onClick = onDeleteClick) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = stringResource(id = R.string.alarm_delete_content_description),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+
+            // Ocorrência pulada se houver
+            if (alarm.skippedDate != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(id = R.string.alarm_next_occurrence_skipped, formatDateString(alarm.skippedDate)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
@@ -748,6 +780,29 @@ fun AlarmsScreen(
                             onDeleteClick = {
                                 alarmToDelete = alarm
                                 showDeleteDialog = true
+                            },
+                            onSkipClick = {
+                                coroutineScope.launch {
+                                    val newSkippedDate = if (alarm.skippedDate == null) {
+                                        val nextDate = calculateNextOccurrenceDate(alarm)
+                                        nextDate.toString()
+                                    } else {
+                                        null
+                                    }
+                                    val updatedAlarm = alarm.copy(
+                                        skippedDate = newSkippedDate,
+                                        lastModified = System.currentTimeMillis()
+                                    )
+                                    alarmRepository.saveAlarm(updatedAlarm)
+                                    alarmService.scheduleAlarm(updatedAlarm)
+                                    
+                                    // Forçar recarga da lista
+                                    alarmRepository.reloadAlarms()
+                                    val currentAlarms = alarmRepository.getAllAlarms()
+                                    independentAlarms = currentAlarms.sortedWith(
+                                        compareBy<AlarmSettings> { a -> a.time }.thenBy { a -> a.label }
+                                    )
+                                }
                             }
                         )
                     }
@@ -1088,6 +1143,57 @@ private fun getNotificationTypeDisplayName(notificationType: NotificationType): 
         NotificationType.ONE_DAY_BEFORE -> stringResource(id = R.string.notification_type_1day_before)
         NotificationType.CUSTOM -> stringResource(id = R.string.notification_type_custom)
         NotificationType.NONE -> stringResource(id = R.string.notification_type_disabled)
+    }
+}
+
+private fun formatDateString(dateStr: String): String {
+    return try {
+        val date = LocalDate.parse(dateStr)
+        date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+    } catch (e: Exception) {
+        dateStr
+    }
+}
+
+private fun calculateNextOccurrenceDate(alarm: AlarmSettings): LocalDate {
+    val today = LocalDate.now()
+    
+    // Se for um alarme único (sem repetição)
+    if (alarm.repeatDays.isEmpty()) {
+        val todayTime = LocalTime.now()
+        return if (alarm.time.isAfter(todayTime)) today else today.plusDays(1)
+    }
+    
+    // Se hoje está nos dias de repetição, e o horário do alarme ainda não passou
+    val todayDayOfWeek = getDayOfWeekString(today)
+    if (alarm.repeatDays.contains(todayDayOfWeek)) {
+        val todayTime = LocalTime.now()
+        if (alarm.time.isAfter(todayTime)) {
+            return today
+        }
+    }
+    
+    // Procurar nos próximos 7 dias
+    for (dayOffset in 1..7) {
+        val futureDate = today.plusDays(dayOffset.toLong())
+        val futureDayOfWeek = getDayOfWeekString(futureDate)
+        if (alarm.repeatDays.contains(futureDayOfWeek)) {
+            return futureDate
+        }
+    }
+    
+    return today
+}
+
+private fun getDayOfWeekString(date: LocalDate): String {
+    return when (date.dayOfWeek) {
+        java.time.DayOfWeek.SUNDAY -> "Dom"
+        java.time.DayOfWeek.MONDAY -> "Seg"
+        java.time.DayOfWeek.TUESDAY -> "Ter"
+        java.time.DayOfWeek.WEDNESDAY -> "Qua"
+        java.time.DayOfWeek.THURSDAY -> "Qui"
+        java.time.DayOfWeek.FRIDAY -> "Sex"
+        java.time.DayOfWeek.SATURDAY -> "Sáb"
     }
 }
 

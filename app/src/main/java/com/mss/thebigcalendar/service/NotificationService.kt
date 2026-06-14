@@ -229,6 +229,45 @@ class NotificationService(
         val notificationTime = calculateNotificationTime(activity)
         val triggerTime = getTriggerTime(activity.date, notificationTime)
         
+        // Se o triggerTime estiver no passado e a atividade for recorrente (e for a atividade base)
+        if (triggerTime <= System.currentTimeMillis() && 
+            activity.recurrenceRule != null && 
+            activity.recurrenceRule != "NONE" && 
+            activity.recurrenceRule.isNotEmpty() && 
+            !activity.id.contains("_")
+        ) {
+            // Cancelar notificação anterior se existir
+            cancelNotification(activity.id)
+
+            val recurrenceService = com.mss.thebigcalendar.service.RecurrenceService()
+            val baseDate = try {
+                java.time.LocalDate.parse(activity.date)
+            } catch (e: Exception) {
+                java.time.LocalDate.now()
+            }
+            
+            // Gerar instâncias para os próximos 2 anos
+            val nextTwoYears = java.time.LocalDate.now().plusYears(2)
+            val instances = recurrenceService.generateRecurringInstances(activity, baseDate, nextTwoYears)
+            
+            // Encontrar a primeira ocorrência futura ativa (que não esteja nas exclusões de datas/instâncias)
+            val nextFutureInstance = instances
+                .filter { instance ->
+                    val instanceNotificationTime = calculateNotificationTime(instance)
+                    val instanceTriggerTime = getTriggerTime(instance.date, instanceNotificationTime)
+                    instanceTriggerTime > System.currentTimeMillis()
+                }
+                .minByOrNull { instance ->
+                    val instanceNotificationTime = calculateNotificationTime(instance)
+                    getTriggerTime(instance.date, instanceNotificationTime)
+                }
+                
+            if (nextFutureInstance != null) {
+                android.util.Log.d("NotificationService", "⏰ Agendando próxima ocorrência futura para atividade recorrente: ${nextFutureInstance.title} em ${nextFutureInstance.date}")
+                scheduleNotification(nextFutureInstance)
+                return
+            }
+        }
         
         // Cancelar notificação anterior se existir
         cancelNotification(activity.id)

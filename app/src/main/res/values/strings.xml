@@ -633,7 +633,8 @@
     <string name="main_loading_progress">%1$d%%</string>
 
     <!-- GeneralSettingsScreen.kt -->
-    <string name="general_import_json_file">Importar Arquivo JSON</string>
+    <string name="general_import_json_file">Importar eventos</string>
+    <string name="general_import_json_file_desc">Importar feriados e eventos via arquivo JSON</string>
     <string name="general_animation_type">Tipo de Animação</string>
     <string name="select_animation">Selecionar Animação</string>
     <string name="close">Fechar</string>
@@ -834,11 +835,19 @@
     <string name="onboarding_restore_local_skip">Concluir sem restaurar</string>
     <string name="onboarding_restore_local_activities_size">Atividades: %1$d • %2$d KB</string>
     <!-- App Icon Settings -->
-    <string name="settings_app_icon_title">Ícone do Aplicativo</string>
+    <string name="settings_app_icon_title">Ícone do App</string>
     <string name="settings_app_icon_mode_dynamic">Dinâmico (conforme o tema)</string>
     <string name="settings_app_icon_mode_white">Branco</string>
     <string name="settings_app_icon_mode_black">Preto</string>
     <string name="settings_app_icon_dialog_title">Selecione o Ícone</string>
     <string name="more_options">Mais opções</string>
     <string name="change_download_location">Mudar local de download</string>
+    <string name="alarm_skip_next_occurrence">Pular próxima ocorrência</string>
+    <string name="alarm_next_occurrence_skipped">Próxima ocorrência de %1$s será pulada</string>
+    <string name="synchronization_settings_desc">Configurações de conta e sincronização de dados</string>
+    <string name="predefined_calendars_title">Calendários Predefinidos</string>
+    <string name="imported">Importado</string>
+    <string name="import_predefined_desc">Clique para importar este calendário</string>
+    <string name="predefined_calendars_desc">Importe calendários temáticos predefinidos de forma rápida</string>
+    <string name="professional_days">Dias das Profissões</string>
 </resources>

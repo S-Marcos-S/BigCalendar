@@ -101,7 +101,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val progressiveSyncService = ProgressiveSyncService(application, googleCalendarService)
     private val searchService = SearchService()
     private val recurrenceService = RecurrenceService()
-    private val backupService = BackupService(application, activityRepository, deletedActivityRepository, completedActivityRepository)
+    private val backupService = BackupService(application, activityRepository, deletedActivityRepository, completedActivityRepository, alarmRepository)
     private val visibilityService = VisibilityService(application)
     private val pdfGenerationService = com.mss.thebigcalendar.data.service.PdfGenerationService(application)
     private val backupScheduler = com.mss.thebigcalendar.service.BackupScheduler(application)
@@ -156,6 +156,23 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isRestoring = true, restoreMessage = null) }
             backupService.restoreFromCloudBackup(account, fileId, fileName)
                 .onSuccess { restoreResult ->
+                    // Cancelar alarmes existentes e limpar o repositório de alarmes
+                    val notificationService = NotificationService(getApplication())
+                    val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                        getApplication(),
+                        alarmRepository,
+                        notificationService
+                    )
+                    try {
+                        val currentAlarms = alarmRepository.getAllAlarms()
+                        currentAlarms.forEach { alarm ->
+                            alarmService.cancelAlarm(alarm.id)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("CalendarViewModel", "Erro ao cancelar alarmes existentes na restauração em nuvem: ${e.message}", e)
+                    }
+                    alarmRepository.clearAllAlarms()
+
                     // Logic to handle the restored data
                     activityRepository.clearAllActivities()
                     deletedActivityRepository.clearAllDeletedActivities()
@@ -164,6 +181,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     activityRepository.saveAllActivities(restoreResult.activities)
                     deletedActivityRepository.saveAllDeletedActivities(restoreResult.deletedActivities)
                     completedActivityRepository.saveAllCompletedActivities(restoreResult.completedActivities)
+
+                    // Salvar e agendar os novos alarmes
+                    restoreResult.alarms.forEach { alarm ->
+                        alarmRepository.saveAlarm(alarm)
+                        if (alarm.isEnabled) {
+                            alarmService.scheduleAlarm(alarm)
+                        }
+                    }
+
+                    // Agendar notificações para as atividades
+                    restoreResult.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
 
                     _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restored from ${restoreResult.backupFileName}") }
                     loadData() // Reload all data
@@ -271,6 +299,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun closeCalendarVisualizationSettings() {
         _uiState.update { it.copy(isCalendarVisualizationSettingsOpen = false, isSettingsScreenOpen = true) }
+    }
+
+    fun openSyncSettings() {
+        _uiState.update { it.copy(isSyncScreenOpen = true, isSettingsScreenOpen = false) }
+    }
+
+    fun closeSyncSettings() {
+        _uiState.update { it.copy(isSyncScreenOpen = false, isSettingsScreenOpen = true) }
     }
 
     fun onMainOnboardingComplete() {
@@ -3040,13 +3076,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         result.completedActivities.forEach { activity -> completedActivityRepository.addCompletedActivity(activity) }
                         _uiState.update { it.copy(restoreProgress = 0.8f) }
 
+                        // Salvar e agendar os alarmes restaurados
+                        val notificationService = NotificationService(getApplication())
+                        val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                            getApplication(),
+                            alarmRepository,
+                            notificationService
+                        )
+                        result.alarms.forEach { alarm ->
+                            alarmRepository.saveAlarm(alarm)
+                            if (alarm.isEnabled) {
+                                alarmService.scheduleAlarm(alarm)
+                            }
+                        }
+
                         _uiState.update { it.copy(backupMessage = "Backup restaurado com sucesso!") }
 
                         loadData()
                         loadBackupFiles()
                         _uiState.update { it.copy(restoreProgress = 0.9f) }
 
-                        val notificationService = NotificationService(getApplication())
                         result.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
 
                         viewModelScope.launch {
@@ -3078,11 +3127,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
     
-    /**
-     * Limpa todos os dados atuais antes da restauração
-     */
     private suspend fun clearAllCurrentData() {
         try {
+            // Cancelar alarmes existentes e limpar o repositório de alarmes
+            val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                getApplication(),
+                alarmRepository,
+                NotificationService(getApplication())
+            )
+            val currentAlarms = alarmRepository.getAllAlarms()
+            currentAlarms.forEach { alarm ->
+                alarmService.cancelAlarm(alarm.id)
+            }
+            alarmRepository.clearAllAlarms()
+
             // Limpar todas as atividades
             val currentActivities = activityRepository.activities.first()
             currentActivities.forEach { activity ->
@@ -3709,6 +3767,75 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao importar santos católicos predefinidos", e)
+            }
+        }
+    }
+
+    fun importPredefinedProfessionalDaysCalendar() {
+        viewModelScope.launch {
+            try {
+                val alreadyImported = jsonCalendarRepository.getAllJsonCalendars().first().any { it.id == "PREDEFINED_PROFESSIONAL_DAYS" }
+                if (alreadyImported) return@launch
+                
+                val context = getApplication<Application>()
+                val rawId = context.resources.getIdentifier("professional_days", "raw", context.packageName)
+                if (rawId == 0) {
+                    Log.e(TAG, "Recurso raw/professional_days não encontrado")
+                    return@launch
+                }
+                val inputStream = context.resources.openRawResource(rawId)
+                val jsonString = inputStream.use { it.bufferedReader().readText() }
+                
+                val calendarTitle = getApplication<Application>().getString(R.string.professional_days)
+                val calendarColor = androidx.compose.ui.graphics.Color(0xFF1976D2)
+                
+                val jsonArray = JSONArray(jsonString)
+                val schedules = mutableListOf<JsonSchedule>()
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val name = jsonObject.getString("name")
+                    val date = jsonObject.getString("date")
+                    val summary = try {
+                        jsonObject.optString("summary", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val wikipediaLink = try {
+                        jsonObject.optString("wikipediaLink", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    schedules.add(JsonSchedule(name, date, summary, wikipediaLink))
+                }
+                
+                val activities = schedules.map { jsonSchedule ->
+                    jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
+                }
+                
+                // 1. Salvar no banco de dados primeiro!
+                activityRepository.saveAllActivities(activities)
+                
+                // 2. Salvar o calendário depois
+                val jsonCalendar = JsonCalendar(
+                    id = "PREDEFINED_PROFESSIONAL_DAYS",
+                    title = calendarTitle,
+                    color = calendarColor,
+                    fileName = "professional_days.json",
+                    importDate = System.currentTimeMillis(),
+                    isVisible = true
+                )
+                jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
+                
+                // Recarregar atividades para atualizar a UI
+                loadActivitiesForCurrentMonth()
+                updateJsonCalendarActivitiesForSelectedDate()
+                
+                viewModelScope.launch {
+                    delay(500)
+                    notifyWidgetsDataChanged()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao importar datas profissionais predefinidas", e)
             }
         }
     }

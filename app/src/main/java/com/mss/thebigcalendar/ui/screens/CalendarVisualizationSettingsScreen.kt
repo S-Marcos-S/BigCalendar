@@ -60,10 +60,17 @@ import com.mss.thebigcalendar.ui.components.LanguageSelectionDialog
 import com.mss.thebigcalendar.ui.components.AppIconSelectionDialog
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarVisualizationSettingsScreen(
+    welcomeName: String,
+    onWelcomeNameChange: (String) -> Unit,
     onBackClick: () -> Unit,
     onLanguageChange: (Language) -> Unit,
     viewModel: CalendarViewModel = viewModel()
@@ -75,6 +82,15 @@ fun CalendarVisualizationSettingsScreen(
     var showAnimationDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showAppIconDialog by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+    var welcomeNameInput by remember { mutableStateOf(welcomeName) }
+
+    LaunchedEffect(welcomeName) {
+        if (welcomeNameInput != welcomeName) {
+            welcomeNameInput = welcomeName
+        }
+    }
 
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
@@ -147,6 +163,23 @@ fun CalendarVisualizationSettingsScreen(
                 text = stringResource(id = R.string.calendar_visualization_settings_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Campo para o nome de boas-vindas
+            OutlinedTextField(
+                value = welcomeNameInput,
+                onValueChange = {
+                    welcomeNameInput = it
+                    scope.launch {
+                        delay(500) // Debounce para evitar muitas escritas no DataStore
+                        if (welcomeNameInput == it) { // Verificar se o valor não mudou durante o delay
+                            onWelcomeNameChange(it)
+                        }
+                    }
+                },
+                label = { Text(stringResource(id = R.string.welcome_name_setting_title)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Row(

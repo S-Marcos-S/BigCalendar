@@ -150,6 +150,7 @@ data class CalendarUiState(
     val sidebarFilterVisibility: SidebarFilterVisibility = SidebarFilterVisibility(),
     val calendarScale: Float = 1f,
     val isCalendarVisualizationSettingsOpen: Boolean = false,
+    val isSyncScreenOpen: Boolean = false,
     val hideOtherMonthDays: Boolean = false,
     val pureBlackTheme: Boolean = false,
     val primaryColor: String = "AUTO",

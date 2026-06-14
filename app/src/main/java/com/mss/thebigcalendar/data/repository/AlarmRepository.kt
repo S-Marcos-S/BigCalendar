@@ -93,9 +93,25 @@ class AlarmRepository(
     }
     
     /**
+     * Limpa todos os alarmes do repositório
+     */
+    suspend fun clearAllAlarms(): Result<Unit> {
+        return try {
+            Log.d(TAG, "🗑️ Limpando todos os alarmes do repositório")
+            _alarms.value = emptyList()
+            persistAlarms(emptyList())
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "🗑️ Erro ao limpar alarmes", e)
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * Busca um alarme por ID
      */
     suspend fun getAlarmById(alarmId: String): AlarmSettings? {
+        loadAlarms()
         return _alarms.value.find { it.id == alarmId }
     }
     
@@ -103,6 +119,7 @@ class AlarmRepository(
      * Busca alarmes ativos para um horário específico
      */
     suspend fun getActiveAlarmsAtTime(time: LocalTime): List<AlarmSettings> {
+        loadAlarms()
         return _alarms.value.filter { alarm ->
             alarm.isEnabled && 
             alarm.time == time &&
@@ -114,6 +131,7 @@ class AlarmRepository(
      * Busca todos os alarmes ativos
      */
     suspend fun getActiveAlarms(): List<AlarmSettings> {
+        loadAlarms()
         return _alarms.value.filter { it.isEnabled }
     }
     
@@ -121,6 +139,7 @@ class AlarmRepository(
      * Busca todos os alarmes (ativos e inativos)
      */
     suspend fun getAllAlarms(): List<AlarmSettings> {
+        loadAlarms()
         return _alarms.value
     }
     
@@ -195,7 +214,7 @@ class AlarmRepository(
             prefix = "[",
             postfix = "]"
         ) { alarm ->
-            "${alarm.id};${alarm.label};${alarm.time};${alarm.isEnabled};${alarm.repeatDays.joinToString(",")};${alarm.soundEnabled};${alarm.vibrationEnabled};${alarm.snoozeMinutes};${alarm.createdAt};${alarm.lastModified}"
+            "${alarm.id};${alarm.label};${alarm.time};${alarm.isEnabled};${alarm.repeatDays.joinToString(",")};${alarm.soundEnabled};${alarm.vibrationEnabled};${alarm.snoozeMinutes};${alarm.createdAt};${alarm.lastModified};${alarm.skippedDate ?: ""}"
         }
     }
     
@@ -223,7 +242,8 @@ class AlarmRepository(
                             vibrationEnabled = parts[6].toBoolean(),
                             snoozeMinutes = parts[7].toInt(),
                             createdAt = parts[8].toLong(),
-                            lastModified = parts[9].toLong()
+                            lastModified = parts[9].toLong(),
+                            skippedDate = if (parts.size >= 11 && parts[10].isNotEmpty()) parts[10] else null
                         )
                     } else null
                 } catch (e: Exception) {

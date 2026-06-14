@@ -16,7 +16,8 @@ data class AlarmSettings(
     val vibrationEnabled: Boolean = true,
     val snoozeMinutes: Int = 5,
     val createdAt: Long = System.currentTimeMillis(),
-    val lastModified: Long = System.currentTimeMillis()
+    val lastModified: Long = System.currentTimeMillis(),
+    val skippedDate: String? = null
 ) {
     companion object {
         /**
