@@ -169,7 +169,7 @@ class HighVisibilityNotificationService : Service() {
         )
         
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(com.mss.thebigcalendar.R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_calendar)
             .setContentTitle("🔔 ${activity.title}")
             .setContentText(applicationContext.getString(R.string.high_visibility_notification_active))
             .setPriority(NotificationCompat.PRIORITY_MAX)

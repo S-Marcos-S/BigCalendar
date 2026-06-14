@@ -566,7 +566,7 @@ class NotificationService(
         Log.d(TAG, "🔔 Dismiss PendingIntent ID: ${(activity.id + "_dismiss").hashCode()}")
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification_calendar)
             .setContentTitle("🔔 Lembrete: ${activity.title}")
             .setContentText(getNotificationText(activity))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

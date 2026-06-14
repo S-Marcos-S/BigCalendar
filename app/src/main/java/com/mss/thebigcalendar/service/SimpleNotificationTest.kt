@@ -39,7 +39,7 @@ class SimpleNotificationTest(private val context: Context) {
     fun showSimpleTestNotification() {
         
         val notification = NotificationCompat.Builder(context, TEST_CHANNEL_ID)
-            .setSmallIcon(com.mss.thebigcalendar.R.mipmap.ic_launcher)
+            .setSmallIcon(com.mss.thebigcalendar.R.drawable.ic_notification_calendar)
             .setContentTitle("🧪 Teste Simples")
             .setContentText("Esta é uma notificação de teste simples!")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
