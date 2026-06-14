@@ -707,6 +707,9 @@ fun MainCalendarView(
                                 if (commemorativeHoliday != null) {
                                     viewModel.onSaintDayClick(commemorativeHoliday)
                                 }
+                            },
+                            onUpdateTaskDescription = { activity, newDesc ->
+                                viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
                             }
                         )
                     }

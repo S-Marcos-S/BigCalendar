@@ -1,6 +1,7 @@
 package com.mss.thebigcalendar.ui.components
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,7 +58,8 @@ fun TasksForSelectedDaySection(
     onDeleteClick: (String) -> Unit,
     onCompleteClick: (String) -> Unit,
     onAddTaskClick: () -> Unit,
-    onCommemorativeClick: (Activity) -> Unit
+    onCommemorativeClick: (Activity) -> Unit,
+    onUpdateTaskDescription: (Activity, String) -> Unit = { _, _ -> }
 ) {
     val dateFormat = stringResource(id = R.string.date_format_day_month)
     val dateFormatter = remember(dateFormat) { DateTimeFormatter.ofPattern(dateFormat, Locale.getDefault()) }
@@ -124,7 +126,8 @@ fun TasksForSelectedDaySection(
                         onTaskLongClick = onTaskLongClick,
                         onDeleteClick = onDeleteClick,
                         onCompleteClick = onCompleteClick,
-                        onCommemorativeClick = onCommemorativeClick
+                        onCommemorativeClick = onCommemorativeClick,
+                        onUpdateTaskDescription = onUpdateTaskDescription
                     )
                 }
             }
@@ -142,6 +145,7 @@ fun TaskItem(
     onDeleteClick: (String) -> Unit,
     onCompleteClick: (String) -> Unit,
     onCommemorativeClick: (Activity) -> Unit,
+    onUpdateTaskDescription: (Activity, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -228,10 +232,11 @@ fun TaskItem(
                     .padding(start = 24.dp, end = 16.dp, bottom = 12.dp)
             ) {
                 if (!task.description.isNullOrBlank()) {
-                    Text(
-                        text = task.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
+                    InteractiveDescription(
+                        description = task.description,
+                        onDescriptionChanged = { newDesc ->
+                            onUpdateTaskDescription(task, newDesc)
+                        },
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
@@ -284,6 +289,62 @@ fun TaskItem(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun InteractiveDescription(
+    description: String,
+    onDescriptionChanged: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lines = remember(description) { description.split("\n") }
+    val checklistRegex = """^\[([ xX]?)]\s*(.*)$""".toRegex()
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        lines.forEachIndexed { index, line ->
+            val match = checklistRegex.matchEntire(line)
+            if (match != null) {
+                val isChecked = match.groupValues[1].lowercase() == "x"
+                val content = match.groupValues[2]
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val newPrefix = if (isChecked) "[ ]" else "[x]"
+                            val newLines = lines.toMutableList()
+                            newLines[index] = "$newPrefix $content"
+                            onDescriptionChanged(newLines.joinToString("\n"))
+                        }
+                        .padding(vertical = 2.dp)
+                ) {
+                    androidx.compose.material3.Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = null, // Click is handled by the Row for larger touch target
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else {
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
             }
         }
     }
