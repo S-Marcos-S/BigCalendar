@@ -31,6 +31,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -149,6 +154,7 @@ fun TaskItem(
     modifier: Modifier = Modifier
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    var showConfirmCompleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(deleteButtonVisible) {
         if (deleteButtonVisible) {
@@ -251,7 +257,13 @@ fun TaskItem(
                         modifier = Modifier
                             .height(40.dp)
                             .width(80.dp)
-                            .clickable { onCompleteClick(task.id) }
+                            .clickable { 
+                                if (hasUncheckedChecklistItems(task.description)) {
+                                    showConfirmCompleteDialog = true
+                                } else {
+                                    onCompleteClick(task.id)
+                                }
+                            }
                     ) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -292,6 +304,36 @@ fun TaskItem(
             }
         }
     }
+
+    if (showConfirmCompleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmCompleteDialog = false },
+            title = { Text("Itens Pendentes") },
+            text = { Text("Você ainda possui itens pendentes na lista de conclusão desta tarefa. Tem certeza de que deseja concluí-la?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmCompleteDialog = false
+                        onCompleteClick(task.id)
+                    }
+                ) {
+                    Text("Sim, concluir")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showConfirmCompleteDialog = false }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
+private fun hasUncheckedChecklistItems(description: String?): Boolean {
+    if (description.isNullOrBlank()) return false
+    return description.split("\n").any { it.trimStart().startsWith("[ ]") }
 }
 
 @Composable
