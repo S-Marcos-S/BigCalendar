@@ -171,7 +171,7 @@ class SettingsRepository(private val context: Context) {
 
     val unfixHeadersOnScroll: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.UNFIX_HEADERS_ON_SCROLL] ?: false
+            preferences[PreferencesKeys.UNFIX_HEADERS_ON_SCROLL] ?: true
         }
 
     suspend fun setUnfixHeadersOnScroll(unfix: Boolean) {

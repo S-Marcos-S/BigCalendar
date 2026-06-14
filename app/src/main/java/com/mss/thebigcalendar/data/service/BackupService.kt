@@ -555,7 +555,7 @@ class BackupService(
                     val primaryColor = settingsJson.optString("primaryColor", "AUTO")
                     settingsRepository.setPrimaryColor(primaryColor)
                     
-                    val unfixHeadersOnScroll = settingsJson.optBoolean("unfixHeadersOnScroll", false)
+                    val unfixHeadersOnScroll = settingsJson.optBoolean("unfixHeadersOnScroll", true)
                     settingsRepository.setUnfixHeadersOnScroll(unfixHeadersOnScroll)
                     
                     // Sidebar

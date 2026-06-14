@@ -153,7 +153,7 @@ data class CalendarUiState(
     val hideOtherMonthDays: Boolean = false,
     val pureBlackTheme: Boolean = false,
     val primaryColor: String = "AUTO",
-    val unfixHeadersOnScroll: Boolean = false,
+    val unfixHeadersOnScroll: Boolean = true,
 
     // Cloud Backup State
     val cloudBackupFiles: List<DriveFile> = emptyList(),
