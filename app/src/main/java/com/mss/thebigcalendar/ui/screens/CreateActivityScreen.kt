@@ -48,6 +48,10 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Checklist
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +102,75 @@ fun CreateActivityScreen(
 
     var title by remember(currentActivity.id) { mutableStateOf(currentActivity.title) }
     var description by remember(currentActivity.id) { mutableStateOf(currentActivity.description ?: "") }
+    var descriptionFieldValue by remember(currentActivity.id) {
+        mutableStateOf(TextFieldValue(currentActivity.description ?: ""))
+    }
+
+    val currentLine: String = remember(descriptionFieldValue) {
+        val text = descriptionFieldValue.text
+        val selection = descriptionFieldValue.selection
+        val cursorPosition = selection.start.coerceIn(0, text.length)
+        val lastNewlineIndex = text.substring(0, cursorPosition).lastIndexOf('\n')
+        val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+        val nextNewlineIndex = text.indexOf('\n', cursorPosition)
+        val lineEnd = if (nextNewlineIndex == -1) text.length else nextNewlineIndex
+        if (lineStart <= lineEnd) text.substring(lineStart, lineEnd) else ""
+    }
+
+    val isChecklistActive = currentLine.startsWith("[ ]") || currentLine.startsWith("[x]")
+    val isNumberedListActive = """^\d+\.\s+""".toRegex().containsMatchIn(currentLine)
+
+    fun toggleListFormat(type: String) {
+        val text = descriptionFieldValue.text
+        val selection = descriptionFieldValue.selection
+        val cursorPosition = selection.start.coerceIn(0, text.length)
+        val lastNewlineIndex = text.substring(0, cursorPosition).lastIndexOf('\n')
+        val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+        
+        val nextNewlineIndex = text.indexOf('\n', cursorPosition)
+        val lineEnd = if (nextNewlineIndex == -1) text.length else nextNewlineIndex
+        
+        val lineToFormat = text.substring(lineStart, lineEnd)
+        
+        val checklistRegex = """^\[([ x]?)]\s*(.*)$""".toRegex()
+        val numberedRegex = """^(\d+)\.\s*(.*)$""".toRegex()
+        
+        var newLine = lineToFormat
+        var selectionOffset = 0
+        
+        if (type == "checklist") {
+            val checklistMatch = checklistRegex.matchEntire(lineToFormat)
+            if (checklistMatch != null) {
+                // Remove checklist prefix
+                val content = checklistMatch.groupValues[2]
+                newLine = content
+                selectionOffset = -(lineToFormat.length - content.length)
+            } else {
+                // Add checklist prefix (and clean numbered if exists)
+                val cleanLine = numberedRegex.matchEntire(lineToFormat)?.groupValues?.get(2) ?: lineToFormat
+                newLine = "[ ] $cleanLine"
+                selectionOffset = newLine.length - lineToFormat.length
+            }
+        } else if (type == "numbered") {
+            val numberedMatch = numberedRegex.matchEntire(lineToFormat)
+            if (numberedMatch != null) {
+                // Remove numbered prefix
+                val content = numberedMatch.groupValues[2]
+                newLine = content
+                selectionOffset = -(lineToFormat.length - content.length)
+            } else {
+                // Add numbered prefix (and clean checklist if exists)
+                val cleanLine = checklistRegex.matchEntire(lineToFormat)?.groupValues?.get(2) ?: lineToFormat
+                newLine = "1. $cleanLine"
+                selectionOffset = newLine.length - lineToFormat.length
+            }
+        }
+        
+        val updatedText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+        val newCursorPos = (cursorPosition + selectionOffset).coerceIn(0, updatedText.length)
+        descriptionFieldValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+        description = updatedText
+    }
     var selectedPriority by remember(currentActivity.id) { mutableStateOf(currentActivity.categoryColor) }
     var selectedActivityType by remember(currentActivity.id) { mutableStateOf(currentActivity.activityType) }
     var selectedVisibility by remember(currentActivity.id) {
@@ -327,16 +400,107 @@ fun CreateActivityScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text(stringResource(id = R.string.create_activity_modal_description)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = false,
-                minLines = 3,
-                maxLines = 5,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = descriptionFieldValue,
+                    onValueChange = { newValue ->
+                        var finalValue = newValue
+                        val oldText = descriptionFieldValue.text
+                        val newText = newValue.text
+                        val oldSelection = descriptionFieldValue.selection
+
+                        if (newText.length == oldText.length + 1 && 
+                            oldSelection.collapsed && 
+                            oldSelection.start < newText.length && 
+                            newText[oldSelection.start] == '\n') {
+                            
+                            val newlinePos = oldSelection.start
+                            val textBeforeNewline = oldText.substring(0, newlinePos)
+                            val lastNewlineIndex = textBeforeNewline.lastIndexOf('\n')
+                            val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+                            val completedLine = textBeforeNewline.substring(lineStart)
+                            
+                            val checklistRegex = """^\[([ x]?)]\s*(.*)$""".toRegex()
+                            val numberedRegex = """^(\d+)\.\s*(.*)$""".toRegex()
+                            
+                            val checklistMatch = checklistRegex.matchEntire(completedLine)
+                            val numberedMatch = numberedRegex.matchEntire(completedLine)
+                            
+                            if (checklistMatch != null) {
+                                val content = checklistMatch.groupValues[2]
+                                if (content.isEmpty()) {
+                                    // Remove checkbox prefix from empty line
+                                    val updatedText = oldText.substring(0, lineStart) + oldText.substring(newlinePos)
+                                    val newSelection = TextRange(lineStart)
+                                    finalValue = TextFieldValue(updatedText, newSelection)
+                                } else {
+                                    // Add new empty checkbox
+                                    val prefix = "[ ] "
+                                    val updatedText = newText.substring(0, newlinePos + 1) + prefix + newText.substring(newlinePos + 1)
+                                    val newCursorPos = newlinePos + 1 + prefix.length
+                                    finalValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+                                }
+                            } else if (numberedMatch != null) {
+                                val num = numberedMatch.groupValues[1].toInt()
+                                val content = numberedMatch.groupValues[2]
+                                if (content.isEmpty()) {
+                                    // Remove number prefix from empty line
+                                    val updatedText = oldText.substring(0, lineStart) + oldText.substring(newlinePos)
+                                    val newSelection = TextRange(lineStart)
+                                    finalValue = TextFieldValue(updatedText, newSelection)
+                                } else {
+                                    // Add next number
+                                    val prefix = "${num + 1}. "
+                                    val updatedText = newText.substring(0, newlinePos + 1) + prefix + newText.substring(newlinePos + 1)
+                                    val newCursorPos = newlinePos + 1 + prefix.length
+                                    finalValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+                                }
+                            }
+                        }
+                        
+                        descriptionFieldValue = finalValue
+                        description = finalValue.text
+                    },
+                    label = { Text(stringResource(id = R.string.create_activity_modal_description)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                )
+
+                // Inline formatting buttons in top-right corner
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 4.dp, end = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { toggleListFormat("numbered") },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatListNumbered,
+                            contentDescription = "Lista Enumerada",
+                            tint = if (isNumberedListActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { toggleListFormat("checklist") },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = "Lista de Conclusão",
+                            tint = if (isChecklistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
