@@ -34,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
@@ -228,6 +230,15 @@ fun TaskItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+
+            if (!task.description.isNullOrBlank()) {
+                Icon(
+                    imageVector = if (deleteButtonVisible) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = stringResource(id = if (deleteButtonVisible) R.string.collapse else R.string.expand),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 16.dp)
+                )
             }
         }
 
