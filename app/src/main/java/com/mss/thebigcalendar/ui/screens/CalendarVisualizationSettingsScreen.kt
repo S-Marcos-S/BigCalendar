@@ -4,11 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,11 +54,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.ui.components.AnimationSelectionDialog
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
+import com.mss.thebigcalendar.data.model.Language
+import com.mss.thebigcalendar.data.model.AppIconMode
+import com.mss.thebigcalendar.ui.components.LanguageSelectionDialog
+import com.mss.thebigcalendar.ui.components.AppIconSelectionDialog
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Android
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarVisualizationSettingsScreen(
     onBackClick: () -> Unit,
+    onLanguageChange: (Language) -> Unit,
     viewModel: CalendarViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -63,6 +73,8 @@ fun CalendarVisualizationSettingsScreen(
     val sliderValue = remember(currentScale) { mutableFloatStateOf(currentScale) }
     var hideOtherMonths by remember { mutableStateOf(uiState.hideOtherMonthDays) }
     var showAnimationDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showAppIconDialog by remember { mutableStateOf(false) }
 
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
@@ -127,7 +139,8 @@ fun CalendarVisualizationSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -386,6 +399,74 @@ fun CalendarVisualizationSettingsScreen(
                     }
                 }
             }
+
+            // Configuração de idioma
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = "Idioma",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Idioma",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { showLanguageDialog = true },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Text(
+                        text = "${uiState.language.flag} ${uiState.language.displayName}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            // Configuração do ícone do aplicativo
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Android,
+                    contentDescription = stringResource(id = R.string.settings_app_icon_title),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(id = R.string.settings_app_icon_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { showAppIconDialog = true },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    val modeLabel = when (uiState.appIconMode) {
+                        AppIconMode.DYNAMIC -> stringResource(id = R.string.settings_app_icon_mode_dynamic)
+                        AppIconMode.WHITE -> stringResource(id = R.string.settings_app_icon_mode_white)
+                        AppIconMode.BLACK -> stringResource(id = R.string.settings_app_icon_mode_black)
+                    }
+                    val iconText = when (uiState.appIconMode) {
+                        AppIconMode.DYNAMIC -> "🔄"
+                        AppIconMode.WHITE -> "⚪"
+                        AppIconMode.BLACK -> "⚫"
+                    }
+                    Text(
+                        text = "$iconText $modeLabel",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -405,6 +486,29 @@ fun CalendarVisualizationSettingsScreen(
                 showAnimationDialog = false
             },
             onDismiss = { showAnimationDialog = false }
+        )
+    }
+
+    // Dialog de seleção de idioma
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguage = uiState.language,
+            onLanguageSelected = { language ->
+                onLanguageChange(language)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
+    }
+
+    // Dialog de seleção de ícone
+    if (showAppIconDialog) {
+        AppIconSelectionDialog(
+            currentMode = uiState.appIconMode,
+            onModeSelected = { mode ->
+                viewModel.onAppIconModeChange(mode)
+            },
+            onDismiss = { showAppIconDialog = false }
         )
     }
 }

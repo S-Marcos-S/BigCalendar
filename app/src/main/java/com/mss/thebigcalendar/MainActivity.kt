@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import com.mss.thebigcalendar.data.model.AppIconMode
+import com.mss.thebigcalendar.data.model.Language
 import android.util.Log
 import android.net.Uri
 import android.os.Build
@@ -425,24 +426,21 @@ class MainActivity : ComponentActivity() {
                                 onImportPredefinedSaintsCalendar = {
                                     viewModel.importPredefinedSaintsCalendar()
                                 },
-                                currentLanguage = uiState.language,
+                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
+                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
+                            )
+                        }
+                        uiState.isCalendarVisualizationSettingsOpen -> {
+                            CalendarVisualizationSettingsScreen(
+                                onBackClick = { viewModel.closeCalendarVisualizationSettings() },
                                 onLanguageChange = { language ->
                                     lifecycleScope.launch {
                                         viewModel.onLanguageChange(language)
                                         recreate()
                                     }
-                                },
-                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
-                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled,
-                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
-                                appIconMode = uiState.appIconMode,
-                                onAppIconModeChange = { viewModel.onAppIconModeChange(it) }
-                            )
-                        }
-                        uiState.isCalendarVisualizationSettingsOpen -> {
-                            CalendarVisualizationSettingsScreen(
-                                onBackClick = { viewModel.closeCalendarVisualizationSettings() }
+                                }
                             )
                         }
                         uiState.isBackupScreenOpen -> {

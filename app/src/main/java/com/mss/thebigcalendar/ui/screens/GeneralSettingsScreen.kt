@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Language
+
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
@@ -47,12 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import androidx.compose.material3.Switch
 import com.mss.thebigcalendar.R
-import com.mss.thebigcalendar.data.model.Language
 import com.mss.thebigcalendar.data.model.Theme
-import com.mss.thebigcalendar.ui.components.LanguageSelectionDialog
-import com.mss.thebigcalendar.data.model.AppIconMode
-import com.mss.thebigcalendar.ui.components.AppIconSelectionDialog
-import androidx.compose.material.icons.filled.Android
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -73,25 +68,18 @@ fun GeneralSettingsScreen(
     onImportJsonClick: () -> Unit = {},
     sidebarFilterVisibility: com.mss.thebigcalendar.data.model.SidebarFilterVisibility = com.mss.thebigcalendar.data.model.SidebarFilterVisibility(),
     onToggleSidebarFilterVisibility: (String) -> Unit = {},
-    currentLanguage: Language = Language.SYSTEM,
-    onLanguageChange: (Language) -> Unit = {},
     onOpenCalendarVisualization: () -> Unit = {},
     isCrashlyticsEnabled: Boolean,
     onCrashlyticsToggle: (Boolean) -> Unit,
     unfixHeadersOnScroll: Boolean = false,
     jsonCalendars: List<com.mss.thebigcalendar.data.model.JsonCalendar> = emptyList(),
     onImportPredefinedMilitaryCalendar: () -> Unit = {},
-    onImportPredefinedSaintsCalendar: () -> Unit = {},
-    appIconMode: AppIconMode = AppIconMode.DYNAMIC,
-    onAppIconModeChange: (AppIconMode) -> Unit = {}
+    onImportPredefinedSaintsCalendar: () -> Unit = {}
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
-    Log.d("GeneralSettingsScreen", "🌐 Idioma atual: ${currentLanguage.displayName} (${currentLanguage.code})")
     
     val scope = rememberCoroutineScope()
     var welcomeNameInput by remember { mutableStateOf(welcomeName) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
-    var showAppIconDialog by remember { mutableStateOf(false) }
 
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = if (unfixHeadersOnScroll) {
@@ -328,84 +316,7 @@ fun GeneralSettingsScreen(
                 }
             }
 
-            // Configuração de idioma
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Log.d("GeneralSettingsScreen", "🎨 Renderizando seção de idioma")
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Language,
-                    contentDescription = "Idioma",
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Idioma",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = { 
-                        Log.d("GeneralSettingsScreen", "🔘 Botão de idioma clicado")
-                        showLanguageDialog = true 
-                    },
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    Text(
-                        text = "${currentLanguage.flag} ${currentLanguage.displayName}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
 
-            // Configuração do ícone do aplicativo
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Android,
-                    contentDescription = stringResource(id = R.string.settings_app_icon_title),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(id = R.string.settings_app_icon_title),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = { 
-                        showAppIconDialog = true 
-                    },
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    val modeLabel = when (appIconMode) {
-                        AppIconMode.DYNAMIC -> stringResource(id = R.string.settings_app_icon_mode_dynamic)
-                        AppIconMode.WHITE -> stringResource(id = R.string.settings_app_icon_mode_white)
-                        AppIconMode.BLACK -> stringResource(id = R.string.settings_app_icon_mode_black)
-                    }
-                    val iconText = when (appIconMode) {
-                        AppIconMode.DYNAMIC -> "🔄"
-                        AppIconMode.WHITE -> "⚪"
-                        AppIconMode.BLACK -> "⚫"
-                    }
-                    Text(
-                        text = "$iconText $modeLabel",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
 
             // Crashlytics Opt-in
             Row(
@@ -539,29 +450,5 @@ fun GeneralSettingsScreen(
         }
     }
 
-    // Dialog de seleção de idioma
-    if (showLanguageDialog) {
-        Log.d("GeneralSettingsScreen", "📱 Exibindo diálogo de seleção de idioma")
-        LanguageSelectionDialog(
-            currentLanguage = currentLanguage,
-            onLanguageSelected = { language ->
-                Log.d("GeneralSettingsScreen", "🌐 Idioma selecionado: ${language.displayName} (${language.code})")
-                onLanguageChange(language)
-                showLanguageDialog = false
-            },
-            onDismiss = { 
-                Log.d("GeneralSettingsScreen", "❌ Diálogo de idioma fechado")
-                showLanguageDialog = false 
-            }
-        )
-    }
 
-    // Dialog de seleção de ícone
-    if (showAppIconDialog) {
-        AppIconSelectionDialog(
-            currentMode = appIconMode,
-            onModeSelected = onAppIconModeChange,
-            onDismiss = { showAppIconDialog = false }
-        )
-    }
 }
