@@ -204,18 +204,45 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         activities = activitiesList
                     )
                 }
+
+                try {
+                    val home = System.getProperty("user.home")
+                    val dir = java.io.File(home, ".thebigcalendar")
+                    if (!dir.exists()) dir.mkdirs()
+                    val activitiesFile = java.io.File(dir, "activities.json")
+                    if (activitiesStr != null) {
+                        activitiesFile.writeText(activitiesStr)
+                    } else {
+                        activitiesFile.writeText("[]")
+                    }
+                } catch(e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
 
     private fun saveData() {
         scope.launch {
+            val activitiesJson = Json.encodeToString(_uiState.value.activities)
             dataStore.edit { preferences ->
                 preferences[KEY_THEME] = _uiState.value.theme.name
                 preferences[KEY_PURE_BLACK] = _uiState.value.pureBlackTheme
                 preferences[KEY_WELCOME_NAME] = _uiState.value.welcomeName
                 preferences[KEY_FILTERS] = Json.encodeToString(_uiState.value.filterOptions)
-                preferences[KEY_ACTIVITIES] = Json.encodeToString(_uiState.value.activities)
+                preferences[KEY_ACTIVITIES] = activitiesJson
+            }
+
+            try {
+                withContext(Dispatchers.IO) {
+                    val home = System.getProperty("user.home")
+                    val dir = java.io.File(home, ".thebigcalendar")
+                    if (!dir.exists()) dir.mkdirs()
+                    val activitiesFile = java.io.File(dir, "activities.json")
+                    activitiesFile.writeText(activitiesJson)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
