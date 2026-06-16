@@ -37,6 +37,9 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 
 // Função utilitária para converter cores hexadecimais em Color do Compose sem depender de APIs do Android
 fun parseHexColor(colorStr: String): Color {
@@ -53,7 +56,7 @@ fun parseHexColor(colorStr: String): Color {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -197,6 +200,105 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 shape = RoundedCornerShape(12.dp)
             )
 
+            // Botão de Sincronização Google Calendar
+            Button(
+                onClick = { viewModel.syncGoogleCalendar() },
+                enabled = !uiState.isSyncing,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                if (uiState.isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sincronizando...", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sincronizar",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sincronizar Google", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            // Mensagem de Sincronização
+            if (uiState.syncMessage != null) {
+                val msg = uiState.syncMessage!!
+                val isError = msg.contains("Erro", ignoreCase = true)
+                val isWarning = msg.contains("Aviso", ignoreCase = true)
+                val isSuccess = msg.contains("concluída", ignoreCase = true)
+
+                val containerColor = when {
+                    isError -> MaterialTheme.colorScheme.errorContainer
+                    isWarning -> MaterialTheme.colorScheme.tertiaryContainer
+                    isSuccess -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+
+                val contentColor = when {
+                    isError -> MaterialTheme.colorScheme.onErrorContainer
+                    isWarning -> MaterialTheme.colorScheme.onTertiaryContainer
+                    isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+
+                val icon = when {
+                    isError -> Icons.Default.Error
+                    isWarning -> Icons.Default.Warning
+                    isSuccess -> Icons.Default.CheckCircle
+                    else -> Icons.Default.Info
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = containerColor,
+                        contentColor = contentColor
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        if (!uiState.isSyncing) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Fechar",
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clickable { viewModel.clearSyncMessage() }
+                            )
+                        }
+                    }
+                }
+            }
+
             Text(
                 "Filtros de Visualização",
                 style = MaterialTheme.typography.labelSmall,
@@ -266,6 +368,14 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 .weight(1f)
                 .fillMaxHeight()
                 .padding(24.dp)
+                .onPointerEvent(PointerEventType.Scroll) { pointerEvent ->
+                    val deltaY = pointerEvent.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                    if (deltaY > 0f) {
+                        viewModel.updateDisplayedMonth(1)
+                    } else if (deltaY < 0f) {
+                        viewModel.updateDisplayedMonth(-1)
+                    }
+                }
         ) {
             // Cabeçalho do Calendário (Mês e Ano + Navegação)
             Row(

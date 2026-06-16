@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -46,7 +48,9 @@ data class DesktopUiState(
     val welcomeName: String = "Usuário",
     val searchQuery: String = "",
     val activityToEdit: Activity? = null,
-    val showSettings: Boolean = false
+    val showSettings: Boolean = false,
+    val isSyncing: Boolean = false,
+    val syncMessage: String? = null
 )
 
 class DesktopCalendarViewModel(private val scope: CoroutineScope) {
@@ -325,5 +329,216 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
         _uiState.update { it.copy(filterOptions = updated) }
         saveData()
+    }
+
+    fun clearSyncMessage() {
+        _uiState.update { it.copy(syncMessage = null) }
+    }
+
+    fun syncGoogleCalendar() {
+        scope.launch {
+            _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando sincronização...") }
+            try {
+                val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+                if (secretStream == null) {
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            syncMessage = "Aviso: arquivo 'client_secrets.json' não encontrado nos recursos. Veja as instruções para ativá-lo."
+                        )
+                    }
+                    return@launch
+                }
+
+                _uiState.update { it.copy(syncMessage = "Acesse o seu navegador para autorizar...") }
+
+                val localActivities = _uiState.value.activities
+                val localToUpload = localActivities.filter { !it.isFromGoogle }
+                val uploadedMappings = mutableMapOf<String, Activity>()
+
+                val activitiesList = withContext(Dispatchers.IO) {
+                    val transport = com.google.api.client.googleapis.javanet.GoogleNetHttpTransport.newTrustedTransport()
+                    val jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+
+                    val clientSecrets = com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.load(
+                        jsonFactory, java.io.InputStreamReader(secretStream)
+                    )
+
+                    val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
+                        transport, jsonFactory, clientSecrets,
+                        listOf("https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events")
+                    )
+                        .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
+                        .setAccessType("offline")
+                        .build()
+
+                    val receiver = com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder().setPort(8888).build()
+                    val credential = com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+
+                    val calendarService = com.google.api.services.calendar.Calendar.Builder(
+                        transport, jsonFactory, credential
+                    )
+                        .setApplicationName("TheBigCalendar")
+                        .build()
+
+                    // 1. Enviar eventos locais que não vieram do Google
+                    if (localToUpload.isNotEmpty()) {
+                        _uiState.update { it.copy(syncMessage = "Enviando ${localToUpload.size} compromissos locais para o Google...") }
+                        for (localAct in localToUpload) {
+                            try {
+                                val event = com.google.api.services.calendar.model.Event().apply {
+                                    summary = localAct.title
+                                    description = localAct.description
+                                    location = localAct.location
+                                }
+
+                                val startDateTime = if (localAct.isAllDay) {
+                                    val localDate = java.time.LocalDate.parse(localAct.date)
+                                    val startInstant = localDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                                    val dateVal = com.google.api.client.util.DateTime(true, startInstant, null)
+                                    com.google.api.services.calendar.model.EventDateTime().setDate(dateVal)
+                                } else {
+                                    val localDateTime = java.time.LocalDateTime.of(java.time.LocalDate.parse(localAct.date), localAct.startTime ?: java.time.LocalTime.of(9, 0))
+                                    val zonedDateTime = localDateTime.atZone(java.time.ZoneId.systemDefault())
+                                    val startVal = com.google.api.client.util.DateTime(zonedDateTime.toInstant().toEpochMilli())
+                                    com.google.api.services.calendar.model.EventDateTime().setDateTime(startVal)
+                                }
+                                event.start = startDateTime
+
+                                val endDateTime = if (localAct.isAllDay) {
+                                    val localDate = java.time.LocalDate.parse(localAct.date).plusDays(1)
+                                    val endInstant = localDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+                                    val dateVal = com.google.api.client.util.DateTime(true, endInstant, null)
+                                    com.google.api.services.calendar.model.EventDateTime().setDate(dateVal)
+                                } else {
+                                    val localDateTime = java.time.LocalDateTime.of(
+                                        java.time.LocalDate.parse(localAct.date),
+                                        localAct.endTime ?: (localAct.startTime ?: java.time.LocalTime.of(9, 0)).plusHours(1)
+                                    )
+                                    val zonedDateTime = localDateTime.atZone(java.time.ZoneId.systemDefault())
+                                    val endVal = com.google.api.client.util.DateTime(zonedDateTime.toInstant().toEpochMilli())
+                                    com.google.api.services.calendar.model.EventDateTime().setDateTime(endVal)
+                                }
+                                event.end = endDateTime
+
+                                val createdEvent = calendarService.events().insert("primary", event).execute()
+                                if (createdEvent.id != null) {
+                                    val updatedAct = localAct.copy(
+                                        id = createdEvent.id,
+                                        isFromGoogle = true
+                                    )
+                                    uploadedMappings[localAct.id] = updatedAct
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                throw Exception("Falha ao enviar compromisso local '${localAct.title}': ${e.message}", e)
+                            }
+                        }
+                    }
+
+                    _uiState.update { it.copy(syncMessage = "Buscando compromissos do Google Calendar...") }
+
+                    // 2. Buscar eventos do Google
+                    val currentYear = YearMonth.now().year
+                    val startDateTime = com.google.api.client.util.DateTime(java.time.OffsetDateTime.of(currentYear, 1, 1, 0, 0, 0, 0, java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
+                    val endDateTime = com.google.api.client.util.DateTime(java.time.OffsetDateTime.of(currentYear, 12, 31, 23, 59, 59, 0, java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
+
+                    val eventsResult = calendarService.events().list("primary")
+                        .setTimeMin(startDateTime)
+                        .setTimeMax(endDateTime)
+                        .setMaxResults(2500)
+                        .execute()
+
+                    val googleEvents = eventsResult.items ?: emptyList()
+
+                    googleEvents.mapNotNull { event ->
+                        try {
+                            val start = event.start?.dateTime?.value ?: event.start?.date?.value ?: return@mapNotNull null
+                            val end = event.end?.dateTime?.value ?: event.end?.date?.value
+
+                            val startDate = if (event.start?.dateTime == null) {
+                                java.time.Instant.ofEpochMilli(start).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                            } else {
+                                java.time.Instant.ofEpochMilli(start).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                            }
+
+                            val startTime = if (event.start?.dateTime != null) {
+                                java.time.Instant.ofEpochMilli(start).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                            } else null
+
+                            val endTime = if (end != null && event.end?.dateTime != null) {
+                                java.time.Instant.ofEpochMilli(end).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                            } else null
+
+                            val summary = event.summary ?: "Sem título"
+                            val isBirthday = event.start?.dateTime == null &&
+                                             (summary.contains("aniversário", ignoreCase = true) ||
+                                              summary.contains("birthday", ignoreCase = true))
+
+                            Activity(
+                                id = event.id ?: UUID.randomUUID().toString(),
+                                title = summary,
+                                description = event.description,
+                                date = startDate.toString(),
+                                startTime = startTime,
+                                endTime = endTime,
+                                isAllDay = event.start?.dateTime == null,
+                                location = event.location,
+                                categoryColor = if (isBirthday) "#FF69B4" else "#4285F4",
+                                activityType = if (isBirthday) ActivityType.BIRTHDAY else ActivityType.EVENT,
+                                recurrenceRule = event.recurrence?.firstOrNull(),
+                                notificationSettings = NotificationSettings(),
+                                showInCalendar = true,
+                                isFromGoogle = true,
+                                excludedDates = emptyList()
+                            )
+                        } catch(e: Exception) {
+                            e.printStackTrace()
+                            null
+                        }
+                    }
+                }
+
+                // Substitui os itens locais que foram enviados pelo seu correspondente com ID gerado pelo Google
+                val currentActivities = _uiState.value.activities.map { localAct ->
+                    uploadedMappings[localAct.id] ?: localAct
+                }.toMutableList()
+
+                var newCount = 0
+                activitiesList.forEach { remote ->
+                    val index = currentActivities.indexOfFirst { it.id == remote.id || (it.title == remote.title && it.date == remote.date) }
+                    if (index != -1) {
+                        currentActivities[index] = remote
+                    } else {
+                        currentActivities.add(remote)
+                        newCount++
+                    }
+                }
+
+                val finalMessage = if (uploadedMappings.isNotEmpty()) {
+                    "Sincronização concluída! ${uploadedMappings.size} locais enviados, $newCount novos importados do Google."
+                } else {
+                    "Sincronização concluída! $newCount novos eventos importados."
+                }
+
+                _uiState.update {
+                    it.copy(
+                        activities = currentActivities,
+                        isSyncing = false,
+                        syncMessage = finalMessage
+                    )
+                }
+                saveData()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = "Erro ao sincronizar: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 }
