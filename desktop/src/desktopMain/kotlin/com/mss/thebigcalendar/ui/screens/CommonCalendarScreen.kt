@@ -40,6 +40,8 @@ import java.util.Locale
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import java.awt.FileDialog
+import java.awt.Frame
 
 // Função utilitária para converter cores hexadecimais em Color do Compose sem depender de APIs do Android
 fun parseHexColor(colorStr: String): Color {
@@ -297,6 +299,41 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                         }
                     }
                 }
+            }
+
+            // Botão de Restaurar Backup
+            Button(
+                onClick = {
+                    try {
+                        val fileDialog = FileDialog(null as Frame?, "Selecionar arquivo de backup", FileDialog.LOAD).apply {
+                            file = "*.json"
+                            isVisible = true
+                        }
+                        val directory = fileDialog.directory
+                        val filename = fileDialog.file
+                        if (directory != null && filename != null) {
+                            val selectedFile = java.io.File(directory, filename)
+                            viewModel.restoreBackup(selectedFile)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                },
+                enabled = !uiState.isSyncing,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Backup,
+                    contentDescription = "Restaurar Backup",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Restaurar Backup", style = MaterialTheme.typography.bodyMedium)
             }
 
             Text(

@@ -21,6 +21,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -540,5 +545,189 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 }
             }
         }
+    }
+
+    fun restoreBackup(file: java.io.File) {
+        scope.launch {
+            _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando restauração do backup...") }
+            try {
+                val content = withContext(Dispatchers.IO) {
+                    file.readText(Charsets.UTF_8)
+                }
+
+                val jsonElement = Json.parseToJsonElement(content)
+                val jsonObject = jsonElement.jsonObject
+
+                // Verificar versão do backup
+                val backupVersion = jsonObject["backupVersion"]?.jsonPrimitive?.content ?: "1.0"
+                if (backupVersion != "1.0" && backupVersion != "1.1") {
+                    throw Exception("Versão de backup não suportada: $backupVersion")
+                }
+
+                // Extrair atividades ativas e concluídas
+                val activitiesArray = jsonObject["activities"]?.jsonArray ?: emptyList()
+                val completedActivitiesArray = jsonObject["completedActivities"]?.jsonArray ?: emptyList()
+
+                val restoredActivities = mutableListOf<Activity>()
+
+                for (element in activitiesArray) {
+                    try {
+                        val actObj = element.jsonObject
+                        restoredActivities.add(parseActivityFromJsonObject(actObj))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
+                for (element in completedActivitiesArray) {
+                    try {
+                        val actObj = element.jsonObject
+                        // Assegurar que atividades no array completedActivities estejam marcadas como concluídas
+                        val act = parseActivityFromJsonObject(actObj).copy(isCompleted = true)
+                        restoredActivities.add(act)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
+                // Restaurar configurações se disponíveis no backup
+                val settingsObj = jsonObject["settings"]?.jsonObject
+                var restoredWelcomeName = _uiState.value.welcomeName
+                var restoredTheme = _uiState.value.theme
+
+                if (settingsObj != null) {
+                    val welcomeNameStr = settingsObj["welcomeName"]?.jsonPrimitive?.content
+                    if (!welcomeNameStr.isNullOrBlank()) {
+                        restoredWelcomeName = welcomeNameStr
+                    }
+                    val themeNameStr = settingsObj["theme"]?.jsonPrimitive?.content
+                    if (!themeNameStr.isNullOrBlank()) {
+                        restoredTheme = try { Theme.valueOf(themeNameStr) } catch(e: Exception) { restoredTheme }
+                    }
+                }
+
+                // Mesclar as atividades restauradas com a lista atual
+                val currentActivities = _uiState.value.activities.toMutableList()
+                var updatedCount = 0
+                var insertedCount = 0
+
+                restoredActivities.forEach { restored ->
+                    val index = currentActivities.indexOfFirst { it.id == restored.id || (it.title == restored.title && it.date == restored.date) }
+                    if (index != -1) {
+                        currentActivities[index] = restored
+                        updatedCount++
+                    } else {
+                        currentActivities.add(restored)
+                        insertedCount++
+                    }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        activities = currentActivities,
+                        welcomeName = restoredWelcomeName,
+                        theme = restoredTheme,
+                        isSyncing = false,
+                        syncMessage = "Backup restaurado! $insertedCount novos compromissos importados, $updatedCount atualizados."
+                    )
+                }
+                saveData()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = "Erro ao restaurar backup: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    private fun parseActivityFromJsonObject(obj: kotlinx.serialization.json.JsonObject): Activity {
+        val id = obj["id"]?.jsonPrimitive?.content ?: UUID.randomUUID().toString()
+        val title = obj["title"]?.jsonPrimitive?.content ?: "Sem título"
+        val description = obj["description"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        val date = obj["date"]?.jsonPrimitive?.content ?: LocalDate.now().toString()
+        
+        val startTimeStr = obj["startTime"]?.jsonPrimitive?.content
+        val startTime = startTimeStr?.takeIf { it.isNotEmpty() }?.let {
+            try { LocalTime.parse(it) } catch (e: Exception) { null }
+        }
+        
+        val endTimeStr = obj["endTime"]?.jsonPrimitive?.content
+        val endTime = endTimeStr?.takeIf { it.isNotEmpty() }?.let {
+            try { LocalTime.parse(it) } catch (e: Exception) { null }
+        }
+        
+        val isAllDay = obj["isAllDay"]?.jsonPrimitive?.booleanOrNull ?: true
+        val location = obj["location"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        val categoryColor = obj["categoryColor"]?.jsonPrimitive?.content ?: "#4285F4"
+        
+        val activityTypeStr = obj["activityType"]?.jsonPrimitive?.content ?: "EVENT"
+        val activityType = try { ActivityType.valueOf(activityTypeStr) } catch(e: Exception) { ActivityType.EVENT }
+        
+        val recurrenceRule = obj["recurrenceRule"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        val isCompleted = obj["isCompleted"]?.jsonPrimitive?.booleanOrNull ?: false
+        
+        val visibilityStr = obj["visibility"]?.jsonPrimitive?.content ?: "LOW"
+        val visibility = try { VisibilityLevel.valueOf(visibilityStr) } catch(e: Exception) { VisibilityLevel.LOW }
+        
+        val showInCalendar = obj["showInCalendar"]?.jsonPrimitive?.booleanOrNull ?: true
+        val isFromGoogle = obj["isFromGoogle"]?.jsonPrimitive?.booleanOrNull ?: false
+        
+        val excludedDates = obj["excludedDates"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+        val excludedInstances = obj["excludedInstances"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+        val wikipediaLink = obj["wikipediaLink"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        
+        val rollover = obj["rollover"]?.jsonPrimitive?.booleanOrNull ?: false
+
+        val notifObj = obj["notificationSettings"]?.jsonObject
+        val notificationSettings = if (notifObj != null) {
+            val notifEnabled = notifObj["isEnabled"]?.jsonPrimitive?.booleanOrNull ?: false
+            val notifTypeStr = notifObj["notificationType"]?.jsonPrimitive?.content ?: "FIFTEEN_MINUTES_BEFORE"
+            val notifType = try {
+                com.mss.thebigcalendar.data.model.NotificationType.valueOf(notifTypeStr)
+            } catch(e: Exception) {
+                com.mss.thebigcalendar.data.model.NotificationType.FIFTEEN_MINUTES_BEFORE
+            }
+            val customMinutes = notifObj["customMinutesBefore"]?.jsonPrimitive?.intOrNull ?: 15
+            val notifTimeStr = notifObj["notificationTime"]?.jsonPrimitive?.content
+            val notifTime = notifTimeStr?.takeIf { it.isNotEmpty() }?.let {
+                try { LocalTime.parse(it) } catch (e: Exception) { null }
+            }
+            NotificationSettings(
+                isEnabled = notifEnabled,
+                notificationType = notifType,
+                customMinutesBefore = customMinutes,
+                notificationTime = notifTime
+            )
+        } else {
+            NotificationSettings()
+        }
+
+        return Activity(
+            id = id,
+            title = title,
+            description = description,
+            date = date,
+            startTime = startTime,
+            endTime = endTime,
+            isAllDay = isAllDay,
+            location = location,
+            categoryColor = categoryColor,
+            activityType = activityType,
+            recurrenceRule = recurrenceRule,
+            isCompleted = isCompleted,
+            visibility = visibility,
+            showInCalendar = showInCalendar,
+            isFromGoogle = isFromGoogle,
+            excludedDates = excludedDates,
+            excludedInstances = excludedInstances,
+            wikipediaLink = wikipediaLink,
+            notificationSettings = notificationSettings,
+            rollover = rollover
+        )
     }
 }
