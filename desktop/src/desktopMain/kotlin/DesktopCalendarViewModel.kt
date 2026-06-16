@@ -43,6 +43,13 @@ data class DesktopFilterOptions(
     val showMilitaryHolidays: Boolean = false
 )
 
+@Serializable
+data class DesktopCloudBackupInfo(
+    val id: String,
+    val name: String,
+    val createdTime: String
+)
+
 data class DesktopUiState(
     val displayedYearMonth: YearMonth = YearMonth.now(),
     val selectedDate: LocalDate = LocalDate.now(),
@@ -55,7 +62,10 @@ data class DesktopUiState(
     val activityToEdit: Activity? = null,
     val showSettings: Boolean = false,
     val isSyncing: Boolean = false,
-    val syncMessage: String? = null
+    val syncMessage: String? = null,
+    val cloudBackups: List<DesktopCloudBackupInfo> = emptyList(),
+    val showCloudBackupDialog: Boolean = false,
+    val isFetchingCloudBackups: Boolean = false
 )
 
 class DesktopCalendarViewModel(private val scope: CoroutineScope) {
@@ -371,7 +381,11 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
                     val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
                         transport, jsonFactory, clientSecrets,
-                        listOf("https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events")
+                        listOf(
+                            "https://www.googleapis.com/auth/calendar",
+                            "https://www.googleapis.com/auth/calendar.events",
+                            "https://www.googleapis.com/auth/drive.appdata"
+                        )
                     )
                         .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
                         .setAccessType("offline")
@@ -729,5 +743,176 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
             notificationSettings = notificationSettings,
             rollover = rollover
         )
+    }
+
+    fun fetchCloudBackups() {
+        scope.launch {
+            _uiState.update { 
+                it.copy(
+                    isFetchingCloudBackups = true, 
+                    showCloudBackupDialog = true, 
+                    syncMessage = null 
+                ) 
+            }
+            try {
+                val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+                if (secretStream == null) {
+                    _uiState.update {
+                        it.copy(
+                            isFetchingCloudBackups = false,
+                            showCloudBackupDialog = false,
+                            syncMessage = "Aviso: arquivo 'client_secrets.json' não encontrado. Não é possível acessar a nuvem."
+                        )
+                    }
+                    return@launch
+                }
+
+                val backupsList = withContext(Dispatchers.IO) {
+                    val transport = com.google.api.client.googleapis.javanet.GoogleNetHttpTransport.newTrustedTransport()
+                    val jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+
+                    val clientSecrets = com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.load(
+                        jsonFactory, java.io.InputStreamReader(secretStream)
+                    )
+
+                    val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
+                        transport, jsonFactory, clientSecrets,
+                        listOf(
+                            "https://www.googleapis.com/auth/calendar",
+                            "https://www.googleapis.com/auth/calendar.events",
+                            "https://www.googleapis.com/auth/drive.appdata"
+                        )
+                    )
+                        .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
+                        .setAccessType("offline")
+                        .build()
+
+                    val receiver = com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder().setPort(8888).build()
+                    val credential = com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+
+                    val driveService = com.google.api.services.drive.Drive.Builder(
+                        transport, jsonFactory, credential
+                    )
+                        .setApplicationName("TheBigCalendar")
+                        .build()
+
+                    // List files in appDataFolder
+                    val filesResult = driveService.files().list()
+                        .setSpaces("appDataFolder")
+                        .setFields("files(id, name, createdTime)")
+                        .execute()
+
+                    val filesList = filesResult.getFiles() ?: emptyList()
+
+                    filesList.mapNotNull { file ->
+                        if (file.getName()?.contains("backup_") == true || file.getName()?.contains(".json") == true) {
+                            val timeStr = file.getCreatedTime()?.toString() ?: ""
+                            DesktopCloudBackupInfo(
+                                id = file.getId() ?: "",
+                                name = file.getName() ?: "Backup sem nome",
+                                createdTime = timeStr
+                            )
+                        } else null
+                    }.sortedByDescending { it.createdTime }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        cloudBackups = backupsList,
+                        isFetchingCloudBackups = false
+                    )
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isFetchingCloudBackups = false,
+                        showCloudBackupDialog = false,
+                        syncMessage = "Erro ao buscar backups na nuvem: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun restoreCloudBackup(fileId: String) {
+        scope.launch {
+            _uiState.update {
+                it.copy(
+                    isFetchingCloudBackups = true,
+                    syncMessage = "Baixando arquivo de backup da nuvem..."
+                )
+            }
+            try {
+                val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+                if (secretStream == null) {
+                    throw Exception("Arquivo 'client_secrets.json' não encontrado.")
+                }
+
+                val tempFile = withContext(Dispatchers.IO) {
+                    val transport = com.google.api.client.googleapis.javanet.GoogleNetHttpTransport.newTrustedTransport()
+                    val jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+
+                    val clientSecrets = com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.load(
+                        jsonFactory, java.io.InputStreamReader(secretStream)
+                    )
+
+                    val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
+                        transport, jsonFactory, clientSecrets,
+                        listOf(
+                            "https://www.googleapis.com/auth/calendar",
+                            "https://www.googleapis.com/auth/calendar.events",
+                            "https://www.googleapis.com/auth/drive.appdata"
+                        )
+                    )
+                        .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
+                        .setAccessType("offline")
+                        .build()
+
+                    val receiver = com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder().setPort(8888).build()
+                    val credential = com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+
+                    val driveService = com.google.api.services.drive.Drive.Builder(
+                        transport, jsonFactory, credential
+                    )
+                        .setApplicationName("TheBigCalendar")
+                        .build()
+
+                    val localTempFile = java.io.File.createTempFile("cloud_restore_", ".json")
+                    localTempFile.deleteOnExit()
+
+                    java.io.FileOutputStream(localTempFile).use { outputStream ->
+                        driveService.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+                    }
+
+                    localTempFile
+                }
+
+                // Restore from the temp file we downloaded
+                restoreBackup(tempFile)
+
+                _uiState.update {
+                    it.copy(
+                        showCloudBackupDialog = false,
+                        isFetchingCloudBackups = false
+                    )
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isFetchingCloudBackups = false,
+                        showCloudBackupDialog = false,
+                        syncMessage = "Erro ao restaurar backup da nuvem: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissCloudBackupDialog() {
+        _uiState.update { it.copy(showCloudBackupDialog = false) }
     }
 }

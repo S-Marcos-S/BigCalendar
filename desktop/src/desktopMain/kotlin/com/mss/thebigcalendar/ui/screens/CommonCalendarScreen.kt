@@ -45,16 +45,24 @@ import java.awt.Frame
 
 // Função utilitária para converter cores hexadecimais em Color do Compose sem depender de APIs do Android
 fun parseHexColor(colorStr: String): Color {
-    return try {
-        val hex = colorStr.removePrefix("#")
-        val argb = when (hex.length) {
-            6 -> 0xFF000000.toInt() or hex.toInt(16)
-            8 -> hex.toLong(16).toInt()
-            else -> 0xFFEF5350.toInt()
+    return when (colorStr) {
+        "1" -> Color.White
+        "2" -> Color.Blue
+        "3" -> Color.Yellow
+        "4" -> Color.Red
+        else -> {
+            try {
+                val hex = colorStr.removePrefix("#")
+                val argb = when (hex.length) {
+                    6 -> 0xFF000000.toInt() or hex.toInt(16)
+                    8 -> hex.toLong(16).toInt()
+                    else -> 0xFFEF5350.toInt()
+                }
+                Color(argb)
+            } catch (e: Exception) {
+                Color.White
+            }
         }
-        Color(argb)
-    } catch (e: Exception) {
-        Color(0xFFEF5350)
     }
 }
 
@@ -70,7 +78,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
     var editStartTime by remember { mutableStateOf("") }
     var editEndTime by remember { mutableStateOf("") }
     var editIsAllDay by remember { mutableStateOf(true) }
-    var editColor by remember { mutableStateOf("#EF5350") }
+    var editColor by remember { mutableStateOf("1") }
     var editType by remember { mutableStateOf(ActivityType.EVENT) }
 
     var editingWelcomeName by remember { mutableStateOf(false) }
@@ -81,14 +89,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
     val activities = uiState.activities
     val filters = uiState.filterOptions
 
-    val categoryColors = listOf(
-        "#EF5350", // Red
-        "#42A5F5", // Blue
-        "#66BB6A", // Green
-        "#FFA726", // Orange
-        "#8E24AA", // Purple
-        "#00897B"  // Teal
-    )
+    val categoryColors = listOf("1", "2", "3", "4")
 
     // Lógica de filtragem de atividades
     val filteredActivities = remember(activities, filters, uiState.searchQuery) {
@@ -301,7 +302,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 }
             }
 
-            // Botão de Restaurar Backup
+            // Botão de Restaurar Backup Local
             Button(
                 onClick = {
                     try {
@@ -320,7 +321,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                     }
                 },
                 enabled = !uiState.isSyncing,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -329,11 +330,33 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
             ) {
                 Icon(
                     imageVector = Icons.Default.Backup,
-                    contentDescription = "Restaurar Backup",
+                    contentDescription = "Restaurar Backup Local",
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Restaurar Backup", style = MaterialTheme.typography.bodyMedium)
+                Text("Restaurar Local", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            // Botão de Restaurar Backup da Nuvem
+            Button(
+                onClick = {
+                    viewModel.fetchCloudBackups()
+                },
+                enabled = !uiState.isSyncing,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = "Restaurar Backup da Nuvem",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Restaurar da Nuvem", style = MaterialTheme.typography.bodyMedium)
             }
 
             Text(
@@ -571,17 +594,25 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         dayActivities.take(3).forEach { act ->
+                                            val pillBg = parseHexColor(act.categoryColor)
+                                            val textColor = if (pillBg == Color.White || pillBg == Color.Yellow) Color.Black else Color.White
+                                            val isWhiteBg = pillBg == Color.White
                                             Text(
                                                 text = act.title,
                                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                                color = Color.White,
+                                                color = textColor,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 textDecoration = if (act.isCompleted) TextDecoration.LineThrough else null,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .clip(RoundedCornerShape(4.dp))
-                                                    .background(parseHexColor(act.categoryColor).copy(alpha = 0.85f))
+                                                    .background(pillBg.copy(alpha = 0.85f))
+                                                    .then(
+                                                        if (isWhiteBg) {
+                                                            Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                                        } else Modifier
+                                                    )
                                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                                             )
                                         }
@@ -713,7 +744,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                     editStartTime = "09:00"
                     editEndTime = "10:00"
                     editIsAllDay = true
-                    editColor = "#EF5350"
+                    editColor = "1"
                     editType = ActivityType.EVENT
                     showCreateDialog = true
                 },
@@ -806,26 +837,47 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                         }
                     }
 
-                    Text("Cor da Categoria", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    Text("Prioridade", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
+                    val priorityLabel = when (editColor) {
+                        "1" -> "Normal"
+                        "2" -> "Média"
+                        "3" -> "Alta"
+                        "4" -> "Crítica"
+                        else -> "Personalizada"
+                    }
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         categoryColors.forEach { colorStr ->
+                            val colorValue = parseHexColor(colorStr)
                             Box(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(parseHexColor(colorStr))
+                                    .background(colorValue)
                                     .border(
                                         width = if (editColor == colorStr) 3.dp else 1.dp,
-                                        color = if (editColor == colorStr) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                        color = if (editColor == colorStr) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else if (colorValue == Color.White) {
+                                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        } else {
+                                            Color.Transparent
+                                        },
                                         shape = CircleShape
                                     )
                                     .clickable { editColor = colorStr }
                             )
                         }
                     }
+                    Text(
+                        text = "Nível selecionado: $priorityLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 20.dp)
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -858,6 +910,141 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             }
                         ) {
                             Text("Salvar")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // DIÁLOGO: Restaurar Backup da Nuvem
+    if (uiState.showCloudBackupDialog) {
+        Dialog(onDismissRequest = { viewModel.dismissCloudBackupDialog() }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.width(450.dp).heightIn(max = 500.dp).padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Restaurar Backup da Nuvem",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    if (uiState.isFetchingCloudBackups) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Buscando backups no Google Drive...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else if (uiState.cloudBackups.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Nenhum backup encontrado na nuvem.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(uiState.cloudBackups) { backup ->
+                                val formattedDate = try {
+                                    val dt = com.google.api.client.util.DateTime(backup.createdTime)
+                                    val instant = java.time.Instant.ofEpochMilli(dt.value)
+                                    val zonedDateTime = instant.atZone(java.time.ZoneId.systemDefault())
+                                    val formatterOutput = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd 'às' HH:mm")
+                                    zonedDateTime.format(formatterOutput)
+                                } catch (e: Exception) {
+                                    backup.createdTime
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                text = backup.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "Criado em: $formattedDate",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                viewModel.restoreCloudBackup(backup.id)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text("Restaurar", style = MaterialTheme.typography.labelMedium)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.dismissCloudBackupDialog() }
+                        ) {
+                            Text("Fechar")
                         }
                     }
                 }
@@ -944,12 +1131,21 @@ fun ActivityItemCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
+            val boxModifier = if (categoryColor == Color.White) {
+                Modifier
+                    .width(4.dp)
+                    .height(48.dp)
+                    .background(categoryColor, shape = RoundedCornerShape(2.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+            } else {
+                Modifier
                     .width(4.dp)
                     .height(48.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(categoryColor)
+            }
+            Box(
+                modifier = boxModifier
             )
             
             Spacer(modifier = Modifier.width(12.dp))
