@@ -58,11 +58,11 @@ import com.mss.thebigcalendar.data.model.ViewMode
 
 private val filterItems = listOf(
     "showHolidays" to R.string.national_holidays,
-    "showSaintDays" to R.string.catholic_saint_days,
     "showEvents" to R.string.events,
     "showTasks" to R.string.tasks,
     "showBirthdays" to R.string.birthday,
-    "showNotes" to R.string.note
+    "showNotes" to R.string.note,
+    "showCommemorative" to R.string.commemorative_dates
 )
 
 @Composable
@@ -205,22 +205,22 @@ fun Sidebar(
             filterLabels.forEach { (key, labelResId) ->
                 val isVisible = when (key) {
                     "showHolidays" -> uiState.sidebarFilterVisibility.showHolidays
-                    "showSaintDays" -> uiState.sidebarFilterVisibility.showSaintDays
                     "showEvents" -> uiState.sidebarFilterVisibility.showEvents
                     "showTasks" -> uiState.sidebarFilterVisibility.showTasks
                     "showBirthdays" -> uiState.sidebarFilterVisibility.showBirthdays
                     "showNotes" -> uiState.sidebarFilterVisibility.showNotes
+                    "showCommemorative" -> uiState.sidebarFilterVisibility.showCommemorative
                     else -> true
                 }
                 
                 if (isVisible) {
                     val isChecked = when (key) {
                         "showHolidays" -> uiState.filterOptions.showHolidays
-                        "showSaintDays" -> uiState.filterOptions.showSaintDays
                         "showEvents" -> uiState.filterOptions.showEvents
                         "showTasks" -> uiState.filterOptions.showTasks
                         "showBirthdays" -> uiState.filterOptions.showBirthdays
                         "showNotes" -> uiState.filterOptions.showNotes
+                        "showCommemorative" -> uiState.filterOptions.showCommemorative
                         else -> false
                     }
                     FilterCheckboxItem(
@@ -424,13 +424,14 @@ private fun JsonCalendarItem(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+        val isPredefined = jsonCalendar.id == "PREDEFINED_MILITARY_HOLIDAYS" || jsonCalendar.id == "PREDEFINED_SAINTS"
         IconButton(
             onClick = onDeleteClick,
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = "Remover calendário",
+                imageVector = if (isPredefined) Icons.Default.Close else Icons.Default.Delete,
+                contentDescription = if (isPredefined) "Remover do menu" else "Remover calendário",
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(20.dp)
             )

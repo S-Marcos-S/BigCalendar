@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Dia da Tomada de Monte Castello",
+    "date": "02-21",
+    "summary": "Celebração da vitória da Força Expedicionária Brasileira (FEB) na histórica batalha na Itália durante a Segunda Guerra Mundial.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Batalha_de_Monte_Castello"
+  },
+  {
+    "name": "Dia da Arma de Engenharia",
+    "date": "04-10",
+    "summary": "Homenagem aos engenheiros militares e ao patrono da arma, João Carlos de Villagran Cabrita.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Arma_de_Engenharia_do_Ex%C3%A9rcito_Brasileiro"
+  },
+  {
+    "name": "Dia do Corpo de Intendência do Exército",
+    "date": "04-12",
+    "summary": "Homenagem ao serviço responsável pelo suprimento, transporte e finanças do Exército Brasileiro, no aniversário de nascimento de seu patrono, Marechal Bittencourt.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Carlos_Machado_de_Bittencourt"
+  },
+  {
+    "name": "Dia do Exército Brasileiro",
+    "date": "04-19",
+    "summary": "Comemoração oficial do Exército Brasileiro, marcando a Batalha dos Guararapes ocorrida em 1648, berço histórico da força terrestre.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Ex%C3%A9rcito"
+  },
+  {
+    "name": "Dia das Armas de Comunicações",
+    "date": "05-05",
+    "summary": "Dia dedicado aos militares que integram a Arma do Comando, em homenagem ao Marechal Cândido Rondon.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/C%C3%A2ndido_Rondon"
+  },
+  {
+    "name": "Dia da Arma de Cavalaria",
+    "date": "05-10",
+    "summary": "Celebração da tradicional Arma da mobilidade e do choque, no aniversário de nascimento de seu patrono, o Marechal Manuel Luís Osório.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Manuel_Lu%C3%ADs_Os%C3%B3rio"
+  },
+  {
+    "name": "Dia da Arma de Infantaria",
+    "date": "05-24",
+    "summary": "Homenagem à 'Rainha das Armas' no dia do nascimento de seu patrono, o Brigadeiro Antônio de Sampaio.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Ant%C3%B4nio_de_Sampaio"
+  },
+  {
+    "name": "Dia do Serviço de Saúde do Exército",
+    "date": "05-27",
+    "summary": "Comemoração das equipes médicas militares no nascimento do General de Divisão Médico João Severiano da Fonseca, patrono do serviço.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Jo%C3%A3o_Severiano_da_Fonseca"
+  },
+  {
+    "name": "Dia da Artilharia",
+    "date": "06-10",
+    "summary": "Celebração da Arma do fogo potente e do apoio ao combate, em memória do nascimento de seu patrono, o Marechal Emílio Luís Mallet.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Em%C3%ADlio_Lu%C3%ADs_Mallet"
+  },
+  {
+    "name": "Dia da Marinha do Brasil",
+    "date": "06-11",
+    "summary": "Celebração da Marinha e homenagem à histórica Batalha Naval do Riachuelo, ocorrida em 1865.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Marinha_do_Brasil"
+  },
+  {
+    "name": "Dia do Quadro de Engenheiros Militares (QEM)",
+    "date": "08-03",
+    "summary": "Celebração dedicada aos engenheiros militares, em honra ao nascimento do Coronel Ricardo Franco de Almeida Serra.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Ricardo_Franco_de_Almeida_Serra"
+  },
+  {
+    "name": "Dia do Soldado",
+    "date": "08-25",
+    "summary": "Homenagem a todos os soldados do Brasil no aniversário de nascimento do Duque de Caxias, patrono do Exército Brasileiro.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Soldado"
+  },
+  {
+    "name": "Dia da Força Aérea Brasileira e do Aviador",
+    "date": "10-23",
+    "summary": "Celebração do primeiro voo do 14-bis por Alberto Santos Dumont em Paris, instituído como dia da Aeronáutica brasileira.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Aviador"
+  },
+  {
+    "name": "Dia do Marinheiro",
+    "date": "12-13",
+    "summary": "Homenagem aos integrantes da Marinha no nascimento do Almirante Joaquim Marques Lisboa, o Marquês de Tamandaré.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Joaquim_Marques_Lisboa"
+  }
+]

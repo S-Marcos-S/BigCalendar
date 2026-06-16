@@ -32,6 +32,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -59,7 +62,8 @@ fun CompletedTasksScreen(
     completedActivities: List<Activity> = emptyList(),
     onBackPressedDispatcher: OnBackPressedDispatcher? = null,
     onDeleteCompletedActivity: (String) -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    unfixHeadersOnScroll: Boolean = false
 ) {
     var searchQuery by remember { mutableStateOf("") }
     
@@ -78,6 +82,37 @@ fun CompletedTasksScreen(
         }
     }
     
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+
     // Filtrar atividades baseado na busca
     val filteredActivities = completedActivities.filter { activity ->
         activity.title.contains(searchQuery, ignoreCase = true) ||
@@ -91,9 +126,16 @@ fun CompletedTasksScreen(
     }
     
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.let { mod ->
+            if (scrollBehavior != null) {
+                mod.nestedScroll(scrollBehavior.nestedScrollConnection)
+            } else {
+                mod
+            }
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -120,9 +162,11 @@ fun CompletedTasksScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -331,6 +375,7 @@ private fun getActivityTypeColor(activityType: ActivityType): Color {
         ActivityType.EVENT -> Color(0xFF2196F3) // Azul
         ActivityType.NOTE -> Color(0xFFFF9800) // Laranja
         ActivityType.BIRTHDAY -> Color(0xFFE91E63) // Rosa
+        ActivityType.COMMEMORATIVE -> Color(0xFFFF9800) // Laranja
     }
 }
 
@@ -340,6 +385,7 @@ private fun getActivityTypeIcon(activityType: ActivityType): androidx.compose.ui
         ActivityType.EVENT -> Icons.Filled.Event
         ActivityType.NOTE -> Icons.Filled.Note
         ActivityType.BIRTHDAY -> Icons.Filled.Cake
+        ActivityType.COMMEMORATIVE -> Icons.Filled.Event
     }
 }
 

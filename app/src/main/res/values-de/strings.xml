@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">dd.MM</string>
     <string name="appointments_for">Termine für %1$s</string>
+    <string name="appointments_for_month">Termine für den Monat %1$s</string>
+    <string name="select_a_day">Wählen Sie einen Tag im Kalender aus.</string>
     <string name="no_appointments">Nichts geplant.</string>
     <string name="no_tasks_or_events">Keine Aufgaben oder Ereignisse geplant.</string>
     <string name="at_time">Um %1$s</string>
@@ -797,5 +799,46 @@
     <string name="onboarding_notification_subtitle">Damit Sie Ihre Termine nicht verpassen</string>
     <string name="onboarding_notification_desc">Big Calendar verwendet Benachrichtigungen, um Sie an wichtige Ereignisse und Aufgaben zu erinnern. Erlauben Sie das Senden von Benachrichtigungen, um die App optimal zu nutzen.</string>
     <string name="onboarding_allow_notifications">Benachrichtigungen zulassen</string>
+    <string name="backup_folder_selected">Ausgewählter Backup-Ordner:</string>
+    <string name="change_download_location">Download-Pfad ändern</string>
+    <string name="change_folder_button">Ändern</string>
+    <string name="design_model">Designmodell</string>
+    <string name="military_holidays">Militärische Feiertage</string>
+    <string name="more_options">Mehr Optionen</string>
+    <string name="no_design_model">Kein Modell</string>
+    <string name="onboarding_checking_backup">Nach Backups suchen...</string>
+    <string name="onboarding_restore_btn">Backup wiederherstellen</string>
+    <string name="onboarding_restore_desc">Wir haben ein Backup von %1$s in Ihrem Google Drive-Konto mit %2$d Aktivitäten gefunden. Möchten Sie diese Informationen wiederherstellen?</string>
+    <string name="onboarding_restore_loading">Backup wird wiederhergestellt...</string>
+    <string name="onboarding_restore_local_activities_size">Aktivitäten: %1$d • %2$d KB</string>
+    <string name="onboarding_restore_local_choose_folder">Ordner auswählen</string>
+    <string name="onboarding_restore_local_choose_other">Anderen Ordner auswählen</string>
+    <string name="onboarding_restore_local_deny">Nein, danke</string>
+    <string name="onboarding_restore_local_desc">Haben Sie ein lokales Kalender-Backup, das Sie wiederherstellen möchten?</string>
+    <string name="onboarding_restore_local_finish">Fertigstellen</string>
+    <string name="onboarding_restore_local_found">Backups gefunden</string>
+    <string name="onboarding_restore_local_found_desc">Wählen Sie eine Backup-Datei aus, um Ihre Daten wiederherzustellen:</string>
+    <string name="onboarding_restore_local_no_backups">Kein Backup gefunden</string>
+    <string name="onboarding_restore_local_no_backups_desc">Wir haben im ausgewählten Ordner keine kompatible Backup-Datei gefunden.</string>
+    <string name="onboarding_restore_local_restore">Wiederherstellen</string>
+    <string name="onboarding_restore_local_search_btn">Lokales Backup suchen</string>
+    <string name="onboarding_restore_local_select_other">Anderen Ordner auswählen</string>
+    <string name="onboarding_restore_local_skip">Ohne Wiederherstellung fertigstellen</string>
+    <string name="onboarding_restore_local_title">Lokales Backup wiederherstellen</string>
+    <string name="onboarding_restore_skip">Nein, von vorne beginnen</string>
+    <string name="onboarding_restore_title">Google Drive Backup wiederherstellen</string>
+    <string name="remove_predefined_calendar_message">Möchten Sie den Kalender \"%1$s\" aus der Seitenleiste der App entfernen?\n\nEr kann über die allgemeinen Einstellungen wieder hinzugefügt werden.</string>
+    <string name="remove_predefined_calendar_title">❌ Aus der Seitenleiste entfernen</string>
+    <string name="select_backup_folder_prompt">Bitte wählen Sie einen Ordner zum Speichern Ihrer lokalen Backups</string>
+    <string name="select_folder_button">Ordner auswählen</string>
+    <string name="settings_app_icon_dialog_title">Symbol auswählen</string>
+    <string name="settings_app_icon_mode_black">Schwarz</string>
+    <string name="settings_app_icon_mode_dynamic">Dynamisch (je nach Design)</string>
+    <string name="settings_app_icon_mode_white">Weiß</string>
+    <string name="settings_app_icon_title">App-Symbol</string>
+    <string name="unfix_headers_on_scroll">Kopfzeile beim Scrollen lösen</string>
+    <string name="unfix_headers_on_scroll_desc">Die Kopfzeile wird zusammen mit dem Bildschirminhalt gescrollt</string>
+    <string name="alarm_skip_next_occurrence">Nächstes Vorkommen überspringen</string>
+    <string name="alarm_next_occurrence_skipped">Nächstes Vorkommen am %1$s wird übersprungen</string>
 </resources>
 

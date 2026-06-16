@@ -24,16 +24,37 @@ class TheBigCalendarApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Crashlytics and Analytics based on user consent
-        appScope.launch {
-            val settingsRepository = SettingsRepository(this@TheBigCalendarApplication)
-            val isEnabled = settingsRepository.isCrashlyticsEnabled.first()
-            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(isEnabled)
-            FirebaseAnalytics.getInstance(this@TheBigCalendarApplication).setAnalyticsCollectionEnabled(isEnabled)
-        }
+        if (isMainProcess()) {
+            // Initialize Crashlytics and Analytics based on user consent in main process
+            appScope.launch {
+                if (com.google.firebase.FirebaseApp.getApps(this@TheBigCalendarApplication).isNotEmpty()) {
+                    val settingsRepository = SettingsRepository(this@TheBigCalendarApplication)
+                    val isEnabled = settingsRepository.isCrashlyticsEnabled.first()
+                    FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(isEnabled)
+                    FirebaseAnalytics.getInstance(this@TheBigCalendarApplication).setAnalyticsCollectionEnabled(isEnabled)
+                }
+            }
 
-        // Agendar o RolloverWorker
-        scheduleRolloverWorker()
+            // Agendar o RolloverWorker no processo principal
+            scheduleRolloverWorker()
+        }
+    }
+
+    private fun isMainProcess(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            return packageName == getProcessName()
+        }
+        val pid = android.os.Process.myPid()
+        val am = getSystemService(ACTIVITY_SERVICE) as? android.app.ActivityManager
+        val runningProcesses = am?.runningAppProcesses
+        if (runningProcesses != null) {
+            for (processInfo in runningProcesses) {
+                if (processInfo.pid == pid) {
+                    return packageName == processInfo.processName
+                }
+            }
+        }
+        return true
     }
 
     private fun scheduleRolloverWorker() {

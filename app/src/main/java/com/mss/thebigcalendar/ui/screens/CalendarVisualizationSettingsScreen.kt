@@ -4,11 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,6 +34,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,11 +54,25 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.ui.components.AnimationSelectionDialog
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
+import com.mss.thebigcalendar.data.model.Language
+import com.mss.thebigcalendar.data.model.AppIconMode
+import com.mss.thebigcalendar.ui.components.LanguageSelectionDialog
+import com.mss.thebigcalendar.ui.components.AppIconSelectionDialog
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarVisualizationSettingsScreen(
+    welcomeName: String,
+    onWelcomeNameChange: (String) -> Unit,
     onBackClick: () -> Unit,
+    onLanguageChange: (Language) -> Unit,
     viewModel: CalendarViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -60,10 +80,58 @@ fun CalendarVisualizationSettingsScreen(
     val sliderValue = remember(currentScale) { mutableFloatStateOf(currentScale) }
     var hideOtherMonths by remember { mutableStateOf(uiState.hideOtherMonthDays) }
     var showAnimationDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showAppIconDialog by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+    var welcomeNameInput by remember { mutableStateOf(welcomeName) }
+
+    LaunchedEffect(welcomeName) {
+        if (welcomeNameInput != welcomeName) {
+            welcomeNameInput = welcomeName
+        }
+    }
+
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
 
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(id = R.string.calendar_visualization_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -74,9 +142,11 @@ fun CalendarVisualizationSettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -85,13 +155,31 @@ fun CalendarVisualizationSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.calendar_visualization_settings_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Campo para o nome de boas-vindas
+            OutlinedTextField(
+                value = welcomeNameInput,
+                onValueChange = {
+                    welcomeNameInput = it
+                    scope.launch {
+                        delay(500) // Debounce para evitar muitas escritas no DataStore
+                        if (welcomeNameInput == it) { // Verificar se o valor não mudou durante o delay
+                            onWelcomeNameChange(it)
+                        }
+                    }
+                },
+                label = { Text(stringResource(id = R.string.welcome_name_setting_title)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Row(
@@ -234,6 +322,33 @@ fun CalendarVisualizationSettingsScreen(
                 )
             }
 
+            // Opção de desfixar o cabeçalho
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.unfix_headers_on_scroll),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(id = R.string.unfix_headers_on_scroll_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                Switch(
+                    checked = uiState.unfixHeadersOnScroll,
+                    onCheckedChange = { enabled ->
+                        viewModel.setUnfixHeadersOnScroll(enabled)
+                    }
+                )
+            }
+
             // Opção da cor primária
             Column(
                 modifier = Modifier
@@ -317,6 +432,74 @@ fun CalendarVisualizationSettingsScreen(
                     }
                 }
             }
+
+            // Configuração de idioma
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = "Idioma",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Idioma",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { showLanguageDialog = true },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Text(
+                        text = "${uiState.language.flag} ${uiState.language.displayName}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            // Configuração do ícone do aplicativo
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Android,
+                    contentDescription = stringResource(id = R.string.settings_app_icon_title),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(id = R.string.settings_app_icon_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { showAppIconDialog = true },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    val modeLabel = when (uiState.appIconMode) {
+                        AppIconMode.DYNAMIC -> stringResource(id = R.string.settings_app_icon_mode_dynamic)
+                        AppIconMode.WHITE -> stringResource(id = R.string.settings_app_icon_mode_white)
+                        AppIconMode.BLACK -> stringResource(id = R.string.settings_app_icon_mode_black)
+                    }
+                    val iconText = when (uiState.appIconMode) {
+                        AppIconMode.DYNAMIC -> "🔄"
+                        AppIconMode.WHITE -> "⚪"
+                        AppIconMode.BLACK -> "⚫"
+                    }
+                    Text(
+                        text = "$iconText $modeLabel",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.weight(1f))
             Text(
@@ -336,6 +519,29 @@ fun CalendarVisualizationSettingsScreen(
                 showAnimationDialog = false
             },
             onDismiss = { showAnimationDialog = false }
+        )
+    }
+
+    // Dialog de seleção de idioma
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguage = uiState.language,
+            onLanguageSelected = { language ->
+                onLanguageChange(language)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
+    }
+
+    // Dialog de seleção de ícone
+    if (showAppIconDialog) {
+        AppIconSelectionDialog(
+            currentMode = uiState.appIconMode,
+            onModeSelected = { mode ->
+                viewModel.onAppIconModeChange(mode)
+            },
+            onDismiss = { showAppIconDialog = false }
         )
     }
 }

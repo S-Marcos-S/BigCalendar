@@ -21,6 +21,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -44,6 +48,10 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Checklist
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,8 +63,114 @@ fun CreateActivityScreen(
 ) {
     val currentActivity = activityToEdit ?: return
 
+    val viewModel = LocalViewModelStoreOwner.current?.let {
+        ViewModelProvider(it)[CalendarViewModel::class.java]
+    }
+    val uiState = viewModel?.uiState?.collectAsState()?.value
+    val unfixHeadersOnScroll = uiState?.unfixHeadersOnScroll ?: false
+
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+
     var title by remember(currentActivity.id) { mutableStateOf(currentActivity.title) }
     var description by remember(currentActivity.id) { mutableStateOf(currentActivity.description ?: "") }
+    var descriptionFieldValue by remember(currentActivity.id) {
+        mutableStateOf(TextFieldValue(currentActivity.description ?: ""))
+    }
+
+    val currentLine: String = remember(descriptionFieldValue) {
+        val text = descriptionFieldValue.text
+        val selection = descriptionFieldValue.selection
+        val cursorPosition = selection.start.coerceIn(0, text.length)
+        val lastNewlineIndex = text.substring(0, cursorPosition).lastIndexOf('\n')
+        val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+        val nextNewlineIndex = text.indexOf('\n', cursorPosition)
+        val lineEnd = if (nextNewlineIndex == -1) text.length else nextNewlineIndex
+        if (lineStart <= lineEnd) text.substring(lineStart, lineEnd) else ""
+    }
+
+    val isChecklistActive = currentLine.startsWith("[ ]") || currentLine.startsWith("[x]")
+    val isNumberedListActive = """^\d+\.\s+""".toRegex().containsMatchIn(currentLine)
+
+    fun toggleListFormat(type: String) {
+        val text = descriptionFieldValue.text
+        val selection = descriptionFieldValue.selection
+        val cursorPosition = selection.start.coerceIn(0, text.length)
+        val lastNewlineIndex = text.substring(0, cursorPosition).lastIndexOf('\n')
+        val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+        
+        val nextNewlineIndex = text.indexOf('\n', cursorPosition)
+        val lineEnd = if (nextNewlineIndex == -1) text.length else nextNewlineIndex
+        
+        val lineToFormat = text.substring(lineStart, lineEnd)
+        
+        val checklistRegex = """^\[([ x]?)]\s*(.*)$""".toRegex()
+        val numberedRegex = """^(\d+)\.\s*(.*)$""".toRegex()
+        
+        var newLine = lineToFormat
+        var selectionOffset = 0
+        
+        if (type == "checklist") {
+            val checklistMatch = checklistRegex.matchEntire(lineToFormat)
+            if (checklistMatch != null) {
+                // Remove checklist prefix
+                val content = checklistMatch.groupValues[2]
+                newLine = content
+                selectionOffset = -(lineToFormat.length - content.length)
+            } else {
+                // Add checklist prefix (and clean numbered if exists)
+                val cleanLine = numberedRegex.matchEntire(lineToFormat)?.groupValues?.get(2) ?: lineToFormat
+                newLine = "[ ] $cleanLine"
+                selectionOffset = newLine.length - lineToFormat.length
+            }
+        } else if (type == "numbered") {
+            val numberedMatch = numberedRegex.matchEntire(lineToFormat)
+            if (numberedMatch != null) {
+                // Remove numbered prefix
+                val content = numberedMatch.groupValues[2]
+                newLine = content
+                selectionOffset = -(lineToFormat.length - content.length)
+            } else {
+                // Add numbered prefix (and clean checklist if exists)
+                val cleanLine = checklistRegex.matchEntire(lineToFormat)?.groupValues?.get(2) ?: lineToFormat
+                newLine = "1. $cleanLine"
+                selectionOffset = newLine.length - lineToFormat.length
+            }
+        }
+        
+        val updatedText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+        val newCursorPos = (cursorPosition + selectionOffset).coerceIn(0, updatedText.length)
+        descriptionFieldValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+        description = updatedText
+    }
     var selectedPriority by remember(currentActivity.id) { mutableStateOf(currentActivity.categoryColor) }
     var selectedActivityType by remember(currentActivity.id) { mutableStateOf(currentActivity.activityType) }
     var selectedVisibility by remember(currentActivity.id) {
@@ -167,8 +281,16 @@ fun CreateActivityScreen(
     }
 
     Scaffold(
+        modifier = Modifier.let { mod ->
+            if (scrollBehavior != null) {
+                mod.nestedScroll(scrollBehavior.nestedScrollConnection)
+            } else {
+                mod
+            }
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     val titleText = when {
                         currentActivity.id == "new" || currentActivity.id.isBlank() -> {
@@ -177,6 +299,7 @@ fun CreateActivityScreen(
                                 ActivityType.EVENT -> stringResource(id = R.string.create_activity_modal_new_event)
                                 ActivityType.NOTE -> stringResource(id = R.string.create_activity_modal_new_note)
                                 ActivityType.BIRTHDAY -> stringResource(id = R.string.create_activity_modal_new_birthday)
+                                ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                             }
                         }
                         else -> {
@@ -185,6 +308,7 @@ fun CreateActivityScreen(
                                 ActivityType.EVENT -> stringResource(id = R.string.create_activity_modal_edit_event)
                                 ActivityType.NOTE -> stringResource(id = R.string.create_activity_modal_edit_note)
                                 ActivityType.BIRTHDAY -> stringResource(id = R.string.create_activity_modal_edit_birthday)
+                                ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                             }
                         }
                     }
@@ -195,7 +319,7 @@ fun CreateActivityScreen(
                         Text(text = titleText)
                         Text(
                             text = selectedDate.format(formatter), // Usar selectedDate diretamente
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = appBarContentColor,
                             modifier = Modifier.clickable { showDatePicker = true }
                         )
                     }
@@ -240,16 +364,18 @@ fun CreateActivityScreen(
                         },
                         enabled = title.isNotBlank(),
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = appBarContentColor
                         )
                     ) {
                         Text(stringResource(id = R.string.create_activity_modal_save))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -274,16 +400,107 @@ fun CreateActivityScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text(stringResource(id = R.string.create_activity_modal_description)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = false,
-                minLines = 3,
-                maxLines = 5,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = descriptionFieldValue,
+                    onValueChange = { newValue ->
+                        var finalValue = newValue
+                        val oldText = descriptionFieldValue.text
+                        val newText = newValue.text
+                        val oldSelection = descriptionFieldValue.selection
+
+                        if (newText.length == oldText.length + 1 && 
+                            oldSelection.collapsed && 
+                            oldSelection.start < newText.length && 
+                            newText[oldSelection.start] == '\n') {
+                            
+                            val newlinePos = oldSelection.start
+                            val textBeforeNewline = oldText.substring(0, newlinePos)
+                            val lastNewlineIndex = textBeforeNewline.lastIndexOf('\n')
+                            val lineStart = if (lastNewlineIndex == -1) 0 else lastNewlineIndex + 1
+                            val completedLine = textBeforeNewline.substring(lineStart)
+                            
+                            val checklistRegex = """^\[([ x]?)]\s*(.*)$""".toRegex()
+                            val numberedRegex = """^(\d+)\.\s*(.*)$""".toRegex()
+                            
+                            val checklistMatch = checklistRegex.matchEntire(completedLine)
+                            val numberedMatch = numberedRegex.matchEntire(completedLine)
+                            
+                            if (checklistMatch != null) {
+                                val content = checklistMatch.groupValues[2]
+                                if (content.isEmpty()) {
+                                    // Remove checkbox prefix from empty line
+                                    val updatedText = oldText.substring(0, lineStart) + oldText.substring(newlinePos)
+                                    val newSelection = TextRange(lineStart)
+                                    finalValue = TextFieldValue(updatedText, newSelection)
+                                } else {
+                                    // Add new empty checkbox
+                                    val prefix = "[ ] "
+                                    val updatedText = newText.substring(0, newlinePos + 1) + prefix + newText.substring(newlinePos + 1)
+                                    val newCursorPos = newlinePos + 1 + prefix.length
+                                    finalValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+                                }
+                            } else if (numberedMatch != null) {
+                                val num = numberedMatch.groupValues[1].toInt()
+                                val content = numberedMatch.groupValues[2]
+                                if (content.isEmpty()) {
+                                    // Remove number prefix from empty line
+                                    val updatedText = oldText.substring(0, lineStart) + oldText.substring(newlinePos)
+                                    val newSelection = TextRange(lineStart)
+                                    finalValue = TextFieldValue(updatedText, newSelection)
+                                } else {
+                                    // Add next number
+                                    val prefix = "${num + 1}. "
+                                    val updatedText = newText.substring(0, newlinePos + 1) + prefix + newText.substring(newlinePos + 1)
+                                    val newCursorPos = newlinePos + 1 + prefix.length
+                                    finalValue = TextFieldValue(updatedText, TextRange(newCursorPos))
+                                }
+                            }
+                        }
+                        
+                        descriptionFieldValue = finalValue
+                        description = finalValue.text
+                    },
+                    label = { Text(stringResource(id = R.string.create_activity_modal_description)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    minLines = 3,
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+                )
+
+                // Inline formatting buttons in top-right corner
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 4.dp, end = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { toggleListFormat("numbered") },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatListNumbered,
+                            contentDescription = "Lista Enumerada",
+                            tint = if (isNumberedListActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { toggleListFormat("checklist") },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = "Lista de Conclusão",
+                            tint = if (isChecklistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
@@ -306,6 +523,7 @@ fun CreateActivityScreen(
                             ActivityType.EVENT -> stringResource(id = R.string.event)
                             ActivityType.NOTE -> stringResource(id = R.string.note)
                             ActivityType.BIRTHDAY -> stringResource(id = R.string.birthday)
+                            ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
                         }
                         Text(
                             text = text,
@@ -602,7 +820,8 @@ fun CreateActivityScreen(
         AlarmScreen(
             onBackClick = { showAlarmScreen = false },
             onBackPressedDispatcher = backPressedDispatcher,
-            activityToEdit = currentActivity
+            activityToEdit = currentActivity,
+            unfixHeadersOnScroll = unfixHeadersOnScroll
         )
     }
     
@@ -612,11 +831,12 @@ fun CreateActivityScreen(
             onBackClick = { 
                 showCustomRepetitionScreen = false
             },
-            onSaveCustomRepetition = { customRule ->
-                customRepetitionRule = customRule
-                selectedRepetition = customRepetitionText
+            onSaveCustomRepetition = { rule ->
+                customRepetitionRule = rule
+                showCustomRepetitionScreen = false
             },
-            existingRule = if (selectedRepetition == customRepetitionText) customRepetitionRule else ""
+            existingRule = customRepetitionRule,
+            unfixHeadersOnScroll = unfixHeadersOnScroll
         )
     }
 }

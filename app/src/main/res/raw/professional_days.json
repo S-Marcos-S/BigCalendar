@@ -1,0 +1,308 @@
+[
+  {
+    "name": "Dia do Faxineiro",
+    "date": "01-02",
+    "summary": "Homenagem aos profissionais responsáveis pela limpeza e manutenção de ambientes.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Faxina"
+  },
+  {
+    "name": "Dia dos Reis",
+    "date": "01-06",
+    "summary": "Celebração cristã que relembra a visita dos Reis Magos ao menino Jesus.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_de_Reis"
+  },
+  {
+    "name": "Dia do Fotógrafo",
+    "date": "01-08",
+    "summary": "Celebração dedicada aos profissionais e entusiastas da arte da fotografia.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Fot%C3%B3grafo"
+  },
+  {
+    "name": "Dia do Astronauta",
+    "date": "01-09",
+    "summary": "Homenagem aos profissionais que se dedicam à exploração do espaço cósmico.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Astronauta"
+  },
+  {
+    "name": "Dia do Farmacêutico",
+    "date": "01-20",
+    "summary": "Homenagem aos profissionais da saúde responsáveis pela manipulação e controle de medicamentos.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Farmac%C3%AAutico"
+  },
+  {
+    "name": "Dia do Carteiro",
+    "date": "01-25",
+    "summary": "Celebração dedicada aos profissionais que realizam a entrega de correspondências e encomendas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Carteiro"
+  },
+  {
+    "name": "Dia do Publicitário",
+    "date": "02-01",
+    "summary": "Homenagem aos profissionais que criam e planejam campanhas de comunicação e marketing.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Publicidade"
+  },
+  {
+    "name": "Dia do Datilógrafo",
+    "date": "02-14",
+    "summary": "Data comemorativa em homenagem aos profissionais da digitação.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Datilografia"
+  },
+  {
+    "name": "Dia do Esportista",
+    "date": "02-19",
+    "summary": "Incentivo à prática de atividades físicas e homenagem aos atletas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Esporte"
+  },
+  {
+    "name": "Dia Nacional do Turismo",
+    "date": "03-02",
+    "summary": "Celebração que valoriza a importância econômica e cultural do turismo no Brasil.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Turismo_no_Brasil"
+  },
+  {
+    "name": "Dia Internacional da Mulher",
+    "date": "03-08",
+    "summary": "Celebração das conquistas sociais, políticas e econômicas das mulheres.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_Internacional_da_Mulher"
+  },
+  {
+    "name": "Dia do Bibliotecário",
+    "date": "03-12",
+    "summary": "Homenagem aos profissionais responsáveis pela organização e conservação de acervos de livros.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Bibliotec%C3%A1rio"
+  },
+  {
+    "name": "Dia do Consumidor",
+    "date": "03-15",
+    "summary": "Data voltada para a conscientização dos direitos e deveres dos consumidores.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_Mundial_dos_Direitos_do_Consumidor"
+  },
+  {
+    "name": "Dia do Artesão",
+    "date": "03-19",
+    "summary": "Homenagem aos profissionais que criam objetos e obras de arte de forma manual.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Artesanato"
+  },
+  {
+    "name": "Dia do Obstetra",
+    "date": "04-12",
+    "summary": "Homenagem aos médicos especialistas no acompanhamento da gestação e parto.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Obstetr%C3%ADcia"
+  },
+  {
+    "name": "Dia do Jornalista",
+    "date": "04-07",
+    "summary": "Celebração dedicada aos profissionais da imprensa e da busca pela informação.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Jornalista"
+  },
+  {
+    "name": "Dia do Exército",
+    "date": "04-19",
+    "summary": "Celebração em memória da Batalha dos Guararapes e homenagem à força terrestre brasileira.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Ex%C3%A9rcito"
+  },
+  {
+    "name": "Dia do Diplomata",
+    "date": "04-20",
+    "summary": "Homenagem aos profissionais da representação internacional em memória ao Barão do Rio Branco.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Diplomata"
+  },
+  {
+    "name": "Dia do Policial Civil e Militar",
+    "date": "04-21",
+    "summary": "Homenagem às forças de segurança pública na data do martírio de Tiradentes.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Pol%C3%ADcia_Militar_do_Brasil"
+  },
+  {
+    "name": "Dia do Trabalhador",
+    "date": "05-01",
+    "summary": "Celebração internacional dedicada às conquistas da classe trabalhadora.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_Internacional_dos_Trabalhadores"
+  },
+  {
+    "name": "Dia do Gari",
+    "date": "05-16",
+    "summary": "Homenagem aos profissionais responsáveis pela limpeza das vias públicas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Gari"
+  },
+  {
+    "name": "Dia do Pedagogo",
+    "date": "05-20",
+    "summary": "Homenagem aos especialistas em educação e processos de ensino-aprendizagem.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Pedagogia"
+  },
+  {
+    "name": "Dia do Geógrafo",
+    "date": "05-29",
+    "summary": "Homenagem aos profissionais que estudam a organização espacial e a superfície terrestre.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Geografia"
+  },
+  {
+    "name": "Dia do Geólogo",
+    "date": "05-30",
+    "summary": "Homenagem aos profissionais dedicados ao estudo da crosta terrestre e minerais.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Geologia"
+  },
+  {
+    "name": "Dia do Químico",
+    "date": "06-18",
+    "summary": "Homenagem aos profissionais dedicados à ciência da matéria e suas transformações.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Qu%C3%ADmica"
+  },
+  {
+    "name": "Dia do Cinema Brasileiro",
+    "date": "06-19",
+    "summary": "Celebração e valorização da produção cinematográfica nacional.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Cinema_do_Brasil"
+  },
+  {
+    "name": "Dia do Vigilante",
+    "date": "06-20",
+    "summary": "Homenagem aos profissionais que atuam na segurança privada de bens e pessoas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Vigilante_patrimonial"
+  },
+  {
+    "name": "Dia do Bombeiro Militar",
+    "date": "07-02",
+    "summary": "Homenagem aos corpos de bombeiros dedicados à proteção e salvamento de vidas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Corpo_de_Bombeiros_Militar"
+  },
+  {
+    "name": "Dia do Panificador",
+    "date": "07-08",
+    "summary": "Homenagem aos padeiros e profissionais da indústria da panificação.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Padeiro"
+  },
+  {
+    "name": "Dia do Engenheiro Florestal",
+    "date": "07-12",
+    "summary": "Homenagem aos profissionais focados no manejo sustentável de florestas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Engenharia_florestal"
+  },
+  {
+    "name": "Dia do Comerciante",
+    "date": "07-16",
+    "summary": "Homenagem aos profissionais do setor de comércio de bens e serviços.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Com%C3%A9rcio"
+  },
+  {
+    "name": "Dia do Motorista",
+    "date": "07-25",
+    "summary": "Celebração dedicada aos motoristas profissionais e condutores em geral, no dia de São Cristóvão.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Motorista"
+  },
+  {
+    "name": "Dia do Advogado",
+    "date": "08-11",
+    "summary": "Celebração que marca a criação dos primeiros cursos de Direito no Brasil.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Advogado"
+  },
+  {
+    "name": "Dia do Psicólogo",
+    "date": "08-27",
+    "summary": "Homenagem à regulamentação da profissão de psicologia no país.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Psic%C3%B3logo"
+  },
+  {
+    "name": "Dia do Bancário",
+    "date": "08-28",
+    "summary": "Homenagem aos trabalhadores do setor financeiro e bancário brasileiro.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Banc%C3%A1rio"
+  },
+  {
+    "name": "Dia do Nutricionista",
+    "date": "08-31",
+    "summary": "Homenagem aos profissionais dedicados à ciência da nutrição e alimentação saudável.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Nutricionista"
+  },
+  {
+    "name": "Dia do Biólogo",
+    "date": "09-03",
+    "summary": "Homenagem aos profissionais que estudam todas as formas de vida e biodiversidade.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Bi%C3%B3logo"
+  },
+  {
+    "name": "Dia do Administrador",
+    "date": "09-09",
+    "summary": "Homenagem à regulamentação da profissão de administrador no Brasil.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Administra%C3%A7%C3%A3o"
+  },
+  {
+    "name": "Dia do Programador",
+    "date": "09-13",
+    "summary": "Celebração dedicada aos desenvolvedores de software, tradicionalmente no 256º dia do ano.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Programador"
+  },
+  {
+    "name": "Dia do Radialista",
+    "date": "09-21",
+    "summary": "Homenagem aos profissionais que atuam nas transmissões e produção de rádio.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Radialista"
+  },
+  {
+    "name": "Dia do Contador",
+    "date": "09-22",
+    "summary": "Homenagem aos profissionais das ciências contábeis e controle financeiro.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Contabilidade"
+  },
+  {
+    "name": "Dia do Médico",
+    "date": "10-18",
+    "summary": "Celebração em homenagem aos profissionais da medicina, associado ao dia de São Lucas.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/M%C3%A9dico"
+  },
+  {
+    "name": "Dia do Professor",
+    "date": "10-15",
+    "summary": "Celebração dedicada aos educadores e sua importância no desenvolvimento do país.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Professor"
+  },
+  {
+    "name": "Dia do Servidor Público",
+    "date": "10-28",
+    "summary": "Homenagem aos trabalhadores que atuam nas esferas do poder público administrativo.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Dia_do_Servidor_P%C3%BAblico"
+  },
+  {
+    "name": "Dia do Engenheiro Civil",
+    "date": "10-25",
+    "summary": "Homenagem aos profissionais que projetam, constroem e gerenciam obras de infraestrutura.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Engenharia_civil"
+  },
+  {
+    "name": "Dia do Biomédico",
+    "date": "11-20",
+    "summary": "Homenagem aos profissionais que atuam na interface entre a biologia e a medicina.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Biomedicina"
+  },
+  {
+    "name": "Dia do Músico",
+    "date": "11-22",
+    "summary": "Homenagem aos artistas e profissionais da música, celebrado no dia de Santa Cecília.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/M%C3%BAsico"
+  },
+  {
+    "name": "Dia do Técnico em Segurança do Trabalho",
+    "date": "11-27",
+    "summary": "Homenagem aos profissionais dedicados a garantir a integridade física dos trabalhadores.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Engenharia_de_seguran%C3%A7a_do_trabalho"
+  },
+  {
+    "name": "Dia do Astrônomo",
+    "date": "12-02",
+    "summary": "Homenagem aos cientistas e estudiosos dos corpos celestes e do universo.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Astr%C3%B4nomo"
+  },
+  {
+    "name": "Dia do Arquiteto e Urbanista",
+    "date": "12-15",
+    "summary": "Homenagem aos profissionais que projetam espaços e planejam o desenvolvimento urbano.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Arquitetura"
+  },
+  {
+    "name": "Dia do Mecânico",
+    "date": "12-20",
+    "summary": "Homenagem aos profissionais responsáveis pela manutenção de máquinas e veículos.",
+    "wikipediaLink": "https://pt.wikipedia.org/wiki/Mec%C3%A2nico"
+  }
+]

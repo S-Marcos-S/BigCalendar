@@ -26,8 +26,8 @@ android {
         applicationId = "com.mss.thebigcalendar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 39
-        versionName = "1.7.96"
+        versionCode = 49
+        versionName = "1.8.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -153,6 +153,7 @@ dependencies {
     implementation("com.itextpdf:kernel:7.2.5")
     implementation("com.itextpdf:io:7.2.5")
     implementation("com.itextpdf:layout:7.2.5")
+    implementation(libs.slf4j.android)
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.room.ktx)

@@ -21,16 +21,34 @@ import java.io.File
 import java.io.OutputStreamWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import com.mss.thebigcalendar.data.model.CalendarFilterOptions
+import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.AnimationType
+import com.mss.thebigcalendar.data.model.SidebarFilterVisibility
+import com.mss.thebigcalendar.data.model.Language
+import com.mss.thebigcalendar.data.model.JsonCalendar
+import com.mss.thebigcalendar.data.model.colorToString
+import com.mss.thebigcalendar.data.model.toColor
+import com.mss.thebigcalendar.data.repository.SettingsRepository
+import com.mss.thebigcalendar.data.repository.JsonCalendarRepository
+import com.mss.thebigcalendar.data.repository.AutoBackupSettings
+import com.mss.thebigcalendar.data.repository.BackupFrequency
+import com.mss.thebigcalendar.data.repository.BackupType
+import com.mss.thebigcalendar.data.model.AlarmSettings
+import com.mss.thebigcalendar.data.repository.AlarmRepository
 
 
 class BackupService(
     private val context: Context,
     private val activityRepository: ActivityRepository,
     private val deletedActivityRepository: DeletedActivityRepository,
-    private val completedActivityRepository: CompletedActivityRepository
+    private val completedActivityRepository: CompletedActivityRepository,
+    private val alarmRepository: AlarmRepository = AlarmRepository(context)
 ) {
 
     private val notificationService = NotificationService(context)
+    private val settingsRepository = SettingsRepository(context)
+    private val jsonCalendarRepository = JsonCalendarRepository(context)
 
     private fun getGoogleDriveService(account: GoogleSignInAccount): GoogleDriveService {
         return GoogleDriveService(context, account)
@@ -175,16 +193,118 @@ class BackupService(
     /**
      * Cria a estrutura JSON do backup
      */
-    private fun createBackupJson(activities: List<Activity>, deletedActivities: List<DeletedActivity>, completedActivities: List<Activity>): String {
+    private suspend fun createBackupJson(activities: List<Activity>, deletedActivities: List<DeletedActivity>, completedActivities: List<Activity>): String {
         val backupJson = JSONObject()
         
         // Metadados do backup
-        backupJson.put("backupVersion", "1.0")
+        backupJson.put("backupVersion", "1.1")
         backupJson.put("createdAt", LocalDateTime.now().toString())
         backupJson.put("appVersion", "TheBigCalendar")
         backupJson.put("totalActivities", activities.size)
         backupJson.put("totalDeletedActivities", deletedActivities.size)
         backupJson.put("totalCompletedActivities", completedActivities.size)
+        
+        // Serializar configurações
+        try {
+            val filterOptionsVal = settingsRepository.filterOptions.first()
+            val showMoonPhasesVal = settingsRepository.showMoonPhases.first()
+            val sidebarFilterVal = settingsRepository.sidebarFilterVisibility.first()
+            val autoBackupVal = settingsRepository.autoBackupSettings.first()
+            val backupDirUriVal = settingsRepository.backupDirectoryUri.first() ?: ""
+
+            val settingsJson = JSONObject().apply {
+                put("theme", settingsRepository.theme.first().name)
+                put("welcomeName", settingsRepository.welcomeName.first())
+                put("showHolidays", filterOptionsVal.showHolidays)
+                put("showEvents", filterOptionsVal.showEvents)
+                put("showTasks", filterOptionsVal.showTasks)
+                put("showBirthdays", filterOptionsVal.showBirthdays)
+                put("showNotes", filterOptionsVal.showNotes)
+                put("showCommemorative", filterOptionsVal.showCommemorative)
+                put("showMoonPhases", showMoonPhasesVal)
+                put("animationType", settingsRepository.animationType.first().name)
+                put("language", settingsRepository.language.first().code)
+                put("calendarScale", settingsRepository.calendarScale.first().toString())
+                put("hideOtherMonthDays", settingsRepository.hideOtherMonthDays.first())
+                put("pureBlackTheme", settingsRepository.pureBlackTheme.first())
+                put("primaryColor", settingsRepository.primaryColor.first())
+                put("unfixHeadersOnScroll", settingsRepository.unfixHeadersOnScroll.first())
+                
+                put("sidebarShowHolidays", sidebarFilterVal.showHolidays)
+                put("sidebarShowEvents", sidebarFilterVal.showEvents)
+                put("sidebarShowTasks", sidebarFilterVal.showTasks)
+                put("sidebarShowBirthdays", sidebarFilterVal.showBirthdays)
+                put("sidebarShowNotes", sidebarFilterVal.showNotes)
+                put("sidebarShowCompletedTasks", sidebarFilterVal.showCompletedTasks)
+                put("sidebarShowMoonPhases", sidebarFilterVal.showMoonPhases)
+                put("sidebarShowCommemorative", sidebarFilterVal.showCommemorative)
+                
+                // Auto Backup
+                put("autoBackupEnabled", autoBackupVal.enabled)
+                put("autoBackupFrequency", autoBackupVal.frequency.name)
+                put("autoBackupHour", autoBackupVal.hour)
+                put("autoBackupMinute", autoBackupVal.minute)
+                put("autoBackupType", autoBackupVal.backupType.name)
+                
+                put("crashlyticsEnabled", settingsRepository.isCrashlyticsEnabled.first())
+                put("hasSeenMainOnboarding", settingsRepository.hasSeenMainOnboarding.first())
+                put("backupDirectoryUri", backupDirUriVal)
+            }
+            backupJson.put("settings", settingsJson)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Erro ao serializar configurações no backup: ${e.message}", e)
+        }
+
+        // Serializar calendários JSON
+        try {
+            val jsonCalendarsList = jsonCalendarRepository.getAllJsonCalendars().first()
+            val jsonCalendarsArray = JSONArray()
+            jsonCalendarsList.forEach { calendar ->
+                val calendarJson = JSONObject().apply {
+                    put("id", calendar.id)
+                    put("title", calendar.title)
+                    put("color", calendar.colorToString())
+                    put("fileName", calendar.fileName)
+                    put("importDate", calendar.importDate)
+                    put("isVisible", calendar.isVisible)
+                }
+                jsonCalendarsArray.put(calendarJson)
+            }
+            backupJson.put("jsonCalendars", jsonCalendarsArray)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Erro ao serializar calendários JSON no backup: ${e.message}", e)
+        }
+        
+        // Serializar alarmes (despertadores)
+        try {
+            val alarmsList = alarmRepository.getAllAlarms()
+            val alarmsArray = JSONArray()
+            alarmsList.forEach { alarm ->
+                val alarmJson = JSONObject().apply {
+                    put("id", alarm.id)
+                    put("label", alarm.label)
+                    put("time", alarm.time.toString())
+                    put("isEnabled", alarm.isEnabled)
+                    
+                    val repeatDaysArray = JSONArray()
+                    alarm.repeatDays.forEach { day ->
+                        repeatDaysArray.put(day)
+                    }
+                    put("repeatDays", repeatDaysArray)
+                    
+                    put("soundEnabled", alarm.soundEnabled)
+                    put("vibrationEnabled", alarm.vibrationEnabled)
+                    put("snoozeMinutes", alarm.snoozeMinutes)
+                    put("createdAt", alarm.createdAt)
+                    put("lastModified", alarm.lastModified)
+                    put("skippedDate", alarm.skippedDate)
+                }
+                alarmsArray.put(alarmJson)
+            }
+            backupJson.put("alarms", alarmsArray)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Erro ao serializar alarmes no backup: ${e.message}", e)
+        }
         
         // Atividades ativas
         val activitiesArray = JSONArray()
@@ -380,7 +500,7 @@ class BackupService(
 
             // Verificar versão do backup
             val backupVersion = json.optString("backupVersion", "1.0")
-            if (backupVersion != "1.0") {
+            if (backupVersion != "1.0" && backupVersion != "1.1") {
                 val errorMessage = "Versão de backup não suportada: $backupVersion"
                 notificationService.showRestoreFailedNotification(errorMessage)
                 return@withContext Result.failure(Exception(errorMessage))
@@ -428,12 +548,133 @@ class BackupService(
                 }
             }
 
+            // Restaurar configurações
+            val settingsJson = json.optJSONObject("settings")
+            if (settingsJson != null) {
+                try {
+                    val themeName = settingsJson.optString("theme", Theme.SYSTEM.name)
+                    settingsRepository.saveTheme(Theme.valueOf(themeName))
+                    
+                    val welcomeName = settingsJson.optString("welcomeName", "")
+                    settingsRepository.saveWelcomeName(welcomeName)
+                    
+                    val filterOptions = CalendarFilterOptions(
+                        showHolidays = settingsJson.optBoolean("showHolidays", true),
+                        showEvents = settingsJson.optBoolean("showEvents", true),
+                        showTasks = settingsJson.optBoolean("showTasks", true),
+                        showBirthdays = settingsJson.optBoolean("showBirthdays", true),
+                        showNotes = settingsJson.optBoolean("showNotes", true),
+                        showCommemorative = settingsJson.optBoolean("showCommemorative", true)
+                    )
+                    settingsRepository.saveFilterOptions(filterOptions)
+                    
+                    val showMoonPhases = settingsJson.optBoolean("showMoonPhases", false)
+                    settingsRepository.saveShowMoonPhases(showMoonPhases)
+                    
+                    val animationTypeName = settingsJson.optString("animationType", AnimationType.NONE.name)
+                    settingsRepository.saveAnimationType(AnimationType.valueOf(animationTypeName))
+                    
+                    val languageCode = settingsJson.optString("language", Language.SYSTEM.code)
+                    settingsRepository.saveLanguage(Language.fromCode(languageCode))
+                    
+                    val calendarScale = settingsJson.optString("calendarScale", "1f").toFloatOrNull() ?: 1f
+                    settingsRepository.setCalendarScale(calendarScale)
+                    
+                    val hideOtherMonthDays = settingsJson.optBoolean("hideOtherMonthDays", false)
+                    settingsRepository.setHideOtherMonthDays(hideOtherMonthDays)
+                    
+                    val pureBlackTheme = settingsJson.optBoolean("pureBlackTheme", false)
+                    settingsRepository.setPureBlackTheme(pureBlackTheme)
+                    
+                    val primaryColor = settingsJson.optString("primaryColor", "AUTO")
+                    settingsRepository.setPrimaryColor(primaryColor)
+                    
+                    val unfixHeadersOnScroll = settingsJson.optBoolean("unfixHeadersOnScroll", true)
+                    settingsRepository.setUnfixHeadersOnScroll(unfixHeadersOnScroll)
+                    
+                    // Sidebar
+                    val sidebarFilter = SidebarFilterVisibility(
+                        showHolidays = settingsJson.optBoolean("sidebarShowHolidays", true),
+                        showEvents = settingsJson.optBoolean("sidebarShowEvents", true),
+                        showTasks = settingsJson.optBoolean("sidebarShowTasks", true),
+                        showBirthdays = settingsJson.optBoolean("sidebarShowBirthdays", true),
+                        showNotes = settingsJson.optBoolean("sidebarShowNotes", true),
+                        showCompletedTasks = settingsJson.optBoolean("sidebarShowCompletedTasks", true),
+                        showMoonPhases = settingsJson.optBoolean("sidebarShowMoonPhases", true),
+                        showCommemorative = settingsJson.optBoolean("sidebarShowCommemorative", true)
+                    )
+                    settingsRepository.saveSidebarFilterVisibility(sidebarFilter)
+                    
+                    // Auto Backup
+                    val autoBackup = AutoBackupSettings(
+                        enabled = settingsJson.optBoolean("autoBackupEnabled", false),
+                        frequency = BackupFrequency.valueOf(settingsJson.optString("autoBackupFrequency", BackupFrequency.DAILY.name)),
+                        hour = settingsJson.optInt("autoBackupHour", 2),
+                        minute = settingsJson.optInt("autoBackupMinute", 0),
+                        backupType = BackupType.valueOf(settingsJson.optString("autoBackupType", BackupType.LOCAL.name))
+                    )
+                    settingsRepository.saveAutoBackupSettings(autoBackup)
+                    
+                    val crashlyticsEnabled = settingsJson.optBoolean("crashlyticsEnabled", false)
+                    settingsRepository.setCrashlyticsEnabled(crashlyticsEnabled)
+                    
+                    val hasSeenMainOnboarding = settingsJson.optBoolean("hasSeenMainOnboarding", false)
+                    settingsRepository.setHasSeenMainOnboarding(hasSeenMainOnboarding)
+                    
+                    val backupDirectoryUri = settingsJson.optString("backupDirectoryUri", "")
+                    if (backupDirectoryUri.isNotEmpty()) {
+                        settingsRepository.saveBackupDirectoryUri(backupDirectoryUri)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Erro ao restaurar configurações do backup: ${e.message}", e)
+                }
+            }
+
+            // Restaurar calendários JSON
+            val jsonCalendarsArray = json.optJSONArray("jsonCalendars")
+            if (jsonCalendarsArray != null) {
+                try {
+                    val restoredCalendars = mutableListOf<JsonCalendar>()
+                    for (i in 0 until jsonCalendarsArray.length()) {
+                        val calendarJson = jsonCalendarsArray.getJSONObject(i)
+                        val calendar = JsonCalendar(
+                            id = calendarJson.getString("id"),
+                            title = calendarJson.getString("title"),
+                            color = calendarJson.getString("color").toColor(),
+                            fileName = calendarJson.getString("fileName"),
+                            importDate = calendarJson.getLong("importDate"),
+                            isVisible = calendarJson.optBoolean("isVisible", true)
+                        )
+                        restoredCalendars.add(calendar)
+                    }
+                    jsonCalendarRepository.overwriteAllJsonCalendars(restoredCalendars)
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Erro ao restaurar calendários JSON do backup: ${e.message}", e)
+                }
+            }
+
+            // Restaurar alarmes
+            val restoredAlarms = mutableListOf<com.mss.thebigcalendar.data.model.AlarmSettings>()
+            val alarmsArray = json.optJSONArray("alarms")
+            if (alarmsArray != null) {
+                try {
+                    for (i in 0 until alarmsArray.length()) {
+                        val alarmJson = alarmsArray.getJSONObject(i)
+                        val alarm = parseAlarmFromJson(alarmJson)
+                        restoredAlarms.add(alarm)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Erro ao restaurar alarmes do backup: ${e.message}", e)
+                }
+            }
+
             val result = RestoreResult(
                 activities = restoredActivities,
                 deletedActivities = restoredDeletedActivities,
                 completedActivities = restoredCompletedActivities,
                 backupFileName = DocumentFile.fromSingleUri(context, backupUri)?.name ?: "Unknown",
-                backupCreatedAt = json.optString("createdAt", "")
+                backupCreatedAt = json.optString("createdAt", ""),
+                alarms = restoredAlarms
             )
 
             notificationService.showRestoreCompleteNotification(result.backupFileName)
@@ -603,6 +844,33 @@ class BackupService(
             deletedBy = deletedJson.optString("deletedBy", "Sistema")
         )
     }
+
+    /**
+     * Parseia um alarme a partir do JSON
+     */
+    private fun parseAlarmFromJson(alarmJson: JSONObject): com.mss.thebigcalendar.data.model.AlarmSettings {
+        val repeatDaysArray = alarmJson.optJSONArray("repeatDays")
+        val repeatDays = mutableSetOf<String>()
+        if (repeatDaysArray != null) {
+            for (i in 0 until repeatDaysArray.length()) {
+                repeatDays.add(repeatDaysArray.getString(i))
+            }
+        }
+        
+        return com.mss.thebigcalendar.data.model.AlarmSettings(
+            id = alarmJson.getString("id"),
+            label = alarmJson.getString("label"),
+            time = java.time.LocalTime.parse(alarmJson.getString("time")),
+            isEnabled = alarmJson.getBoolean("isEnabled"),
+            repeatDays = repeatDays,
+            soundEnabled = alarmJson.optBoolean("soundEnabled", true),
+            vibrationEnabled = alarmJson.optBoolean("vibrationEnabled", true),
+            snoozeMinutes = alarmJson.optInt("snoozeMinutes", 5),
+            createdAt = alarmJson.optLong("createdAt", System.currentTimeMillis()),
+            lastModified = alarmJson.optLong("lastModified", System.currentTimeMillis()),
+            skippedDate = alarmJson.optString("skippedDate", "").takeIf { it.isNotEmpty() && it != "null" }
+        )
+    }
 }
 
 /**
@@ -627,5 +895,6 @@ data class RestoreResult(
     val deletedActivities: List<com.mss.thebigcalendar.data.model.DeletedActivity>,
     val completedActivities: List<com.mss.thebigcalendar.data.model.Activity>,
     val backupFileName: String,
-    val backupCreatedAt: String
+    val backupCreatedAt: String,
+    val alarms: List<com.mss.thebigcalendar.data.model.AlarmSettings> = emptyList()
 )

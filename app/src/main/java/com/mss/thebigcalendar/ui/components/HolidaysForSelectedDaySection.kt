@@ -1,6 +1,7 @@
 package com.mss.thebigcalendar.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +25,8 @@ import com.mss.thebigcalendar.data.model.HolidayType
 @Composable
 fun HolidaysForSelectedDaySection(
     modifier: Modifier = Modifier,
-    holidays: List<Holiday>
+    holidays: List<Holiday>,
+    onHolidayClick: (Holiday) -> Unit
 ) {
     if (holidays.isNotEmpty()) {
         Column(modifier = modifier) {
@@ -37,7 +39,10 @@ fun HolidaysForSelectedDaySection(
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 holidays.forEach { holiday ->
-                    HolidayItem(holiday = holiday)
+                    HolidayItem(
+                        holiday = holiday,
+                        onClick = { onHolidayClick(holiday) }
+                    )
                 }
             }
         }
@@ -47,6 +52,7 @@ fun HolidaysForSelectedDaySection(
 @Composable
 fun HolidayItem(
     holiday: Holiday,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -54,6 +60,7 @@ fun HolidayItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

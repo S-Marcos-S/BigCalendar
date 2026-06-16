@@ -309,10 +309,47 @@ class AlarmService(
     }
     
     /**
+     * Limpa a data pulada caso ela já tenha passado
+     */
+    private suspend fun cleanPastSkippedDate(alarmSettings: AlarmSettings) {
+        if (alarmSettings.skippedDate != null) {
+            val skipped = try {
+                LocalDate.parse(alarmSettings.skippedDate)
+            } catch (e: Exception) {
+                null
+            }
+            if (skipped != null && skipped.isBefore(LocalDate.now())) {
+                Log.d(TAG, "⏰ Limpando skippedDate passada ($skipped) para o alarme: ${alarmSettings.label}")
+                val updated = alarmSettings.copy(
+                    skippedDate = null,
+                    lastModified = System.currentTimeMillis()
+                )
+                alarmRepository.saveAlarm(updated)
+            }
+        }
+    }
+
+    /**
      * Agenda um alarme único (não recorrente)
      */
-    private fun scheduleSingleAlarm(alarmSettings: AlarmSettings) {
+    private suspend fun scheduleSingleAlarm(alarmSettings: AlarmSettings) {
         val triggerTime = calculateNextTriggerTime(alarmSettings.time)
+        val today = LocalDate.now()
+        
+        val targetDate = if (triggerTime <= System.currentTimeMillis()) {
+            today.plusDays(1)
+        } else {
+            today
+        }
+        
+        // Se a data do alarme único for a data pulada, não agendar
+        if (alarmSettings.skippedDate == targetDate.toString()) {
+            Log.d(TAG, "⏰ Pulando alarme único: ${alarmSettings.label} para a data $targetDate")
+            return
+        }
+        
+        // Limpar data pulada se estiver no passado
+        cleanPastSkippedDate(alarmSettings)
         
         if (triggerTime <= System.currentTimeMillis()) {
             Log.w(TAG, "⏰ Horário do alarme já passou hoje, agendando para amanhã")
@@ -326,15 +363,23 @@ class AlarmService(
     /**
      * Agenda um alarme recorrente
      */
-    private fun scheduleRepeatingAlarm(alarmSettings: AlarmSettings) {
+    private suspend fun scheduleRepeatingAlarm(alarmSettings: AlarmSettings) {
         val today = LocalDate.now()
         val todayDayOfWeek = getDayOfWeekString(today)
+        
+        // Limpar data pulada se estiver no passado
+        cleanPastSkippedDate(alarmSettings)
         
         if (alarmSettings.repeatDays.contains(todayDayOfWeek)) {
             // Se hoje está nos dias de repetição, agendar para hoje
             val triggerTime = calculateNextTriggerTime(alarmSettings.time)
             if (triggerTime > System.currentTimeMillis()) {
-                scheduleAlarmAtTime(alarmSettings.id, triggerTime)
+                val todayStr = today.toString()
+                if (alarmSettings.skippedDate != todayStr) {
+                    scheduleAlarmAtTime(alarmSettings.id, triggerTime)
+                } else {
+                    Log.d(TAG, "⏰ Pulando ocorrência de hoje para o alarme: ${alarmSettings.label} (pulado: $todayStr)")
+                }
             }
         }
         
@@ -345,7 +390,12 @@ class AlarmService(
             
             if (alarmSettings.repeatDays.contains(futureDayOfWeek)) {
                 val triggerTime = calculateNextTriggerTime(alarmSettings.time, futureDate)
-                scheduleAlarmAtTime("${alarmSettings.id}_${futureDate}", triggerTime)
+                val futureDateStr = futureDate.toString()
+                if (alarmSettings.skippedDate != futureDateStr) {
+                    scheduleAlarmAtTime("${alarmSettings.id}_${futureDate}", triggerTime)
+                } else {
+                    Log.d(TAG, "⏰ Pulando ocorrência futura para o alarme: ${alarmSettings.label} (pulado: $futureDateStr)")
+                }
             }
         }
     }
@@ -578,7 +628,7 @@ class AlarmService(
             val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
                 .setContentTitle(context.getString(R.string.alarm_notification_title))
                 .setContentText("${alarmSettings.label} - ${alarmSettings.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}")
-                .setSmallIcon(com.mss.thebigcalendar.R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification_calendar)
                 .setContentIntent(pendingIntent)
                 .setFullScreenIntent(pendingIntent, true) // Força tela cheia
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
@@ -659,7 +709,7 @@ class AlarmService(
             val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
                 .setContentTitle(context.getString(R.string.alarm_notification_title))
                 .setContentText("${alarmSettings.label} - ${alarmSettings.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}")
-                .setSmallIcon(com.mss.thebigcalendar.R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification_calendar)
                 .setContentIntent(pendingIntent)
                 .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
                 .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
@@ -832,7 +882,7 @@ class AlarmService(
             val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
                 .setContentTitle(context.getString(R.string.alarm_status_notification_title))
                 .setContentText("${alarmSettings.label}${context.getString(R.string.at_time_conjunction)}${alarmSettings.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}")
-                .setSmallIcon(com.mss.thebigcalendar.R.mipmap.ic_launcher) // Ícone de alerta mais visível
+                .setSmallIcon(R.drawable.ic_notification_calendar) // Ícone de alerta mais visível
                 .setContentIntent(pendingIntent)
                 .setOngoing(true) // Notificação persistente
                 .setAutoCancel(false) // Não remove ao tocar

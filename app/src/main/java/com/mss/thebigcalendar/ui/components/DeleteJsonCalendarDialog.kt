@@ -18,15 +18,20 @@ fun DeleteJsonCalendarDialog(
     onConfirmDelete: () -> Unit
 ) {
     if (jsonCalendar != null) {
+        val isPredefined = jsonCalendar.id == "PREDEFINED_MILITARY_HOLIDAYS" || jsonCalendar.id == "PREDEFINED_SAINTS"
         AlertDialog(
             onDismissRequest = onDismissRequest,
             title = { 
-                Text(stringResource(id = R.string.delete_json_calendar_title))
+                Text(
+                    if (isPredefined) stringResource(id = R.string.remove_predefined_calendar_title)
+                    else stringResource(id = R.string.delete_json_calendar_title)
+                )
             },
             text = { 
                 Text(
-                    "Tem certeza que deseja remover o calendário \"${jsonCalendar.title}\"?\n\n" +
-                    "Todas as datas e eventos deste calendário serão removidos permanentemente."
+                    if (isPredefined) stringResource(id = R.string.remove_predefined_calendar_message, jsonCalendar.title)
+                    else "Tem certeza que deseja remover o calendário \"${jsonCalendar.title}\"?\n\n" +
+                         "Todas as datas e eventos deste calendário serão removidos permanentemente."
                 )
             },
             confirmButton = {

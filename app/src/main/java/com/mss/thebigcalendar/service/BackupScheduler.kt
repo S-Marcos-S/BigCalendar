@@ -1,49 +1,140 @@
 package com.mss.thebigcalendar.service
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
+import android.content.Intent
+import android.os.Build
+import android.util.Log
 import com.mss.thebigcalendar.data.repository.AutoBackupSettings
 import com.mss.thebigcalendar.data.repository.BackupFrequency
-import com.mss.thebigcalendar.worker.AutoBackupWorker
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 class BackupScheduler(private val context: Context) {
 
     companion object {
-        private const val AUTO_BACKUP_WORK_NAME = "auto_backup_work"
+        private const val TAG = "BackupScheduler"
+        private const val AUTO_BACKUP_ALARM_ID = 7777
     }
 
     fun schedule(settings: AutoBackupSettings) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, NotificationReceiver::class.java).apply {
+            action = NotificationService.ACTION_AUTO_BACKUP
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            AUTO_BACKUP_ALARM_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Cancel existing alarm first to prevent duplicates
+        alarmManager.cancel(pendingIntent)
+
         if (settings.enabled) {
-            val repeatInterval = when (settings.frequency) {
-                BackupFrequency.DAILY -> 1
-                BackupFrequency.TWO_DAYS -> 2
-                BackupFrequency.WEEKLY -> 7
-                BackupFrequency.MONTHLY -> 30
-            }
-
             val initialDelay = calculateInitialDelay(settings.hour, settings.minute)
+            val triggerTime = System.currentTimeMillis() + initialDelay
 
-            val backupWorkRequest =
-                PeriodicWorkRequestBuilder<AutoBackupWorker>(repeatInterval.toLong(), TimeUnit.DAYS)
-                    .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-                    .build()
-
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                AUTO_BACKUP_WORK_NAME,
-                ExistingPeriodicWorkPolicy.REPLACE,
-                backupWorkRequest
-            )
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                }
+                Log.d(TAG, "🔄 Backup automático agendado via AlarmManager para: ${java.util.Date(triggerTime)}")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Erro ao agendar backup automático com AlarmManager", e)
+            }
         } else {
-            cancel()
+            Log.d(TAG, "🔄 Backup automático desabilitado")
+        }
+    }
+
+    fun scheduleNext(settings: AutoBackupSettings) {
+        if (!settings.enabled) return
+
+        val repeatInterval = when (settings.frequency) {
+            BackupFrequency.DAILY -> 1
+            BackupFrequency.TWO_DAYS -> 2
+            BackupFrequency.WEEKLY -> 7
+            BackupFrequency.MONTHLY -> 30
+        }
+
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, NotificationReceiver::class.java).apply {
+            action = NotificationService.ACTION_AUTO_BACKUP
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            AUTO_BACKUP_ALARM_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val nextRun = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, repeatInterval)
+            set(Calendar.HOUR_OF_DAY, settings.hour)
+            set(Calendar.MINUTE, settings.minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val triggerTime = nextRun.timeInMillis
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+            }
+            Log.d(TAG, "🔄 Próximo backup automático agendado para: ${java.util.Date(triggerTime)}")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Erro ao agendar próxima recorrência do backup automático", e)
         }
     }
 
     fun cancel() {
-        WorkManager.getInstance(context).cancelUniqueWork(AUTO_BACKUP_WORK_NAME)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, NotificationReceiver::class.java).apply {
+            action = NotificationService.ACTION_AUTO_BACKUP
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            AUTO_BACKUP_ALARM_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
+        Log.d(TAG, "🔄 Backup automático cancelado no AlarmManager")
     }
 
     private fun calculateInitialDelay(hour: Int, minute: Int): Long {

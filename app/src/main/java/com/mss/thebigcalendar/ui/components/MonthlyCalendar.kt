@@ -197,11 +197,6 @@ private fun DayCell(
             color = when {
                 day.isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                 day.isNationalHoliday -> Color.Red
-                day.isSaintDay -> when (theme) {
-                    com.mss.thebigcalendar.data.model.Theme.DARK -> Color.Yellow
-                    com.mss.thebigcalendar.data.model.Theme.LIGHT -> Color.Blue
-                    com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
-                }
                 day.isWeekend -> MaterialTheme.colorScheme.primary
                 day.isCurrentMonth -> if (isDark) Color.White else Color.Black
                 else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -211,26 +206,18 @@ private fun DayCell(
         var linesBudget = 4
 
         if (!isCompact && day.holiday != null && linesBudget > 0) {
-            val isSaintDay = day.isSaintDay
             val isNationalHoliday = day.isNationalHoliday
             Text(
                 text = day.holiday.name,
                 color = when {
                     isNationalHoliday -> Color.Red
-                    isSaintDay -> {
-                        when (theme) {
-                            com.mss.thebigcalendar.data.model.Theme.DARK -> Color.Yellow
-                            com.mss.thebigcalendar.data.model.Theme.LIGHT -> Color.Blue
-                            com.mss.thebigcalendar.data.model.Theme.SYSTEM -> if (isSystemInDarkTheme()) Color.Yellow else Color.Blue
-                        }
-                    }
                     else -> MaterialTheme.colorScheme.secondary
                 },
-                fontSize = if (isSaintDay) 7.sp else 8.sp,
+                fontSize = 8.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 1.dp),
-                fontWeight = if (isSaintDay || isNationalHoliday) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isNationalHoliday) FontWeight.Bold else FontWeight.Normal
             )
             linesBudget -= 1
         }
@@ -260,6 +247,7 @@ private fun DayCell(
             val taskDotColors = visibleTasks.map { task ->
                 remember(task.categoryColor, task.activityType) {
                     when {
+                        task.activityType == com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> Color(0xFFFF9800)
                         task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> Color(0xFFE91E63)
                         task.activityType == com.mss.thebigcalendar.data.model.ActivityType.NOTE -> Color(0xFF9C27B0)
                         task.categoryColor == context.getString(R.string.category_color_1) -> Color.White
@@ -304,6 +292,7 @@ private fun DayCell(
                     if (linesBudget <= 0) return@forEachIndexed
                     val taskColor = remember(task.categoryColor, task.activityType) {
                         when {
+                            task.activityType == com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> Color(0xFFFF9800) // Laranja para datas comemorativas
                             task.activityType == com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> Color(0xFFE91E63) // Rosa para aniversários
                             task.activityType == com.mss.thebigcalendar.data.model.ActivityType.NOTE -> Color(0xFF9C27B0) // Roxo para notas
                             task.categoryColor == context.getString(R.string.category_color_1) -> Color.White

@@ -48,9 +48,9 @@ class ActivityRepository(private val context: Context) {
                         val isInMonth = activityDate.year == yearMonth.year && 
                                        activityDate.month == yearMonth.month
                         
-                        // Para aniversários, verificar se é o mesmo mês (ignorando ano)
-                        val isBirthdayInMonth = if (activity.activityType == ActivityType.BIRTHDAY) {
-                            // Para aniversários, incluir apenas se for do mês correto (independente do ano)
+                        // Para aniversários e feriados JSON importados, verificar se é o mesmo mês (ignorando ano)
+                        val isSpecialOrJsonInMonth = if (activity.activityType == ActivityType.BIRTHDAY || 
+                                                        activity.location?.startsWith("JSON_IMPORTED_") == true) {
                             activityDate.month == yearMonth.month
                         } else {
                             // Para outros tipos, verificar se está exatamente no mês solicitado
@@ -65,7 +65,7 @@ class ActivityRepository(private val context: Context) {
                             false
                         }
                         
-                        isBirthdayInMonth || hasRecurringInstances
+                        isSpecialOrJsonInMonth || hasRecurringInstances
                     } catch (e: Exception) {
                         android.util.Log.e("ActivityRepository", "Erro ao processar atividade: ${activity.title}", e)
                         false
@@ -295,6 +295,7 @@ class ActivityRepository(private val context: Context) {
             ActivityType.TASK -> ActivityTypeProto.TASK
             ActivityType.BIRTHDAY -> ActivityTypeProto.BIRTHDAY
             ActivityType.NOTE -> ActivityTypeProto.NOTE
+            ActivityType.COMMEMORATIVE -> ActivityTypeProto.EVENT
         }
     }
 

@@ -47,6 +47,9 @@ class NotificationService(
         const val ACTION_VIEW_ACTIVITY = "com.mss.thebigcalendar.VIEW_ACTIVITY"
         const val ACTION_SNOOZE = "com.mss.thebigcalendar.SNOOZE"
         const val ACTION_DISMISS = "com.mss.thebigcalendar.DISMISS"
+        const val ACTION_AUTO_BACKUP = "com.mss.thebigcalendar.ACTION_AUTO_BACKUP"
+        
+        const val AUTO_BACKUP_NOTIFICATION_ID = 9999
         
         // Extras para as notificações
         const val EXTRA_ACTIVITY_ID = "activity_id"
@@ -139,6 +142,21 @@ class NotificationService(
         notificationManager.notify(1, builder.build())
     }
 
+    fun showAutoBackupInProgressNotification() {
+        val builder = NotificationCompat.Builder(context, AUTO_BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_cloud_upload)
+            .setContentTitle("Realizando Backup Automático")
+            .setContentText("O backup agendado está sendo executado...")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setOngoing(true)
+            .setProgress(0, 0, true)
+        notificationManager.notify(AUTO_BACKUP_NOTIFICATION_ID, builder.build())
+    }
+
+    fun cancelAutoBackupInProgressNotification() {
+        notificationManager.cancel(AUTO_BACKUP_NOTIFICATION_ID)
+    }
+
     fun showRestoreInProgressNotification() {
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_download)
@@ -211,6 +229,45 @@ class NotificationService(
         val notificationTime = calculateNotificationTime(activity)
         val triggerTime = getTriggerTime(activity.date, notificationTime)
         
+        // Se o triggerTime estiver no passado e a atividade for recorrente (e for a atividade base)
+        if (triggerTime <= System.currentTimeMillis() && 
+            activity.recurrenceRule != null && 
+            activity.recurrenceRule != "NONE" && 
+            activity.recurrenceRule.isNotEmpty() && 
+            !activity.id.contains("_")
+        ) {
+            // Cancelar notificação anterior se existir
+            cancelNotification(activity.id)
+
+            val recurrenceService = com.mss.thebigcalendar.service.RecurrenceService()
+            val baseDate = try {
+                java.time.LocalDate.parse(activity.date)
+            } catch (e: Exception) {
+                java.time.LocalDate.now()
+            }
+            
+            // Gerar instâncias para os próximos 2 anos
+            val nextTwoYears = java.time.LocalDate.now().plusYears(2)
+            val instances = recurrenceService.generateRecurringInstances(activity, baseDate, nextTwoYears)
+            
+            // Encontrar a primeira ocorrência futura ativa (que não esteja nas exclusões de datas/instâncias)
+            val nextFutureInstance = instances
+                .filter { instance ->
+                    val instanceNotificationTime = calculateNotificationTime(instance)
+                    val instanceTriggerTime = getTriggerTime(instance.date, instanceNotificationTime)
+                    instanceTriggerTime > System.currentTimeMillis()
+                }
+                .minByOrNull { instance ->
+                    val instanceNotificationTime = calculateNotificationTime(instance)
+                    getTriggerTime(instance.date, instanceNotificationTime)
+                }
+                
+            if (nextFutureInstance != null) {
+                android.util.Log.d("NotificationService", "⏰ Agendando próxima ocorrência futura para atividade recorrente: ${nextFutureInstance.title} em ${nextFutureInstance.date}")
+                scheduleNotification(nextFutureInstance)
+                return
+            }
+        }
         
         // Cancelar notificação anterior se existir
         cancelNotification(activity.id)
@@ -548,7 +605,7 @@ class NotificationService(
         Log.d(TAG, "🔔 Dismiss PendingIntent ID: ${(activity.id + "_dismiss").hashCode()}")
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification_calendar)
             .setContentTitle("🔔 Lembrete: ${activity.title}")
             .setContentText(getNotificationText(activity))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

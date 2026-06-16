@@ -30,6 +30,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,9 +71,46 @@ fun TrashScreen(
         else -> deletedActivities.sortedByDescending { it.deletedAt }
     }
 
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.trash)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -88,7 +128,7 @@ fun TrashScreen(
                         Icon(
                             Icons.Default.CheckCircle,
                             contentDescription = stringResource(R.string.completed_tasks_title),
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            tint = appBarContentColor
                         )
                     }
                     
@@ -101,7 +141,7 @@ fun TrashScreen(
                                 Icon(
                                     Icons.Default.Sort,
                                     contentDescription = stringResource(R.string.sort_order),
-                                    tint = MaterialTheme.colorScheme.onPrimary
+                                    tint = appBarContentColor
                                 )
                             }
                             
@@ -134,15 +174,17 @@ fun TrashScreen(
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.empty_trash),
-                                tint = MaterialTheme.colorScheme.onPrimary
+                                tint = appBarContentColor
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -234,6 +276,7 @@ fun DeletedActivityItem(
                         com.mss.thebigcalendar.data.model.ActivityType.TASK -> MaterialTheme.colorScheme.secondaryContainer
                         com.mss.thebigcalendar.data.model.ActivityType.NOTE -> MaterialTheme.colorScheme.secondaryContainer
                         com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> MaterialTheme.colorScheme.tertiaryContainer
+                        com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> MaterialTheme.colorScheme.primaryContainer
                     }
                 ),
             contentAlignment = Alignment.Center
@@ -244,6 +287,7 @@ fun DeletedActivityItem(
                     com.mss.thebigcalendar.data.model.ActivityType.TASK -> "📋"
                     com.mss.thebigcalendar.data.model.ActivityType.NOTE -> "📝"
                     com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> "🎂"
+                    com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> "📅"
                 },
                 style = MaterialTheme.typography.titleMedium
             )
@@ -270,6 +314,7 @@ fun DeletedActivityItem(
                     com.mss.thebigcalendar.data.model.ActivityType.TASK -> stringResource(R.string.task)
                     com.mss.thebigcalendar.data.model.ActivityType.NOTE -> stringResource(R.string.note_label)
                     com.mss.thebigcalendar.data.model.ActivityType.BIRTHDAY -> stringResource(R.string.birthday)
+                    com.mss.thebigcalendar.data.model.ActivityType.COMMEMORATIVE -> stringResource(R.string.commemorative_dates)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

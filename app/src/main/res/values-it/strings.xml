@@ -187,6 +187,8 @@
     <!-- TasksForSelectedDaySection.kt -->
     <string name="date_format_day_month">dd/MM</string>
     <string name="appointments_for">Appuntamenti per %1$s</string>
+    <string name="appointments_for_month">Appuntamenti per il mese di %1$s</string>
+    <string name="select_a_day">Seleziona un giorno sul calendario.</string>
     <string name="no_appointments">Niente programmato.</string>
     <string name="no_tasks_or_events">Nessuna attività o evento programmato.</string>
     <string name="at_time">Alle %1$s</string>
@@ -789,5 +791,46 @@
     <string name="onboarding_notification_subtitle">Per non perdere i tuoi appuntamenti</string>
     <string name="onboarding_notification_desc">Big Calendar utilizza le notifiche per ricordarti eventi e attività importanti. Consenti l\'invio di notifiche per sfruttare al meglio l\'app.</string>
     <string name="onboarding_allow_notifications">Consenti Notifiche</string>
+    <string name="backup_folder_selected">Cartella di backup selezionata:</string>
+    <string name="change_download_location">Cambia percorso di download</string>
+    <string name="change_folder_button">Modifica</string>
+    <string name="design_model">Modello di design</string>
+    <string name="military_holidays">Festività militari</string>
+    <string name="more_options">Altre opzioni</string>
+    <string name="no_design_model">Senza modello</string>
+    <string name="onboarding_checking_backup">Ricerca backup in corso...</string>
+    <string name="onboarding_restore_btn">Ripristina backup</string>
+    <string name="onboarding_restore_desc">Abbiamo trovato un backup di %1$s nel tuo account Google Drive con %2$d attività. Desideri ripristinare queste informazioni?</string>
+    <string name="onboarding_restore_loading">Ripristino del backup...</string>
+    <string name="onboarding_restore_local_activities_size">Attività: %1$d • %2$d KB</string>
+    <string name="onboarding_restore_local_choose_folder">Scegli cartella</string>
+    <string name="onboarding_restore_local_choose_other">Scegli un\'altra cartella</string>
+    <string name="onboarding_restore_local_deny">No, grazie</string>
+    <string name="onboarding_restore_local_desc">Hai un backup locale del calendario da ripristinare?</string>
+    <string name="onboarding_restore_local_finish">Concludi</string>
+    <string name="onboarding_restore_local_found">Backup trovati</string>
+    <string name="onboarding_restore_local_found_desc">Seleziona un file di backup per ripristinare i tuoi dati:</string>
+    <string name="onboarding_restore_local_no_backups">Nessun backup trovato</string>
+    <string name="onboarding_restore_local_no_backups_desc">Non abbiamo trovato alcun file di backup compatibile nella cartella selezionata.</string>
+    <string name="onboarding_restore_local_restore">Ripristina</string>
+    <string name="onboarding_restore_local_search_btn">Cerca backup locale</string>
+    <string name="onboarding_restore_local_select_other">Seleziona un\'altra cartella</string>
+    <string name="onboarding_restore_local_skip">Concludi senza ripristinare</string>
+    <string name="onboarding_restore_local_title">Ripristina backup locale</string>
+    <string name="onboarding_restore_skip">No, inizia da zero</string>
+    <string name="onboarding_restore_title">Ripristina backup da Google Drive</string>
+    <string name="remove_predefined_calendar_message">Vuoi rimuovere il calendario \"%1$s\" dalla barra laterale dell\'applicazione?\n\nPotrà essere aggiunto di nuovo tramite la schermata delle impostazioni generali.</string>
+    <string name="remove_predefined_calendar_title">❌ Rimuovi dalla barra laterale</string>
+    <string name="select_backup_folder_prompt">Scegli una cartella per salvare i tuoi backup locali</string>
+    <string name="select_folder_button">Scegli cartella</string>
+    <string name="settings_app_icon_dialog_title">Seleziona icona</string>
+    <string name="settings_app_icon_mode_black">Nero</string>
+    <string name="settings_app_icon_mode_dynamic">Dinamica (in base al tema)</string>
+    <string name="settings_app_icon_mode_white">Bianco</string>
+    <string name="settings_app_icon_title">Icona dell\'applicazione</string>
+    <string name="unfix_headers_on_scroll">Sblocca intestazione allo scorrimento</string>
+    <string name="unfix_headers_on_scroll_desc">L\'intestazione scorrerà insieme al contenuto dello schermo</string>
+    <string name="alarm_skip_next_occurrence">Salta la prossima occorrenza</string>
+    <string name="alarm_next_occurrence_skipped">La prossima occorrenza del %1$s sarà saltata</string>
 </resources>
 

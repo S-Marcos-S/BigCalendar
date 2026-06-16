@@ -20,6 +20,7 @@ foundation = "1.9.1"
 ui = "1.9.1"
 uiText = "1.9.2"
 material3 = "1.4.0"
+slf4j = "1.7.36"
 roomKtx = "2.8.3"
 firebaseCrashlyticsPlugin = "3.0.1"
 firebaseBom = "33.1.1"
@@ -69,6 +70,7 @@ play-services-drive = { group = "com.google.android.gms", name = "play-services-
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+slf4j-android = { group = "org.slf4j", name = "slf4j-android", version.ref = "slf4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

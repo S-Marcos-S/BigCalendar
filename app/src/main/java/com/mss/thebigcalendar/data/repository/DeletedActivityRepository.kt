@@ -150,6 +150,7 @@ class DeletedActivityRepository(private val context: Context) {
             ActivityType.TASK -> TrashActivityTypeProto.TRASH_TASK
             ActivityType.BIRTHDAY -> TrashActivityTypeProto.TRASH_BIRTHDAY
             ActivityType.NOTE -> TrashActivityTypeProto.TRASH_NOTE
+            ActivityType.COMMEMORATIVE -> TrashActivityTypeProto.TRASH_EVENT
         }
     }
 

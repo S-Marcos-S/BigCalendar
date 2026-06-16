@@ -8,6 +8,12 @@ import android.content.Intent
 import android.util.Log
 import com.mss.thebigcalendar.data.model.VisibilityLevel
 import com.mss.thebigcalendar.data.repository.ActivityRepository
+import com.mss.thebigcalendar.data.repository.SettingsRepository
+import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
+import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
+import com.mss.thebigcalendar.data.service.BackupService
+import com.mss.thebigcalendar.data.repository.BackupType
+import com.mss.thebigcalendar.service.GoogleAuthService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +43,9 @@ class NotificationReceiver : BroadcastReceiver() {
                 }
                 NotificationService.ACTION_DISMISS -> {
                     handleDismiss(context, intent)
+                }
+                NotificationService.ACTION_AUTO_BACKUP -> {
+                    handleAutoBackup(context)
                 }
                 Intent.ACTION_BOOT_COMPLETED -> {
                     // Reagendar todas as notificações após reinicialização
@@ -75,6 +84,32 @@ class NotificationReceiver : BroadcastReceiver() {
                 
                 if (!activityExists) {
                     Log.d(TAG, "🔔 Atividade $activityId foi deletada - cancelando notificação sem exibir")
+                    val notificationService = NotificationService(context)
+                    notificationService.cancelNotification(activityId ?: "")
+                    return@launch
+                }
+                
+                // ✅ Verificar se a instância específica foi excluída ou concluída
+                val isExcluded = if (activityId != null && activityId.contains("_")) {
+                    val parts = activityId.split("_")
+                    val baseId = parts[0]
+                    val instanceDate = parts.getOrNull(1)
+                    val baseActivity = activities.find { it.id == baseId }
+                    if (baseActivity != null) {
+                        if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true) {
+                            baseActivity.excludedInstances.contains(activityId)
+                        } else {
+                            instanceDate != null && baseActivity.excludedDates.contains(instanceDate)
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+                
+                if (isExcluded) {
+                    Log.d(TAG, "🔔 Instância $activityId foi marcada como concluída/excluída - cancelando notificação sem exibir")
                     val notificationService = NotificationService(context)
                     notificationService.cancelNotification(activityId ?: "")
                     return@launch
@@ -772,6 +807,15 @@ class NotificationReceiver : BroadcastReceiver() {
                 }
                 
                 Log.d(TAG, "🔔 Todas as notificações foram reagendadas após reinicialização")
+
+                // Reagendar o backup automático
+                val settingsRepository = SettingsRepository(context)
+                val settings = settingsRepository.autoBackupSettings.first()
+                if (settings.enabled) {
+                    val backupScheduler = BackupScheduler(context)
+                    backupScheduler.schedule(settings)
+                    Log.d(TAG, "🔄 Backup automático reagendado após reinicialização")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "🔔 Erro ao reagendar notificações após reinicialização", e)
             }
@@ -809,6 +853,91 @@ class NotificationReceiver : BroadcastReceiver() {
             // Se não encontrar próxima instância, avançar para o próximo dia na mesma hora
             val nextDate = currentDate.plusDays(1)
             Pair(nextDate, currentTime)
+        }
+    }
+
+    private fun handleAutoBackup(context: Context) {
+        Log.d(TAG, "🔄 handleAutoBackup iniciado")
+        val pendingResult = goAsync()
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            val settingsRepository = SettingsRepository(context)
+            val notificationService = NotificationService(context)
+            val googleAuthService = GoogleAuthService(context)
+
+            try {
+                val settings = settingsRepository.autoBackupSettings.first()
+                if (settings.enabled) {
+                    // 1. Mostrar notificação de progresso
+                    withContext(Dispatchers.Main) {
+                        notificationService.showAutoBackupInProgressNotification()
+                    }
+
+                    // 2. Executar o backup
+                    val activityRepository = ActivityRepository(context)
+                    val deletedActivityRepository = DeletedActivityRepository(context)
+                    val completedActivityRepository = CompletedActivityRepository(context)
+
+                    val backupService = BackupService(
+                        context,
+                        activityRepository,
+                        deletedActivityRepository,
+                        completedActivityRepository
+                    )
+
+                    val result = when (settings.backupType) {
+                        BackupType.LOCAL -> {
+                            val directoryUriString = settingsRepository.backupDirectoryUri.first()
+                            if (!directoryUriString.isNullOrBlank()) {
+                                backupService.createBackup(android.net.Uri.parse(directoryUriString))
+                            } else {
+                                Result.failure(Exception("Diretório de backup local não configurado"))
+                            }
+                        }
+                        BackupType.CLOUD -> {
+                            val account = googleAuthService.getLastSignedInAccount()
+                            if (account != null) {
+                                backupService.createCloudBackup(account)
+                            } else {
+                                Result.failure(Exception("Conta Google não conectada"))
+                            }
+                        }
+                    }
+
+                    // 3. Remover notificação de progresso
+                    withContext(Dispatchers.Main) {
+                        notificationService.cancelAutoBackupInProgressNotification()
+                    }
+
+                    // 4. Mostrar notificação de sucesso/falha
+                    withContext(Dispatchers.Main) {
+                        if (result.isSuccess) {
+                            notificationService.showAutoBackupSuccessNotification(
+                                settings.backupType,
+                                result.getOrNull() ?: ""
+                            )
+                            Log.d(TAG, "🔄 Backup automático executado com sucesso")
+                        } else {
+                            notificationService.showAutoBackupFailedNotification(
+                                settings.backupType,
+                                result.exceptionOrNull()?.message ?: "Erro desconhecido"
+                            )
+                            Log.e(TAG, "🔄 Falha ao executar backup automático: ${result.exceptionOrNull()?.message}")
+                        }
+                    }
+
+                    // 5. Agendar a próxima ocorrência
+                    val backupScheduler = BackupScheduler(context)
+                    backupScheduler.scheduleNext(settings)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Erro geral durante o processamento do backup automático", e)
+                try {
+                    notificationService.cancelAutoBackupInProgressNotification()
+                } catch (ignored: Exception) {}
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }

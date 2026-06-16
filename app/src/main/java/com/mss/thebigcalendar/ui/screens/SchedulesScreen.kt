@@ -30,6 +30,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,7 +64,8 @@ fun SchedulesScreen(
     onBackClick: () -> Unit,
     activities: List<Activity> = emptyList(),
     onBackPressedDispatcher: OnBackPressedDispatcher? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    unfixHeadersOnScroll: Boolean = false
 ) {
     // Estado para controlar o tipo selecionado
     var selectedType by remember { mutableStateOf(ActivityType.NOTE) }
@@ -82,10 +86,48 @@ fun SchedulesScreen(
         }
     }
     
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+    
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.let { mod ->
+            if (scrollBehavior != null) {
+                mod.nestedScroll(scrollBehavior.nestedScrollConnection)
+            } else {
+                mod
+            }
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -127,7 +169,7 @@ fun SchedulesScreen(
                         TextButton(
                             onClick = { showDropdown = true },
                             colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                contentColor = appBarContentColor
                             )
                         ) {
                             Text(
@@ -165,10 +207,11 @@ fun SchedulesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -386,6 +429,7 @@ private fun getIconForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> Icons.Default.Assignment
     ActivityType.NOTE -> Icons.Default.Note
     ActivityType.BIRTHDAY -> Icons.Default.Cake
+    ActivityType.COMMEMORATIVE -> Icons.Default.Event
 }
 
 @Composable
@@ -394,6 +438,7 @@ private fun getTitleForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> stringResource(id = R.string.tasks_title)
     ActivityType.NOTE -> stringResource(id = R.string.notes_title)
     ActivityType.BIRTHDAY -> stringResource(id = R.string.birthdays_title)
+    ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
 }
 
 @Composable
@@ -402,6 +447,7 @@ private fun getCountTextForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> stringResource(id = R.string.tasks_count)
     ActivityType.NOTE -> stringResource(id = R.string.notes_count)
     ActivityType.BIRTHDAY -> stringResource(id = R.string.birthdays_count)
+    ActivityType.COMMEMORATIVE -> stringResource(id = R.string.commemorative_dates)
 }
 
 private fun getColorForType(type: ActivityType) = when (type) {
@@ -409,4 +455,5 @@ private fun getColorForType(type: ActivityType) = when (type) {
     ActivityType.TASK -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Verde
     ActivityType.NOTE -> androidx.compose.ui.graphics.Color(0xFF9C27B0) // Roxo
     ActivityType.BIRTHDAY -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Laranja
+    ActivityType.COMMEMORATIVE -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Laranja
 }

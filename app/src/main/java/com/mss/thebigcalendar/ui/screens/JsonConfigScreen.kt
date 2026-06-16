@@ -1,5 +1,6 @@
 package com.mss.thebigcalendar.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -22,6 +23,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +40,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,12 +67,50 @@ fun JsonConfigScreen(
     fileName: String?,
     onBackClick: () -> Unit,
     onSaveClick: (String, Color, String) -> Unit,
-    onSelectFileClick: () -> Unit = {}
+    onSelectFileClick: () -> Unit = {},
+    unfixHeadersOnScroll: Boolean = false,
+    hasMilitaryImported: Boolean = false,
+    hasSaintsImported: Boolean = false,
+    hasProfessionalImported: Boolean = false,
+    onImportPredefinedMilitaryCalendar: () -> Unit = {},
+    onImportPredefinedSaintsCalendar: () -> Unit = {},
+    onImportPredefinedProfessionalDaysCalendar: () -> Unit = {}
 ) {
     var title by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf(Color.Blue) }
     var showColorPicker by remember { mutableStateOf(false) }
     var jsonContent by remember { mutableStateOf("") }
+
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
     
     val colors = listOf(
         Color.Red to stringResource(R.string.color_red),
@@ -77,8 +122,14 @@ fun JsonConfigScreen(
     )
 
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.configure_calendar)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -89,9 +140,11 @@ fun JsonConfigScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -104,6 +157,120 @@ fun JsonConfigScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Seção de Calendários Predefinidos
+            Text(
+                text = stringResource(R.string.predefined_calendars_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Opção 1: Dias de Santos Católicos
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = !hasSaintsImported) { onImportPredefinedSaintsCalendar() }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Book,
+                            contentDescription = null,
+                            tint = if (hasSaintsImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.catholic_saint_days),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (hasSaintsImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasSaintsImported) stringResource(R.string.imported) else stringResource(R.string.import_predefined_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // Opção 2: Feriados Militares
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = !hasMilitaryImported) { onImportPredefinedMilitaryCalendar() }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = null,
+                            tint = if (hasMilitaryImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.military_holidays),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (hasMilitaryImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasMilitaryImported) stringResource(R.string.imported) else stringResource(R.string.import_predefined_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Opção 3: Dias das Profissões
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = !hasProfessionalImported) { onImportPredefinedProfessionalDaysCalendar() }
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Work,
+                            contentDescription = null,
+                            tint = if (hasProfessionalImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.professional_days),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (hasProfessionalImported) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasProfessionalImported) stringResource(R.string.imported) else stringResource(R.string.import_predefined_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            androidx.compose.material3.HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+
             // Seção de seleção de arquivo
             if (fileName != null) {
                 // Informações do arquivo selecionado

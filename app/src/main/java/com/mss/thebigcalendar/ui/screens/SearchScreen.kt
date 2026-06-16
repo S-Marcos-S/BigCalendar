@@ -32,6 +32,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -70,10 +73,47 @@ fun SearchScreen(
     
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+ 
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
 
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+ 
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.search)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -84,9 +124,11 @@ fun SearchScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -272,7 +314,6 @@ fun SearchResultItem(
                     when (result.type) {
                         SearchResult.Type.ACTIVITY -> MaterialTheme.colorScheme.primaryContainer
                         SearchResult.Type.HOLIDAY -> MaterialTheme.colorScheme.secondaryContainer
-                        SearchResult.Type.SAINT_DAY -> MaterialTheme.colorScheme.tertiaryContainer
                     }
                 ),
             contentAlignment = Alignment.Center
@@ -281,7 +322,6 @@ fun SearchResultItem(
                 text = when (result.type) {
                     SearchResult.Type.ACTIVITY -> "📅"
                     SearchResult.Type.HOLIDAY -> "🎉"
-                    SearchResult.Type.SAINT_DAY -> "⛪"
                 },
                 style = MaterialTheme.typography.titleMedium
             )

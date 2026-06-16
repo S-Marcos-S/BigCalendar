@@ -4,8 +4,10 @@ package com.mss.thebigcalendar.ui.screens
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,6 +15,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -38,6 +44,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,12 +76,12 @@ import com.mss.thebigcalendar.ui.components.CustomDrawer
 import com.mss.thebigcalendar.ui.components.DeleteConfirmationDialog
 import com.mss.thebigcalendar.ui.components.DeleteJsonCalendarDialog
 import com.mss.thebigcalendar.ui.components.HolidaysForSelectedDaySection
+import com.mss.thebigcalendar.ui.components.CommemorativeDatesForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.JsonCalendarForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.JsonHolidayInfoDialog
 import com.mss.thebigcalendar.ui.components.MonthlyCalendar
 import com.mss.thebigcalendar.ui.components.MoonPhasesComponent
 import com.mss.thebigcalendar.ui.components.NotesForSelectedDaySection
-import com.mss.thebigcalendar.ui.components.SaintDaysForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.SaintInfoDialog
 import com.mss.thebigcalendar.ui.components.Sidebar
 import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
@@ -200,10 +209,48 @@ fun CalendarScreen(
                 Modifier
             }
 
+            val topAppBarState = rememberTopAppBarState()
+            val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+                TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+            } else {
+                null
+            }
+
+            val transitionFraction = scrollBehavior?.state?.let { state ->
+                maxOf(state.collapsedFraction, state.overlappedFraction)
+            } ?: 0f
+
+            val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+                androidx.compose.ui.graphics.Color.Black
+            } else {
+                lerp(
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.surface,
+                    transitionFraction
+                )
+            }
+
+            val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                lerp(
+                    MaterialTheme.colorScheme.onPrimary,
+                    MaterialTheme.colorScheme.onSurface,
+                    transitionFraction
+                )
+            }
+
             Scaffold(
-                modifier = scaffoldModifier,
+                modifier = scaffoldModifier.let { modifier ->
+                    if (scrollBehavior != null) {
+                        modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    } else {
+                        modifier
+                    }
+                },
                 topBar = {
                     TopAppBar(
+                            scrollBehavior = scrollBehavior,
                             title = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     when (uiState.viewMode) {
@@ -226,7 +273,7 @@ fun CalendarScreen(
                                                 Text(
                                                     text = uiState.displayedYearMonth.year.toString(),
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                    color = appBarContentColor
                                                 )
                                             }
                                         }
@@ -248,7 +295,7 @@ fun CalendarScreen(
                                     Icon(
                                         Icons.Default.Menu,
                                         stringResource(id = R.string.open_close_menu),
-                                        tint = MaterialTheme.colorScheme.onPrimary
+                                        tint = appBarContentColor
                                     )
                                 }
                             },
@@ -268,7 +315,7 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Default.Search,
                                             stringResource(id = R.string.search),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -280,7 +327,7 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Default.Today,
                                             contentDescription = stringResource(id = R.string.go_to_today),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(
@@ -292,19 +339,21 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.Filled.BarChart,
                                             stringResource(id = R.string.chart),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
-                                    IconButton(
-                                        onClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Add,
-                                            contentDescription = stringResource(id = R.string.add_appointment),
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimary
-                                        )
+                                    if (uiState.googleSignInAccount != null) {
+                                        IconButton(
+                                            onClick = { viewModel.syncGoogleCalendarSimple() },
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Sync,
+                                                contentDescription = stringResource(id = R.string.sync_now),
+                                                modifier = Modifier.size(20.dp),
+                                                tint = appBarContentColor
+                                            )
+                                        }
                                     }
                                     IconButton(
                                         onClick = { viewModel.onTrashIconClick() },
@@ -316,7 +365,7 @@ fun CalendarScreen(
                                             Icons.Default.Delete,
                                             contentDescription = stringResource(id = R.string.trash),
                                             modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                 } else {
@@ -324,22 +373,24 @@ fun CalendarScreen(
                                         Icon(
                                             Icons.AutoMirrored.Filled.ArrowBack,
                                             stringResource(id = R.string.previous),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                     IconButton(onClick = nextAction) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.ArrowForward,
                                             stringResource(id = R.string.next),
-                                            tint = MaterialTheme.colorScheme.onPrimary
+                                            tint = appBarContentColor
                                         )
                                     }
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                                containerColor = appBarContainerColor,
+                                scrolledContainerColor = appBarContainerColor,
+                                titleContentColor = appBarContentColor,
+                                navigationIconContentColor = appBarContentColor,
+                                actionIconContentColor = appBarContentColor
                             )
                         )
                 },
@@ -416,7 +467,7 @@ fun MainCalendarView(
     drawerState: androidx.compose.material3.DrawerState,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
-    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE,
+    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.SLIDE,
     onCalendarReady: (LayoutCoordinates) -> Unit
 ) {
     var horizontalDragOffset by remember { mutableFloatStateOf(0f) }
@@ -489,22 +540,6 @@ fun MainCalendarView(
                                     color = MaterialTheme.colorScheme.outline,
                                     shape = MaterialTheme.shapes.medium
                                 )
-                                .pointerInput("calendar-resize") {
-                                    detectVerticalDragGestures(
-                                        onDragStart = { isZooming = true },
-                                        onVerticalDrag = { _, dragAmount ->
-                                            // Arrastar para baixo aumenta, para cima diminui
-                                            val delta = (dragAmount) / 800f
-                                            val newScale = (calendarScale + delta).coerceIn(0.5f, 1.22f)
-                                            if (newScale != calendarScale) {
-                                                calendarScale = newScale
-                                                viewModel.setCalendarScale(newScale)
-                                            }
-                                        },
-                                        onDragEnd = { isZooming = false },
-                                        onDragCancel = { isZooming = false }
-                                    )
-                                }
                                 .onGloballyPositioned { onCalendarReady(it) }
                         ) {
                             Column(
@@ -530,6 +565,40 @@ fun MainCalendarView(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 0.dp)
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(24.dp)
+                                        .pointerInput("calendar-resize") {
+                                            detectVerticalDragGestures(
+                                                onDragStart = { isZooming = true },
+                                                onVerticalDrag = { _, dragAmount ->
+                                                    // Arrastar para baixo aumenta, para cima diminui
+                                                    val delta = (dragAmount) / 800f
+                                                    val newScale = (calendarScale + delta).coerceIn(0.5f, 1.22f)
+                                                    if (newScale != calendarScale) {
+                                                        calendarScale = newScale
+                                                        viewModel.setCalendarScale(newScale)
+                                                    }
+                                                },
+                                                onDragEnd = { isZooming = false },
+                                                onDragCancel = { isZooming = false }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(40.dp)
+                                            .height(4.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.outlineVariant,
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
@@ -541,24 +610,30 @@ fun MainCalendarView(
                         ) {
                             HolidaysForSelectedDaySection(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                holidays = uiState.holidaysForSelectedDate
+                                holidays = uiState.holidaysForSelectedDate,
+                                onHolidayClick = { holiday ->
+                                    viewModel.onSaintDayClick(holiday)
+                                }
                             )
                         }
                     }
 
-                    if (uiState.saintDaysForSelectedDate.isNotEmpty()) {
+                    if (uiState.commemorativeDatesForSelectedDate.isNotEmpty()) {
                         item(
-                            key = "saints-${uiState.selectedDate}",
-                            contentType = "saints"
+                            key = "commemoratives-${uiState.selectedDate}",
+                            contentType = "commemoratives"
                         ) {
-                            SaintDaysForSelectedDaySection(
+                            CommemorativeDatesForSelectedDaySection(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                saints = uiState.saintDaysForSelectedDate,
-                                onSaintClick = { viewModel.onSaintDayClick(it) }
+                                commemorativeDates = uiState.commemorativeDatesForSelectedDate,
+                                onCommemorativeClick = { commemorative ->
+                                    viewModel.onSaintDayClick(commemorative)
+                                }
                             )
                         }
                     }
-                    
+
+
                     item(
                         key = "birthdays-${uiState.selectedDate}",
                         contentType = "birthdays"
@@ -613,6 +688,7 @@ fun MainCalendarView(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
                             tasks = uiState.tasksForSelectedDate,
                             selectedDate = uiState.selectedDate,
+                            displayedYearMonth = uiState.displayedYearMonth,
                             activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
                             onTaskClick = {
                                 if (uiState.activityIdWithDeleteButtonVisible != null) {
@@ -624,7 +700,17 @@ fun MainCalendarView(
                             onTaskLongClick = { viewModel.onTaskLongPressed(it) },
                             onDeleteClick = { viewModel.requestDeleteActivity(it) },
                             onCompleteClick = { viewModel.markActivityAsCompleted(it) },
-                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) }
+                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
+                            onCommemorativeClick = { task ->
+                                val date = java.time.LocalDate.parse(task.date)
+                                val commemorativeHoliday = uiState.commemorativeDates[date]
+                                if (commemorativeHoliday != null) {
+                                    viewModel.onSaintDayClick(commemorativeHoliday)
+                                }
+                            },
+                            onUpdateTaskDescription = { activity, newDesc ->
+                                viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                            }
                         )
                     }
                     
@@ -667,10 +753,7 @@ fun MainCalendarView(
                 YearlyCalendarView(
                     modifier = Modifier.fillMaxSize(),
                     year = uiState.displayedYearMonth.year,
-                    onMonthClicked = { viewModel.onYearlyMonthClicked(it) },
-                    onNavigateYear = { delta ->
-                        if (delta > 0) viewModel.onNextYear() else viewModel.onPreviousYear()
-                    }
+                    onMonthClicked = { viewModel.onYearlyMonthClicked(it) }
                 )
             }
         }
@@ -704,7 +787,7 @@ fun AnimatedMonthlyCalendar(
     onNextMonth: () -> Unit,
     isAnimating: Boolean,
     animationDirection: Float,
-    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.NONE,
+    animationType: com.mss.thebigcalendar.data.model.AnimationType = com.mss.thebigcalendar.data.model.AnimationType.SLIDE,
     verticalScale: Float = 1f,
     hideOtherMonthDays: Boolean = false
 ) {

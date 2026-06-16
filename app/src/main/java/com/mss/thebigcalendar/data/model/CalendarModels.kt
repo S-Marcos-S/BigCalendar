@@ -17,7 +17,8 @@ enum class ActivityType {
     EVENT,
     TASK,
     NOTE,
-    BIRTHDAY
+    BIRTHDAY,
+    COMMEMORATIVE
 }
 
 enum class VisibilityLevel {
@@ -62,7 +63,6 @@ data class CalendarDay(
     val jsonHolidays: List<JsonHoliday> = emptyList(), // Agendamentos JSON importados
     val isWeekend: Boolean = false,
     val isNationalHoliday: Boolean = false,
-    val isSaintDay: Boolean = false,
     val isJsonHolidayDay: Boolean = false
 )
 
@@ -86,7 +86,6 @@ data class CalendarUiState(
     val welcomeName: String = "",
     val activities: List<Activity> = emptyList(),
     val nationalHolidays: Map<LocalDate, Holiday> = emptyMap(),
-    val saintDays: Map<String, Holiday> = emptyMap(), // MM-dd -> Holiday
     val commemorativeDates: Map<LocalDate, Holiday> = emptyMap(),
     val filterOptions: CalendarFilterOptions = CalendarFilterOptions(),
     val isSidebarOpen: Boolean = false,
@@ -99,10 +98,10 @@ data class CalendarUiState(
     val tasksForSelectedDate: List<Activity> = emptyList(), // NOVO: Lista de tarefas para o dia selecionado
     val birthdaysForSelectedDate: List<Activity> = emptyList(), // Lista de aniversários para o dia selecionado
     val notesForSelectedDate: List<Activity> = emptyList(), // Lista de notas para o dia selecionado
-    val animationType: AnimationType = AnimationType.NONE, // Tipo de animação selecionado
+    val animationType: AnimationType = AnimationType.SLIDE, // Tipo de animação selecionado
     val language: Language = Language.SYSTEM, // Idioma selecionado
     val holidaysForSelectedDate: List<Holiday> = emptyList(),
-    val saintDaysForSelectedDate: List<Holiday> = emptyList(),
+    val commemorativeDatesForSelectedDate: List<Holiday> = emptyList(),
     val googleSignInAccount: GoogleSignInAccount? = null,
     val signInIntent: Intent? = null,
     val loginMessage: String? = null,
@@ -124,10 +123,13 @@ data class CalendarUiState(
     val isBackupScreenOpen: Boolean = false,
     val backupMessage: String? = null,
     val isRestoringBackup: Boolean = false,
+    val localBackupUriBeingRestored: String? = null,
     val restoreProgress: Float = 0f,
     val needsBackupDirectorySelection: Boolean = false,
     val backupDirectoryUri: String? = null,
     val backupFiles: List<BackupInfo> = emptyList(),
+    val isListingLocalBackups: Boolean = false,
+    val appIconMode: AppIconMode = AppIconMode.DYNAMIC,
     val showCompletedActivities: Boolean = false,
     val completedActivities: List<Activity> = emptyList(),
     val trashSortOrder: String = "newest_first",
@@ -148,9 +150,11 @@ data class CalendarUiState(
     val sidebarFilterVisibility: SidebarFilterVisibility = SidebarFilterVisibility(),
     val calendarScale: Float = 1f,
     val isCalendarVisualizationSettingsOpen: Boolean = false,
+    val isSyncScreenOpen: Boolean = false,
     val hideOtherMonthDays: Boolean = false,
     val pureBlackTheme: Boolean = false,
     val primaryColor: String = "AUTO",
+    val unfixHeadersOnScroll: Boolean = true,
 
     // Cloud Backup State
     val cloudBackupFiles: List<DriveFile> = emptyList(),
@@ -171,7 +175,8 @@ data class CalendarUiState(
 )
 
 enum class Theme { LIGHT, DARK, SYSTEM }
+enum class AppIconMode { DYNAMIC, WHITE, BLACK }
 enum class ViewMode { MONTHLY, YEARLY }
-enum class HolidayType { NATIONAL, COMMEMORATIVE, SAINT, JSON_IMPORT }
+enum class HolidayType { NATIONAL, COMMEMORATIVE, JSON_IMPORT }
 @Immutable
 data class Holiday(val name: String, val date: String, val type: HolidayType, val summary: String? = null, val wikipediaLink: String? = null)

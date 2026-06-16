@@ -46,6 +46,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +73,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.BitmapFactory
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.layout.ContentScale
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.CalendarUiState
@@ -111,7 +118,6 @@ fun PrintCalendarScreen(
     var selectedMonth by remember { mutableStateOf(java.time.YearMonth.now()) }
     var includeTasks by remember { mutableStateOf(uiState.filterOptions.showTasks) }
     var includeHolidays by remember { mutableStateOf(uiState.filterOptions.showHolidays) }
-    var includeSaintDays by remember { mutableStateOf(uiState.filterOptions.showSaintDays) }
     var includeEvents by remember { mutableStateOf(uiState.filterOptions.showEvents) }
     var includeBirthdays by remember { mutableStateOf(uiState.filterOptions.showBirthdays) }
     var includeNotes by remember { mutableStateOf(uiState.filterOptions.showNotes) }
@@ -209,19 +215,86 @@ fun PrintCalendarScreen(
 
     val scrollState = rememberScrollState()
 
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = if (uiState.unfixHeadersOnScroll) {
+        TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    } else {
+        null
+    }
+
+    val transitionFraction = scrollBehavior?.state?.let { state ->
+        maxOf(state.collapsedFraction, state.overlappedFraction)
+    } ?: 0f
+
+    val appBarContainerColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        androidx.compose.ui.graphics.Color.Black
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.surface,
+            transitionFraction
+        )
+    }
+
+    val appBarContentColor = if (MaterialTheme.colorScheme.surface == androidx.compose.ui.graphics.Color.Black) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        lerp(
+            MaterialTheme.colorScheme.onPrimary,
+            MaterialTheme.colorScheme.onSurface,
+            transitionFraction
+        )
+    }
+
+    var isMenuExpanded by remember { mutableStateOf(false) }
+
     Scaffold(
+        modifier = if (scrollBehavior != null) {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        } else {
+            Modifier
+        },
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(id = R.string.print_calendar)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(id = R.string.back))
                     }
                 },
+                actions = {
+                    Box {
+                        IconButton(onClick = { isMenuExpanded = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(id = R.string.more_options),
+                                tint = appBarContentColor
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = isMenuExpanded,
+                            onDismissRequest = { isMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(id = R.string.change_download_location)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    // Lógica para mudar local de download será implementada futuramente
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Folder, contentDescription = null)
+                                }
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = appBarContainerColor,
+                    scrolledContainerColor = appBarContainerColor,
+                    titleContentColor = appBarContentColor,
+                    navigationIconContentColor = appBarContentColor,
+                    actionIconContentColor = appBarContentColor
                 )
             )
         }
@@ -477,27 +550,6 @@ fun PrintCalendarScreen(
                                                 borderColor = if (includeHolidays) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                                 selectedBorderColor = MaterialTheme.colorScheme.primary,
                                                 borderWidth = if (includeHolidays) 2.dp else 1.dp,
-                                                selectedBorderWidth = 2.dp
-                                            )
-                                        )
-                                        FilterChip(
-                                            selected = includeSaintDays,
-                                            onClick = { includeSaintDays = !includeSaintDays },
-                                            label = { Text(stringResource(id = R.string.catholic_saint_days)) },
-                                            leadingIcon = if (includeSaintDays) {
-                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                                            } else null,
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                            ),
-                                            border = FilterChipDefaults.filterChipBorder(
-                                                enabled = true,
-                                                selected = includeSaintDays,
-                                                borderColor = if (includeSaintDays) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                selectedBorderColor = MaterialTheme.colorScheme.primary,
-                                                borderWidth = if (includeSaintDays) 2.dp else 1.dp,
                                                 selectedBorderWidth = 2.dp
                                             )
                                         )
@@ -2070,7 +2122,6 @@ fun PrintCalendarScreen(
                             selectedMonth = selectedMonth,
                             includeTasks = includeTasks,
                             includeHolidays = includeHolidays,
-                            includeSaintDays = includeSaintDays,
                             includeEvents = includeEvents,
                             includeBirthdays = includeBirthdays,
                             includeNotes = includeNotes,
@@ -2156,7 +2207,6 @@ data class PrintOptions(
     val selectedMonth: java.time.YearMonth,
     val includeTasks: Boolean,
     val includeHolidays: Boolean,
-    val includeSaintDays: Boolean,
     val includeEvents: Boolean,
     val includeBirthdays: Boolean,
     val includeNotes: Boolean,

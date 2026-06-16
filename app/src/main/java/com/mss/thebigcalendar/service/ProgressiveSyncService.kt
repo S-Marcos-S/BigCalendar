@@ -19,6 +19,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.flow.first
 
 class ProgressiveSyncService(
     private val context: Context,
@@ -85,24 +86,34 @@ class ProgressiveSyncService(
             
             val calendarService = googleCalendarService.getCalendarService(account)
             val now = LocalDate.now()
-            val nextMonth = now.plusMonths(1)
+            val startDate = now.minusMonths(1)
+            val endDate = now.plusMonths(2)
             
-            // Buscar eventos do mês atual e próximo com timeout
-            // Se forceFullSync for true, useIncrementalSync deve ser false
+            // Buscar eventos do mês anterior, atual e dois meses seguintes (sem lacunas)
             val events = withTimeout(30.seconds) {
-                fetchEventsForPeriod(calendarService, now, nextMonth, useIncrementalSync = !forceFullSync)
+                fetchEventsForPeriod(calendarService, startDate, endDate, useIncrementalSync = !forceFullSync)
             }
+            
+            // Buscar aniversários dos calendários especiais de contatos e aniversários
+            val birthdayEvents = withTimeout(15.seconds) {
+                fetchBirthdayEvents(calendarService)
+            }
+            
+            val allEvents = events + birthdayEvents
+            
+            val cancelledEventIds = allEvents.filter { it.status == "cancelled" }.mapNotNull { it.id }
+            val activeEvents = allEvents.filter { it.status != "cancelled" }
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Processando eventos...",
                 progress = 30,
-                totalEvents = events.size,
+                totalEvents = activeEvents.size,
                 processedEvents = 0,
                 currentPhase = SyncPhase.QUICK_SYNC
             ))
             
             // Converter e salvar eventos em lote
-            val activities = convertEventsToActivities(events)
+            val activities = convertEventsToActivities(activeEvents)
             val repository = ActivityRepository(context)
             
             onProgressUpdate(SyncProgress(
@@ -115,6 +126,34 @@ class ProgressiveSyncService(
             
             // Salvar todos os eventos de uma vez
             repository.saveAllActivities(activities)
+            
+            // Apagar eventos cancelados (deletados no Google Agenda)
+            cancelledEventIds.forEach { id ->
+                repository.deleteActivity(id)
+            }
+            
+            // Se for sincronização completa (não incremental), remover eventos locais que não estão no fetch
+            if (forceFullSync) {
+                // Limpar eventos regulares no período
+                val localGoogleActivities = repository.getActivitiesForPeriod(startDate, endDate).first()
+                    .filter { it.isFromGoogle }
+                val fetchedIds = activities.map { it.id }.toSet()
+                localGoogleActivities.forEach { localActivity ->
+                    if (!fetchedIds.contains(localActivity.id)) {
+                        repository.deleteActivity(localActivity.id)
+                    }
+                }
+                
+                // Limpar todos os aniversários do Google locais que foram removidos
+                val localGoogleBirthdays = repository.activities.first()
+                    .filter { it.isFromGoogle && it.activityType == ActivityType.BIRTHDAY }
+                val fetchedBirthdayIds = birthdayEvents.mapNotNull { it.id }.toSet()
+                localGoogleBirthdays.forEach { localBirthday ->
+                    if (!fetchedBirthdayIds.contains(localBirthday.id)) {
+                        repository.deleteActivity(localBirthday.id)
+                    }
+                }
+            }
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Sincronização rápida concluída",
@@ -151,24 +190,37 @@ class ProgressiveSyncService(
             
             val calendarService = googleCalendarService.getCalendarService(account)
             val now = LocalDate.now()
-            val endOfYear = now.withMonth(12).withDayOfMonth(31)
             
-            // Buscar eventos do resto do ano com timeout
-            // Se forceFullSync for true, useIncrementalSync deve ser false
-            val events = withTimeout(60.seconds) {
-                fetchEventsForPeriod(calendarService, now.plusMonths(2), endOfYear, useIncrementalSync = !forceFullSync)
+            val futureStartDate = now.plusMonths(2)
+            val futureEndDate = now.plusMonths(12)
+            val pastStartDate = now.minusMonths(12)
+            val pastEndDate = now.minusMonths(1)
+            
+            // Buscar eventos futuros (de 2 a 12 meses à frente)
+            val futureEvents = withTimeout(45.seconds) {
+                fetchEventsForPeriod(calendarService, futureStartDate, futureEndDate, useIncrementalSync = !forceFullSync)
             }
+            
+            // Buscar eventos passados (de 1 a 12 meses atrás)
+            val pastEvents = withTimeout(45.seconds) {
+                fetchEventsForPeriod(calendarService, pastStartDate, pastEndDate, useIncrementalSync = !forceFullSync)
+            }
+            
+            val allEvents = futureEvents + pastEvents
+            
+            val cancelledEventIds = allEvents.filter { it.status == "cancelled" }.mapNotNull { it.id }
+            val activeEvents = allEvents.filter { it.status != "cancelled" }
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Processando eventos restantes...",
                 progress = 80,
-                totalEvents = events.size,
+                totalEvents = activeEvents.size,
                 processedEvents = 0,
                 currentPhase = SyncPhase.BACKGROUND_SYNC
             ))
             
             // Converter e salvar eventos em lote
-            val activities = convertEventsToActivities(events)
+            val activities = convertEventsToActivities(activeEvents)
             val repository = ActivityRepository(context)
             
             onProgressUpdate(SyncProgress(
@@ -181,6 +233,34 @@ class ProgressiveSyncService(
             
             // Salvar todos os eventos de uma vez
             repository.saveAllActivities(activities)
+            
+            // Apagar eventos cancelados (deletados no Google Agenda)
+            cancelledEventIds.forEach { id ->
+                repository.deleteActivity(id)
+            }
+            
+            // Se for sincronização completa (não incremental), remover eventos locais que não estão no fetch
+            if (forceFullSync) {
+                val fetchedIds = activities.map { it.id }.toSet()
+                
+                // Limpar futuro
+                val localFuture = repository.getActivitiesForPeriod(futureStartDate, futureEndDate).first()
+                    .filter { it.isFromGoogle }
+                localFuture.forEach { localActivity ->
+                    if (!fetchedIds.contains(localActivity.id)) {
+                        repository.deleteActivity(localActivity.id)
+                    }
+                }
+                
+                // Limpar passado
+                val localPast = repository.getActivitiesForPeriod(pastStartDate, pastEndDate).first()
+                    .filter { it.isFromGoogle }
+                localPast.forEach { localActivity ->
+                    if (!fetchedIds.contains(localActivity.id)) {
+                        repository.deleteActivity(localActivity.id)
+                    }
+                }
+            }
             
             onProgressUpdate(SyncProgress(
                 currentStep = "Sincronização concluída",
@@ -312,6 +392,31 @@ class ProgressiveSyncService(
                 null
             }
         }
+    }
+    
+    /**
+     * Busca aniversários nos calendários especiais de contatos e aniversários
+     */
+    private suspend fun fetchBirthdayEvents(calendarService: Calendar): List<com.google.api.services.calendar.model.Event> = withContext(Dispatchers.IO) {
+        val birthdayEvents = mutableListOf<com.google.api.services.calendar.model.Event>()
+        
+        // Calendário de contatos (contacts)
+        try {
+            val events = calendarService.events().list("contacts").execute()
+            events.items?.let { birthdayEvents.addAll(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Falha ao buscar calendário de contatos: ${e.message}")
+        }
+        
+        // Calendário de aniversários (birthdays)
+        try {
+            val events = calendarService.events().list("birthdays").execute()
+            events.items?.let { birthdayEvents.addAll(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Falha ao buscar calendário de aniversários: ${e.message}")
+        }
+        
+        birthdayEvents
     }
     
     /**

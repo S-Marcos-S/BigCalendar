@@ -2,8 +2,12 @@ package com.mss.thebigcalendar
 
 import android.Manifest
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import com.mss.thebigcalendar.data.model.AppIconMode
+import com.mss.thebigcalendar.data.model.Language
+import android.util.Log
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -33,6 +37,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.mss.thebigcalendar.data.model.Theme
 import com.mss.thebigcalendar.ui.onboarding.OnboardingFlow
 import com.mss.thebigcalendar.ui.screens.AlarmsScreen
@@ -45,6 +50,7 @@ import com.mss.thebigcalendar.ui.screens.GeneralSettingsScreen
 import com.mss.thebigcalendar.ui.screens.JsonConfigScreen
 import com.mss.thebigcalendar.ui.screens.PrintCalendarScreen
 import com.mss.thebigcalendar.ui.screens.SchedulesScreen
+import com.mss.thebigcalendar.ui.screens.SyncSettingsScreen
 import com.mss.thebigcalendar.ui.screens.SearchScreen
 import com.mss.thebigcalendar.ui.screens.TrashScreen
 import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
@@ -181,6 +187,7 @@ class MainActivity : ComponentActivity() {
                     state.activityToEdit != null -> viewModel.closeCreateActivityModal()
                     state.isSidebarOpen -> viewModel.closeSidebar()
                     state.isCalendarVisualizationSettingsOpen -> viewModel.closeCalendarVisualizationSettings()
+                    state.isSyncScreenOpen -> viewModel.closeSyncSettings()
                     state.isSettingsScreenOpen -> viewModel.closeSettingsScreen()
                     state.isSearchScreenOpen -> viewModel.closeSearchScreen()
                     state.isChartScreenOpen -> viewModel.closeChartScreen()
@@ -231,6 +238,12 @@ class MainActivity : ComponentActivity() {
                     if (showOnboarding) {
                         OnboardingFlow(
                             isLoggingIn = uiState.isLoggingIn,
+                            googleSignInAccount = uiState.googleSignInAccount,
+                            cloudBackupFiles = uiState.cloudBackupFiles,
+                            isListingCloudBackups = uiState.isListingCloudBackups,
+                            isRestoring = uiState.isRestoring,
+                            onCheckBackup = { viewModel.listCloudBackups() },
+                            onRestoreBackup = { fileId, fileName -> viewModel.restoreFromCloudBackup(fileId, fileName) },
                             onComplete = {
                                 showOnboarding = false
                             },
@@ -244,7 +257,15 @@ class MainActivity : ComponentActivity() {
                                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 }
-                            }
+                            },
+                            backupDirectoryUri = uiState.backupDirectoryUri,
+                            backupFiles = uiState.backupFiles,
+                            isListingLocalBackups = uiState.isListingLocalBackups,
+                            isRestoringLocalBackup = uiState.isRestoringBackup,
+                            localBackupUriBeingRestored = uiState.localBackupUriBeingRestored,
+                            onBackupDirectorySelected = { uri -> viewModel.onBackupDirectorySelected(uri) },
+                            onRestoreLocalBackup = { uriString -> viewModel.restoreFromBackup(uriString) },
+                            onLoadLocalBackups = { viewModel.loadBackupFiles() }
                         )
                     } else {
 //... existing code ...
@@ -311,11 +332,21 @@ class MainActivity : ComponentActivity() {
                         } else {
                             when {
                         uiState.isJsonConfigScreenOpen -> {
+                            val hasMilitaryImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+                            val hasSaintsImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_SAINTS" }
+                            val hasProfessionalImported = uiState.jsonCalendars.any { it.id == "PREDEFINED_PROFESSIONAL_DAYS" }
                             JsonConfigScreen(
                                 fileName = uiState.selectedJsonFileName,
                                 onBackClick = { viewModel.closeJsonConfigScreen() },
                                 onSaveClick = { title, color, jsonContent -> viewModel.saveJsonConfig(title, color, jsonContent) },
-                                onSelectFileClick = { openJsonFilePicker() }
+                                onSelectFileClick = { openJsonFilePicker() },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
+                                hasMilitaryImported = hasMilitaryImported,
+                                hasSaintsImported = hasSaintsImported,
+                                hasProfessionalImported = hasProfessionalImported,
+                                onImportPredefinedMilitaryCalendar = { viewModel.importPredefinedMilitaryCalendar() },
+                                onImportPredefinedSaintsCalendar = { viewModel.importPredefinedSaintsCalendar() },
+                                onImportPredefinedProfessionalDaysCalendar = { viewModel.importPredefinedProfessionalDaysCalendar() }
                             )
                         }
                         uiState.isCompletedTasksScreenOpen -> {
@@ -325,7 +356,8 @@ class MainActivity : ComponentActivity() {
                                 onBackPressedDispatcher = onBackPressedDispatcher,
                                 onDeleteCompletedActivity = { activityId ->
                                     viewModel.deleteCompletedActivity(activityId)
-                                }
+                                },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isPrintCalendarScreenOpen -> {
@@ -360,14 +392,16 @@ class MainActivity : ComponentActivity() {
                                 lastYearData = viewModel.getLastYearCompletedTasksData(),
                                 currentMonth = uiState.displayedYearMonth, // Added this line
                                 onNavigateToCompletedTasks = { viewModel.onCompletedTasksClick() },
-                                onBackPressedDispatcher = onBackPressedDispatcher
+                                onBackPressedDispatcher = onBackPressedDispatcher,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isNotesScreenOpen -> {
                             SchedulesScreen(
                                 onBackClick = { viewModel.closeNotesScreen() },
                                 activities = uiState.activities,
-                                onBackPressedDispatcher = onBackPressedDispatcher
+                                onBackPressedDispatcher = onBackPressedDispatcher,
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isAlarmsScreenOpen -> {
@@ -380,37 +414,42 @@ class MainActivity : ComponentActivity() {
                             GeneralSettingsScreen(
                                 currentTheme = uiState.theme,
                                 onThemeChange = { viewModel.onThemeChange(it) },
-                                welcomeName = uiState.welcomeName,
-                                onWelcomeNameChange = { newName ->
-                                    viewModel.onWelcomeNameChange(newName)
-                                },
-                                googleAccount = uiState.googleSignInAccount,
-                                onSignInClicked = { viewModel.onSignInClicked() },
-                                onSignOutClicked = { viewModel.signOut() },
-                                isSyncing = uiState.isSyncing,
-                                onManualSync = { viewModel.onManualSync() },
-                                syncProgress = uiState.syncProgress,
                                 onBackClick = { viewModel.closeSettingsScreen() },
                                 onImportJsonClick = { viewModel.openJsonConfigScreen() },
                                 sidebarFilterVisibility = uiState.sidebarFilterVisibility,
                                 onToggleSidebarFilterVisibility = { filterKey ->
                                     viewModel.toggleSidebarFilterVisibility(filterKey)
                                 },
-                                currentLanguage = uiState.language,
-                                                                onLanguageChange = { language ->
-                                                                    lifecycleScope.launch {
-                                                                        viewModel.onLanguageChange(language)
-                                                                        recreate()
-                                                                    }
-                                                                },
-                                                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
-                                                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                                                                onCrashlyticsToggle = viewModel::setCrashlyticsEnabled
-                                                            )
-                                                        }
-                                                        uiState.isCalendarVisualizationSettingsOpen -> {
-                                                            CalendarVisualizationSettingsScreen(
-                                onBackClick = { viewModel.closeCalendarVisualizationSettings() }
+                                onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
+                                onOpenSyncSettings = { viewModel.openSyncSettings() },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
+                            )
+                        }
+                        uiState.isCalendarVisualizationSettingsOpen -> {
+                            CalendarVisualizationSettingsScreen(
+                                welcomeName = uiState.welcomeName,
+                                onWelcomeNameChange = { viewModel.onWelcomeNameChange(it) },
+                                onBackClick = { viewModel.closeCalendarVisualizationSettings() },
+                                onLanguageChange = { language ->
+                                    lifecycleScope.launch {
+                                        viewModel.onLanguageChange(language)
+                                        recreate()
+                                    }
+                                }
+                            )
+                        }
+                        uiState.isSyncScreenOpen -> {
+                            SyncSettingsScreen(
+                                googleAccount = uiState.googleSignInAccount,
+                                onSignInClicked = { viewModel.onSignInClicked() },
+                                onSignOutClicked = { viewModel.signOut() },
+                                isSyncing = uiState.isSyncing,
+                                onManualSync = { viewModel.onManualSync() },
+                                syncProgress = uiState.syncProgress,
+                                isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                                onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) },
+                                onBackClick = { viewModel.closeSyncSettings() },
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
                         uiState.isBackupScreenOpen -> {
@@ -483,6 +522,70 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         // ✅ Marcar que o app ainda está em execução (mas não ativo)
         setAppRunningState(true)
+        applyAppIconSettingsOnExit()
+    }
+
+    private fun applyAppIconSettingsOnExit() {
+        val uiState = viewModel.uiState.value
+        val mode = uiState.appIconMode
+        val theme = uiState.theme
+        
+        val targetAlias = when (mode) {
+            AppIconMode.WHITE -> "com.mss.thebigcalendar.MainActivityAliasWhite"
+            AppIconMode.BLACK -> "com.mss.thebigcalendar.MainActivityAliasBlack"
+            AppIconMode.DYNAMIC -> {
+                val isDarkMode = when (theme) {
+                    Theme.LIGHT -> false
+                    Theme.DARK -> true
+                    Theme.SYSTEM -> {
+                        val nightModeFlags = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                        nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    }
+                }
+                if (isDarkMode) {
+                    "com.mss.thebigcalendar.MainActivityAliasBlack"
+                } else {
+                    "com.mss.thebigcalendar.MainActivityAliasWhite"
+                }
+            }
+        }
+
+        val packageManager = packageManager
+        val whiteComponent = ComponentName(this, "com.mss.thebigcalendar.MainActivityAliasWhite")
+        val blackComponent = ComponentName(this, "com.mss.thebigcalendar.MainActivityAliasBlack")
+
+        try {
+            val currentWhiteState = packageManager.getComponentEnabledSetting(whiteComponent)
+            val currentBlackState = packageManager.getComponentEnabledSetting(blackComponent)
+
+            val targetWhiteState = if (targetAlias == "com.mss.thebigcalendar.MainActivityAliasWhite") {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+
+            val targetBlackState = if (targetAlias == "com.mss.thebigcalendar.MainActivityAliasBlack") {
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            } else {
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            }
+
+            if (currentWhiteState != targetWhiteState || currentBlackState != targetBlackState) {
+                Log.d("MainActivity", "🔄 Alternando ícone do launcher: Branco=$targetWhiteState, Preto=$targetBlackState")
+                packageManager.setComponentEnabledSetting(
+                    whiteComponent,
+                    targetWhiteState,
+                    PackageManager.DONT_KILL_APP
+                )
+                packageManager.setComponentEnabledSetting(
+                    blackComponent,
+                    targetBlackState,
+                    PackageManager.DONT_KILL_APP
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Erro ao configurar componentes de ícone do app", e)
+        }
     }
     
     override fun onDestroy() {

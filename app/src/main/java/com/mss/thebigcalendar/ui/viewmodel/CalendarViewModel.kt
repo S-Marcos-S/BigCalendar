@@ -16,6 +16,7 @@ import com.mss.thebigcalendar.data.model.CalendarUiState
 import com.mss.thebigcalendar.data.model.Holiday
 import com.mss.thebigcalendar.data.model.SearchResult
 import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.AppIconMode
 import com.mss.thebigcalendar.data.model.ViewMode
 import com.mss.thebigcalendar.data.model.JsonSchedule
 import com.mss.thebigcalendar.data.model.toActivity
@@ -34,6 +35,7 @@ import com.mss.thebigcalendar.service.RecurrenceService
 import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
 import com.mss.thebigcalendar.data.repository.AlarmRepository
+import com.mss.thebigcalendar.data.repository.SyncRepository
 import com.mss.thebigcalendar.data.service.BackupService
 import com.mss.thebigcalendar.data.service.BackupInfo
 import com.mss.thebigcalendar.service.VisibilityService
@@ -91,6 +93,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val completedActivityRepository = CompletedActivityRepository(application)
     private val alarmRepository = AlarmRepository(application)
     private val jsonCalendarRepository = JsonCalendarRepository(application)
+    private val syncRepository = SyncRepository(application)
     
     // Services
     private val googleAuthService = GoogleAuthService(application)
@@ -98,7 +101,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val progressiveSyncService = ProgressiveSyncService(application, googleCalendarService)
     private val searchService = SearchService()
     private val recurrenceService = RecurrenceService()
-    private val backupService = BackupService(application, activityRepository, deletedActivityRepository, completedActivityRepository)
+    private val backupService = BackupService(application, activityRepository, deletedActivityRepository, completedActivityRepository, alarmRepository)
     private val visibilityService = VisibilityService(application)
     private val pdfGenerationService = com.mss.thebigcalendar.data.service.PdfGenerationService(application)
     private val backupScheduler = com.mss.thebigcalendar.service.BackupScheduler(application)
@@ -153,6 +156,23 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isRestoring = true, restoreMessage = null) }
             backupService.restoreFromCloudBackup(account, fileId, fileName)
                 .onSuccess { restoreResult ->
+                    // Cancelar alarmes existentes e limpar o repositório de alarmes
+                    val notificationService = NotificationService(getApplication())
+                    val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                        getApplication(),
+                        alarmRepository,
+                        notificationService
+                    )
+                    try {
+                        val currentAlarms = alarmRepository.getAllAlarms()
+                        currentAlarms.forEach { alarm ->
+                            alarmService.cancelAlarm(alarm.id)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("CalendarViewModel", "Erro ao cancelar alarmes existentes na restauração em nuvem: ${e.message}", e)
+                    }
+                    alarmRepository.clearAllAlarms()
+
                     // Logic to handle the restored data
                     activityRepository.clearAllActivities()
                     deletedActivityRepository.clearAllDeletedActivities()
@@ -161,6 +181,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     activityRepository.saveAllActivities(restoreResult.activities)
                     deletedActivityRepository.saveAllDeletedActivities(restoreResult.deletedActivities)
                     completedActivityRepository.saveAllCompletedActivities(restoreResult.completedActivities)
+
+                    // Salvar e agendar os novos alarmes
+                    restoreResult.alarms.forEach { alarm ->
+                        alarmRepository.saveAlarm(alarm)
+                        if (alarm.isEnabled) {
+                            alarmService.scheduleAlarm(alarm)
+                        }
+                    }
+
+                    // Agendar notificações para as atividades
+                    restoreResult.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
 
                     _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restored from ${restoreResult.backupFileName}") }
                     loadData() // Reload all data
@@ -205,6 +236,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         
         // Registrar broadcast receiver para atualizações de notificações
         registerNotificationBroadcastReceiver()
+
+        // Observar mudanças no ano exibido para carregar os feriados nacionais dinamicamente
+        viewModelScope.launch {
+            var lastYear: Int? = null
+            _uiState.collect { state ->
+                val currentYear = state.displayedYearMonth.year
+                if (currentYear != lastYear) {
+                    lastYear = currentYear
+                    loadHolidaysForYear(currentYear)
+                }
+            }
+        }
     }
 
     fun setCalendarScale(scale: Float) {
@@ -235,6 +278,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setUnfixHeadersOnScroll(unfix: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setUnfixHeadersOnScroll(unfix)
+            _uiState.update { it.copy(unfixHeadersOnScroll = unfix) }
+        }
+    }
+
     fun setCrashlyticsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.setCrashlyticsEnabled(enabled)
@@ -249,6 +299,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun closeCalendarVisualizationSettings() {
         _uiState.update { it.copy(isCalendarVisualizationSettingsOpen = false, isSettingsScreenOpen = true) }
+    }
+
+    fun openSyncSettings() {
+        _uiState.update { it.copy(isSyncScreenOpen = true, isSettingsScreenOpen = false) }
+    }
+
+    fun closeSyncSettings() {
+        _uiState.update { it.copy(isSyncScreenOpen = false, isSettingsScreenOpen = true) }
     }
 
     fun onMainOnboardingComplete() {
@@ -303,17 +361,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             append("${state.displayedYearMonth}_")
             // Removido selectedDate - não afeta o cache do calendário
             append("${state.filterOptions.showHolidays}_")
-            append("${state.filterOptions.showSaintDays}_")
             append("${state.filterOptions.showEvents}_")
             append("${state.filterOptions.showTasks}_")
             append("${state.filterOptions.showNotes}_")
             append("${state.filterOptions.showBirthdays}_")
+            append("${state.filterOptions.showCommemorative}_")
             append("${state.showCompletedActivities}_")
             append("${state.showMoonPhases}_")
             append("${state.activities.size}_")
             append("${state.completedActivities.size}_")
             append("${state.nationalHolidays.size}_")
-            append("${state.saintDays.size}_")
+            append("${state.commemorativeDates.size}_")
             append("${state.jsonHolidays.size}_")
             append("${state.jsonCalendars.size}")
         }
@@ -343,7 +401,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         val account = googleAuthService.getLastSignedInAccount()
         if (account != null) {
             _uiState.update { it.copy(googleSignInAccount = account) }
-            fetchGoogleCalendarEvents(account)
+            // Sincronização automática na inicialização: usar sincronização progressiva e respeitar o limite de 24 horas
+            viewModelScope.launch {
+                val lastSync = syncRepository.getLastSyncTime()
+                val currentTime = System.currentTimeMillis()
+                val timeSinceLastSync = currentTime - lastSync
+                
+                // Apenas sincronizar se passou mais de 24 horas (diário)
+                if (timeSinceLastSync >= 24 * 60 * 60 * 1000) {
+                    performProgressiveSync(account, forceFullSync = false)
+                } else {
+                    // Atualizar o timestamp em memória para refletir a última sincronização conhecida
+                    _uiState.update { it.copy(lastGoogleSyncTime = lastSync) }
+                }
+            }
         }
     }
     
@@ -367,7 +438,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             loginMessage = if(loginSuccess) getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_success_message) else getApplication<Application>().getString(com.mss.thebigcalendar.R.string.login_failure_message)
         ) }
         if (loginSuccess) {
-            fetchGoogleCalendarEvents(account!!)
+            // No primeiro login, sempre fazemos uma sincronização progressiva completa para garantir que todos os dados sejam importados
+            performProgressiveSync(account!!, forceFullSync = true)
         } else {
             android.util.Log.w("CalendarViewModel", "Sign-in failed, not fetching events.")
         }
@@ -386,65 +458,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Detecta se um evento do Google Calendar é um aniversário baseado em características específicas
-     */
-    private fun detectBirthdayEvent(event: com.google.api.services.calendar.model.Event): Boolean {
-        val title = event.summary?.lowercase() ?: ""
-        val description = event.description?.lowercase() ?: ""
-        val isAllDay = event.start?.dateTime == null
-        val hasRecurrence = event.recurrence?.isNotEmpty() == true
-        
-        // Palavras-chave para detectar aniversários (em português e inglês)
-        val birthdayKeywords = listOf(
-            "birthday", "aniversário", "nascimento", "nasc", "bday", "b-day",
-            "feliz aniversário", "happy birthday", "completa anos", "turns",
-            "aniversariante", "birthday boy", "birthday girl", "aniversariantes",
-            "parabéns", "congratulations", "festa", "party", "celebration"
-        )
-        
-        // Verificar se o título ou descrição contém palavras-chave de aniversário
-        val hasBirthdayKeywords = birthdayKeywords.any { keyword ->
-            title.contains(keyword) || description.contains(keyword)
-        }
-        
-        // Verificar se é um evento recorrente anual (típico de aniversários)
-        val isYearlyRecurring = event.recurrence?.any { rule ->
-            rule.contains("FREQ=YEARLY") || rule.contains("RRULE:FREQ=YEARLY") ||
-            rule.contains("INTERVAL=1") && rule.contains("FREQ=YEARLY")
-        } == true
-        
-        // Verificar se é um evento de dia inteiro (aniversários geralmente são)
-        val isAllDayEvent = isAllDay
-        
-        // Verificar se tem configurações específicas de aniversário do Google
-        val hasBirthdaySettings = event.gadget?.preferences?.any { (key, value) ->
-            key == "googCalEventType" && value == "birthday"
-        } == true
-        
-        // Verificar se vem de um calendário específico de aniversários
-        val isFromBirthdayCalendar = event.organizer?.email?.contains("birthday") == true ||
-                                   event.creator?.email?.contains("birthday") == true
-        
-        // Verificar se tem padrões específicos de aniversário no título
-        val hasBirthdayPatterns = title.matches(Regex(".*\\b\\d{1,2}/\\d{1,2}\\b.*")) || // Padrão DD/MM
-                                 title.matches(Regex(".*\\b\\d{1,2}-\\d{1,2}\\b.*")) || // Padrão DD-MM
-                                 title.matches(Regex(".*\\b\\d{1,2}\\.\\d{1,2}\\b.*"))   // Padrão DD.MM
-        
-        // Um evento é considerado aniversário se:
-        // 1. Contém palavras-chave de aniversário, OU
-        // 2. É recorrente anual E é de dia inteiro, OU  
-        // 3. Tem configurações específicas de aniversário do Google, OU
-        // 4. Vem de um calendário de aniversários, OU
-        // 5. Tem padrões de data no título (típico de aniversários)
-        val result = hasBirthdayKeywords || 
-                    (isYearlyRecurring && isAllDayEvent) || 
-                    hasBirthdaySettings ||
-                    isFromBirthdayCalendar ||
-                    hasBirthdayPatterns
-        
-        return result
-    }
     
     /**
      * Cria aniversários de exemplo para teste se nenhum for detectado automaticamente
@@ -497,143 +510,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun fetchGoogleCalendarEvents(account: GoogleSignInAccount, forceSync: Boolean = false) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null) }
-            try {
-                val currentTime = System.currentTimeMillis()
-                val lastSync = _uiState.value.lastGoogleSyncTime
-                val timeSinceLastSync = currentTime - lastSync
-                
-                // Sincronização diária: só sincronizar se passou mais de 24 horas (a menos que seja forçada)
-                if (!forceSync && timeSinceLastSync < 24 * 60 * 60 * 1000) {
-                    _uiState.update { it.copy(isSyncing = false) }
-                    return@launch
-                }
-                
-                // NÃO deletar eventos existentes até os novos chegarem - isso evita o "flash"
-                // Os eventos antigos serão substituídos pelos novos ao final
-
-                // 2. Fetch new events from Google Calendar
-                val calendarService = googleCalendarService.getCalendarService(account)
-                
-                // Buscar eventos do calendário principal
-                val primaryEvents = withContext(Dispatchers.IO) {
-                    calendarService.events().list("primary").execute()
-                }
-                
-                // Buscar eventos de contatos (que contêm aniversários)
-                val contactEvents = withContext(Dispatchers.IO) {
-                    try {
-                        calendarService.events().list("contacts").execute()
-                    } catch (e: Exception) {
-                        // Se não conseguir acessar o calendário de contatos, usar lista vazia
-                        com.google.api.services.calendar.model.Events()
-                    }
-                }
-                
-                // Buscar eventos de aniversários específicos
-                val birthdayCalendarEvents = withContext(Dispatchers.IO) {
-                    try {
-                        calendarService.events().list("birthdays").execute()
-                    } catch (e: Exception) {
-                        // Se não conseguir acessar o calendário de aniversários, usar lista vazia
-                        com.google.api.services.calendar.model.Events()
-                    }
-                }
-                
-                // Combinar todos os eventos
-                val allEvents = mutableListOf<com.google.api.services.calendar.model.Event>()
-                allEvents.addAll(primaryEvents.items ?: emptyList())
-                allEvents.addAll(contactEvents.items ?: emptyList())
-                allEvents.addAll(birthdayCalendarEvents.items ?: emptyList())
-                
-                val events = com.google.api.services.calendar.model.Events().apply {
-                    items = allEvents
-                }
-
-                // 3. Map them to the app's Activity model
-                val activities = events.items.mapNotNull { event ->
-                    // Ignore events without a start date
-                    val start = event.start?.dateTime?.value ?: event.start?.date?.value ?: return@mapNotNull null
-                    val end = event.end?.dateTime?.value ?: event.end?.date?.value
-
-                    // Tratar eventos de dia inteiro (como aniversários) de forma diferente
-                    val startDate = if (event.start?.dateTime == null) {
-                        // Para eventos de dia inteiro, usar UTC para evitar problemas de fuso horário
-                        // O Google Calendar envia eventos de dia inteiro no início do dia UTC
-                        val utcDate = Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDate()
-                        utcDate
-                    } else {
-                        // Para eventos com horário, usar fuso horário local
-                        val localDate = Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).toLocalDate()
-                        localDate
-                    }
-                    
-                    val startTime = if (event.start?.dateTime != null) Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).toLocalTime() else null
-                    val endTime = if (end != null && event.end?.dateTime != null) Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault()).toLocalTime() else null
-
-                    // Detectar se é um aniversário baseado em características específicas
-                    val isBirthday = detectBirthdayEvent(event)
-                    
-                    Activity(
-                        id = event.id ?: UUID.randomUUID().toString(),
-                        title = event.summary ?: getApplication<Application>().getString(com.mss.thebigcalendar.R.string.event_no_title),
-                        description = event.description,
-                        date = startDate.toString(),
-                        startTime = startTime,
-                        endTime = endTime,
-                        isAllDay = event.start?.dateTime == null,
-                        location = event.location,
-                        categoryColor = if (isBirthday) "#FF69B4" else "#4285F4", // Rosa para aniversários, Azul para eventos
-                        activityType = if (isBirthday) ActivityType.BIRTHDAY else ActivityType.EVENT,
-                        recurrenceRule = event.recurrence?.firstOrNull(),
-                        showInCalendar = true, // Por padrão, mostrar no calendário
-                        isFromGoogle = true,
-                        excludedDates = emptyList(),
-                        wikipediaLink = null // Eventos do Google Calendar não têm links da Wikipedia
-                    )
-                }
-                
-                // Log das estatísticas de sincronização
-                val totalEvents = activities.size
-                val birthdayEvents = activities.count { it.activityType == ActivityType.BIRTHDAY }
-                val regularEvents = activities.count { it.activityType == ActivityType.EVENT }
-                
-                // 4. Fazer merge dos eventos (manter existentes + adicionar novos)
-                val currentActivities = activityRepository.activities.first()
-                activities.forEach { newActivity ->
-                    // Verificar se já existe uma atividade com o mesmo ID
-                    val existingActivity = currentActivities.find { it.id == newActivity.id }
-                    if (existingActivity != null) {
-                        // Se já existe, preservar a cor personalizada do usuário
-                        val updatedActivity = newActivity.copy(categoryColor = existingActivity.categoryColor)
-                        activityRepository.saveActivity(updatedActivity)
-                    } else {
-                        // Se não existe, adicionar nova com cor padrão
-                        activityRepository.saveActivity(newActivity)
-                    }
-                }
-                
-                // 5. Atualizar a UI após salvar as atividades
-                updateAllDateDependentUI()
-                
-                // 6. Atualizar timestamp de última sincronização
-                _uiState.update { it.copy(lastGoogleSyncTime = currentTime) }
-                
-                // 7. Verificar se há aniversários e criar alguns de exemplo se necessário
-                if (birthdayEvents == 0) {
-                    createSampleBirthdays()
-                }
-
-            } catch (e: Exception) {
-                Log.e("CalendarViewModel", "Error fetching Google Calendar events", e)
-                _uiState.update { it.copy(syncErrorMessage = getApplication<Application>().getString(com.mss.thebigcalendar.R.string.sync_failure_message)) }
-            } finally {
-                _uiState.update { it.copy(isSyncing = false) }
-            }
-        }
-    }
 
     private fun loadSettings() {
         viewModelScope.launch {
@@ -659,6 +535,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.primaryColor.collect { color ->
                 _uiState.update { it.copy(primaryColor = color) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.unfixHeadersOnScroll.collect { unfix ->
+                _uiState.update { it.copy(unfixHeadersOnScroll = unfix) }
             }
         }
         viewModelScope.launch {
@@ -716,6 +597,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.appIconMode.collect { mode ->
+                _uiState.update { it.copy(appIconMode = mode) }
+            }
+        }
+        viewModelScope.launch {
             // Observar o estado de login do Google e o nome de boas-vindas
             _uiState.collect { uiState ->
                 val googleAccount = uiState.googleSignInAccount
@@ -760,8 +646,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 updateAllDateDependentUI()
             }
         }
-        
-        loadInitialHolidaysAndSaints()
+
         
         // Aguardar tempo suficiente para garantir que a animação complete
         viewModelScope.launch {
@@ -814,21 +699,36 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun loadInitialHolidaysAndSaints() {
-        viewModelScope.launch {
-            val nationalHolidaysList = holidayRepository.getNationalHolidays()
-            val saintDaysList = withContext(Dispatchers.IO) { holidayRepository.getSaintDays() }
 
-            _uiState.update { currentState ->
-                currentState.copy(
-                    nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) },
-                    saintDays = saintDaysList.associateBy { it.date }
-                )
+
+    private var loadedHolidaysYear: Int? = null
+
+    private fun loadHolidaysForYear(year: Int) {
+        if (loadedHolidaysYear == year) return
+        loadedHolidaysYear = year
+        viewModelScope.launch {
+            try {
+                val nationalHolidaysList = mutableListOf<Holiday>().apply {
+                    addAll(holidayRepository.getNationalHolidays(year - 1))
+                    addAll(holidayRepository.getNationalHolidays(year))
+                    addAll(holidayRepository.getNationalHolidays(year + 1))
+                }
+                val commemorativeDatesList = mutableListOf<Holiday>().apply {
+                    addAll(holidayRepository.getCommemorativeDates(year - 1))
+                    addAll(holidayRepository.getCommemorativeDates(year))
+                    addAll(holidayRepository.getCommemorativeDates(year + 1))
+                }
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        nationalHolidays = nationalHolidaysList.associateBy { LocalDate.parse(it.date) },
+                        commemorativeDates = commemorativeDatesList.associateBy { LocalDate.parse(it.date) }
+                    )
+                }
+                clearCalendarCache()
+                updateAllDateDependentUI()
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao carregar feriados para o ano $year", e)
             }
-            // Limpar cache quando os feriados mudam
-            clearCalendarCache()
-            // Não chamar updateCalendarDays() aqui para evitar loop infinito
-            // updateCalendarDays() será chamado por updateAllDateDependentUI()
         }
     }
     
@@ -856,7 +756,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 // Coletar todas as atividades para este dia (incluindo repetitivas)
                 val allActivitiesForThisDay = mutableListOf<Activity>()
                 
-                val tasksForThisDay = if (state.filterOptions.showTasks || state.filterOptions.showEvents || state.filterOptions.showNotes || state.filterOptions.showBirthdays) {
+                val tasksForThisDay = if (state.filterOptions.showTasks || state.filterOptions.showEvents || state.filterOptions.showNotes || state.filterOptions.showBirthdays || state.filterOptions.showCommemorative) {
                     
                     state.activities.forEach { activity ->
                         try {
@@ -933,6 +833,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                     
+                    // Adicionar data comemorativa se aplicável
+                    val commemorativeDate = state.commemorativeDates[date]
+                    if (state.filterOptions.showCommemorative && commemorativeDate != null) {
+                        allActivitiesForThisDay.add(
+                            Activity(
+                                id = "commemorative_${commemorativeDate.name}_${date}",
+                                title = commemorativeDate.name,
+                                description = null,
+                                date = date.toString(),
+                                startTime = null,
+                                endTime = null,
+                                isAllDay = true,
+                                location = null,
+                                categoryColor = "#FF9800",
+                                activityType = ActivityType.COMMEMORATIVE,
+                                recurrenceRule = null
+                            )
+                        )
+                    }
+                    
                     // Incluir tarefas finalizadas na lista final se a opção estiver ativada
                     val finalTasksList = if (state.showCompletedActivities) {
                         allActivitiesForThisDay.sortedWith(compareByDescending<Activity> { it.categoryColor.toIntOrNull()
@@ -949,8 +869,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 val holidayForThisDay = if (state.filterOptions.showHolidays) state.nationalHolidays[date] else null
-                val saintDayForThisDay = if (state.filterOptions.showSaintDays) state.saintDays[date.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"))] else null
-                
                 // Buscar agendamentos JSON para este dia
                 val monthDay = date.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"))
                 val jsonHolidaysForThisDay = state.jsonHolidays[monthDay] ?: emptyList()
@@ -961,11 +879,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     isSelected = date.isEqual(state.selectedDate),
                     isToday = date.isEqual(LocalDate.now()),
                     tasks = tasksForThisDay,
-                    holiday = holidayForThisDay ?: saintDayForThisDay,
+                    holiday = holidayForThisDay,
                     jsonHolidays = jsonHolidaysForThisDay,
                     isWeekend = date.dayOfWeek == java.time.DayOfWeek.SATURDAY || date.dayOfWeek == java.time.DayOfWeek.SUNDAY,
                     isNationalHoliday = holidayForThisDay?.type == com.mss.thebigcalendar.data.model.HolidayType.NATIONAL,
-                    isSaintDay = state.filterOptions.showSaintDays && saintDayForThisDay != null,
                     isJsonHolidayDay = jsonHolidaysForThisDay.isNotEmpty()
                 )
             }
@@ -980,6 +897,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateTasksForSelectedDate() {
         val state = _uiState.value
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        
+        if (isDifferentMonth) {
+            _uiState.update { 
+                it.copy(
+                    tasksForSelectedDate = emptyList(),
+                    birthdaysForSelectedDate = emptyList(),
+                    notesForSelectedDate = emptyList()
+                ) 
+            }
+            updateJsonCalendarActivitiesForSelectedDate()
+            return
+        }
         
         // Separar aniversários das outras atividades usando cache
         val birthdays = if (state.filterOptions.showBirthdays) {
@@ -1100,6 +1031,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+
+
         
         // Filtrar atividades JSON importadas da seção "Agendamentos para..."
         val otherTasks = allTasksForSelectedDate
@@ -1130,7 +1063,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     private fun updateHolidaysForSelectedDate() {
         val state = _uiState.value
-        val holidays = if (state.filterOptions.showHolidays) {
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        val holidays = if (state.filterOptions.showHolidays && !isDifferentMonth) {
             state.nationalHolidays[state.selectedDate]?.let { listOf(it) } ?: emptyList()
         } else {
             emptyList()
@@ -1138,15 +1073,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(holidaysForSelectedDate = holidays) }
     }
 
-    private fun updateSaintDaysForSelectedDate() {
+
+
+    private fun updateCommemorativeDatesForSelectedDate() {
         val state = _uiState.value
-        val saints = if (state.filterOptions.showSaintDays) {
-            val monthDay = state.selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd"))
-            state.saintDays[monthDay]?.let { listOf(it) } ?: emptyList()
+        val isDifferentMonth = state.selectedDate.month != state.displayedYearMonth.month ||
+                state.selectedDate.year != state.displayedYearMonth.year
+        val commemoratives = if (state.filterOptions.showCommemorative && !isDifferentMonth) {
+            state.commemorativeDates[state.selectedDate]?.let { listOf(it) } ?: emptyList()
         } else {
             emptyList()
         }
-        _uiState.update { it.copy(saintDaysForSelectedDate = saints) }
+        _uiState.update { it.copy(commemorativeDatesForSelectedDate = commemoratives) }
     }
 
     private fun updateAllDateDependentUI() {
@@ -1158,8 +1096,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             delay(100) // Debounce de 100ms
             updateCalendarDays()
             updateTasksForSelectedDate()
+            updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
-            updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
     }
 
@@ -1263,7 +1202,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             updateTasksForSelectedDate()
             updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
-            updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
     }
     
@@ -1296,7 +1235,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             updateTasksForSelectedDate()
             updateJsonCalendarActivitiesForSelectedDate()
             updateHolidaysForSelectedDate()
-            updateSaintDaysForSelectedDate()
+            updateCommemorativeDatesForSelectedDate()
         }
 
         if (shouldOpenModal) {
@@ -1355,11 +1294,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     val currentFilters = _uiState.value.filterOptions
                     val newFilters = when (key) {
                         "showHolidays" -> currentFilters.copy(showHolidays = value)
-                        "showSaintDays" -> currentFilters.copy(showSaintDays = value)
                         "showEvents" -> currentFilters.copy(showEvents = value)
                         "showTasks" -> currentFilters.copy(showTasks = value)
                         "showNotes" -> currentFilters.copy(showNotes = value)
                         "showBirthdays" -> currentFilters.copy(showBirthdays = value)
+                        "showCommemorative" -> currentFilters.copy(showCommemorative = value)
                         else -> currentFilters
                     }
                     
@@ -1380,6 +1319,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun onThemeChange(newTheme: Theme) {
         viewModelScope.launch {
             settingsRepository.saveTheme(newTheme)
+        }
+    }
+
+    fun onAppIconModeChange(mode: AppIconMode) {
+        viewModelScope.launch {
+            settingsRepository.saveAppIconMode(mode)
         }
     }
 
@@ -2172,9 +2117,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
                 settingsRepository.saveBackupDirectoryUri(uri.toString())
                 _uiState.update { it.copy(needsBackupDirectorySelection = false) }
-
-                // Automatically trigger backup after directory is selected
-                onBackupRequest()
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Falha ao salvar o diretório de backup", e)
                 _uiState.update { it.copy(backupMessage = "Falha ao definir o diretório de backup.") }
@@ -2256,11 +2198,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         val currentVisibility = _uiState.value.sidebarFilterVisibility
         val newVisibility = when (filterKey) {
             "showHolidays" -> currentVisibility.copy(showHolidays = !currentVisibility.showHolidays)
-            "showSaintDays" -> currentVisibility.copy(showSaintDays = !currentVisibility.showSaintDays)
             "showEvents" -> currentVisibility.copy(showEvents = !currentVisibility.showEvents)
             "showTasks" -> currentVisibility.copy(showTasks = !currentVisibility.showTasks)
             "showBirthdays" -> currentVisibility.copy(showBirthdays = !currentVisibility.showBirthdays)
             "showNotes" -> currentVisibility.copy(showNotes = !currentVisibility.showNotes)
+            "showCommemorative" -> currentVisibility.copy(showCommemorative = !currentVisibility.showCommemorative)
             "showCompletedActivities" -> currentVisibility.copy(showCompletedTasks = !currentVisibility.showCompletedTasks)
             "showMoonPhases" -> currentVisibility.copy(showMoonPhases = !currentVisibility.showMoonPhases)
             else -> currentVisibility
@@ -2269,11 +2211,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         // Se a opção foi removida do sidebar (agora está false), também desativar o filtro
         val shouldDisableFilter = when (filterKey) {
             "showHolidays" -> !newVisibility.showHolidays && currentVisibility.showHolidays
-            "showSaintDays" -> !newVisibility.showSaintDays && currentVisibility.showSaintDays
             "showEvents" -> !newVisibility.showEvents && currentVisibility.showEvents
             "showTasks" -> !newVisibility.showTasks && currentVisibility.showTasks
             "showBirthdays" -> !newVisibility.showBirthdays && currentVisibility.showBirthdays
             "showNotes" -> !newVisibility.showNotes && currentVisibility.showNotes
+            "showCommemorative" -> !newVisibility.showCommemorative && currentVisibility.showCommemorative
             "showCompletedActivities" -> !newVisibility.showCompletedTasks && currentVisibility.showCompletedTasks
             "showMoonPhases" -> !newVisibility.showMoonPhases && currentVisibility.showMoonPhases
             else -> false
@@ -2346,6 +2288,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     
                         // Atualizar a atividade base com a nova lista de exclusões
                         activityRepository.saveActivity(updatedBaseActivity)
+                        
+                        // Cancelar a notificação para a instância específica concluída
+                        val notificationService = NotificationService(getApplication())
+                        notificationService.cancelNotification(activityId)
+                        
                         // Atualizar a UI
                         updateAllDateDependentUI()
                         
@@ -2391,6 +2338,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         
                         // Atualizar a atividade base com a nova lista de exclusões
                         activityRepository.saveActivity(updatedBaseActivity)
+
+                        // Cancelar a notificação para a primeira instância recorrente
+                        val notificationService = NotificationService(getApplication())
+                        val timeString = activityToComplete.startTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                        val instanceId = if (activityToComplete.recurrenceRule?.startsWith("FREQ=HOURLY") == true && timeString != null) {
+                            "${activityToComplete.id}_${activityToComplete.date}_$timeString"
+                        } else {
+                            "${activityToComplete.id}_${activityToComplete.date}"
+                        }
+                        notificationService.cancelNotification(instanceId)
 
                         // Atualizar a UI
                         updateAllDateDependentUI()
@@ -2544,7 +2501,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     // Funções de pesquisa
     fun onSearchQueryChange(query: String) {
-        println("🔍 Pesquisando por: '$query'")
         _uiState.update { it.copy(searchQuery = query) }
         
         if (query.isBlank()) {
@@ -2552,36 +2508,30 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             return
         }
         
-        // Verificar dados disponíveis
-        println("📊 Dados disponíveis para pesquisa:")
-        println("  - Atividades: ${_uiState.value.activities.size}")
-        println("  - Feriados nacionais: ${_uiState.value.nationalHolidays.size}")
-        println("  - Dias de santos: ${_uiState.value.saintDays.size}")
-        println("  - Datas comemorativas: ${_uiState.value.commemorativeDates.size}")
-        
-        // Realizar pesquisa
-        val results = searchService.search(
-            query = query,
-            activities = _uiState.value.activities,
-            nationalHolidays = _uiState.value.nationalHolidays,
-            saintDays = _uiState.value.saintDays,
-            commemorativeDates = _uiState.value.commemorativeDates
-        )
-        
-        println("🔍 Resultados encontrados: ${results.size}")
-        results.forEach { result ->
-            println("  - ${result.title} (${result.type})")
+        viewModelScope.launch {
+            try {
+                val allActivities = activityRepository.activities.first()
+                val results = searchService.search(
+                    query = query,
+                    activities = allActivities,
+                    nationalHolidays = _uiState.value.nationalHolidays,
+                    commemorativeDates = _uiState.value.commemorativeDates
+                )
+                _uiState.update { it.copy(searchResults = results) }
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao realizar busca", e)
+            }
         }
-        
-        _uiState.update { it.copy(searchResults = results) }
     }
 
     fun onSearchResultClick(result: SearchResult) {
         println("🎯 Resultado selecionado: ${result.title} (${result.type})")
         result.date?.let { targetDate ->
             println("📅 Navegando para data: $targetDate")
-            // Navegar para o mês da data encontrada
+            val currentState = _uiState.value
             val targetYearMonth = java.time.YearMonth.from(targetDate)
+            val monthChanged = currentState.displayedYearMonth != targetYearMonth
+            
             _uiState.update { 
                 it.copy(
                     displayedYearMonth = targetYearMonth,
@@ -2589,8 +2539,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 )
             }
             
-            // Atualizar a UI para mostrar o mês correto
-            updateAllDateDependentUI()
+            if (monthChanged) {
+                updateActivitiesForNewMonth(targetYearMonth)
+            } else {
+                updateAllDateDependentUI()
+            }
         }
         
         // Limpar pesquisa
@@ -2793,14 +2746,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun forceGoogleSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
-            fetchGoogleCalendarEvents(account, forceSync = true)
+            performProgressiveSync(account, forceFullSync = true)
         }
     }
     
     fun manualGoogleSync() {
         val account = _uiState.value.googleSignInAccount
         if (account != null) {
-            fetchGoogleCalendarEvents(account, forceSync = true)
+            performProgressiveSync(account, forceFullSync = true)
+        }
+    }
+    
+    fun syncGoogleCalendarSimple() {
+        val account = _uiState.value.googleSignInAccount
+        if (account != null) {
+            performProgressiveSync(account, forceFullSync = false)
         }
     }
     
@@ -3057,20 +3017,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val directoryUriString = _uiState.value.backupDirectoryUri
             if (directoryUriString.isNullOrBlank()) {
-                _uiState.update { it.copy(backupFiles = emptyList()) }
+                _uiState.update { it.copy(backupFiles = emptyList(), isListingLocalBackups = false) }
                 return@launch
             }
 
+            _uiState.update { it.copy(isListingLocalBackups = true) }
             try {
                 val directoryUri = Uri.parse(directoryUriString)
                 val backupDocumentFiles = backupService.listBackupFiles(directoryUri)
                 val backupInfos = backupDocumentFiles.mapNotNull { file ->
                     backupService.getBackupInfo(file).getOrNull()
                 }
-                _uiState.update { it.copy(backupFiles = backupInfos) }
+                _uiState.update { it.copy(backupFiles = backupInfos, isListingLocalBackups = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro ao carregar arquivos de backup via SAF", e)
-                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.") }
+                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.", isListingLocalBackups = false) }
             }
         }
     }
@@ -3096,6 +3057,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(
                     backupMessage = null,
                     isRestoringBackup = true,
+                    localBackupUriBeingRestored = backupUri,
                     restoreProgress = 0f
                 ) }
 
@@ -3114,25 +3076,43 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         result.completedActivities.forEach { activity -> completedActivityRepository.addCompletedActivity(activity) }
                         _uiState.update { it.copy(restoreProgress = 0.8f) }
 
+                        // Salvar e agendar os alarmes restaurados
+                        val notificationService = NotificationService(getApplication())
+                        val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                            getApplication(),
+                            alarmRepository,
+                            notificationService
+                        )
+                        result.alarms.forEach { alarm ->
+                            alarmRepository.saveAlarm(alarm)
+                            if (alarm.isEnabled) {
+                                alarmService.scheduleAlarm(alarm)
+                            }
+                        }
+
                         _uiState.update { it.copy(backupMessage = "Backup restaurado com sucesso!") }
 
                         loadData()
                         loadBackupFiles()
                         _uiState.update { it.copy(restoreProgress = 0.9f) }
 
-                        val notificationService = NotificationService(getApplication())
                         result.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
 
                         viewModelScope.launch {
                             delay(500)
                             notifyWidgetsDataChanged()
-                            _uiState.update { it.copy(isRestoringBackup = false, restoreProgress = 1f) }
+                            _uiState.update { it.copy(
+                                isRestoringBackup = false,
+                                localBackupUriBeingRestored = null,
+                                restoreProgress = 1f
+                            ) }
                         }
                     },
                     onFailure = { exception ->
                         _uiState.update { it.copy(
                             backupMessage = "Erro ao restaurar backup: ${exception.message}",
-                            isRestoringBackup = false
+                            isRestoringBackup = false,
+                            localBackupUriBeingRestored = null
                         ) }
                     }
                 )
@@ -3140,17 +3120,27 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 _uiState.update { it.copy(
                     backupMessage = "Erro inesperado: ${e.message}",
-                    isRestoringBackup = false
+                    isRestoringBackup = false,
+                    localBackupUriBeingRestored = null
                 ) }
             }
         }
     }
     
-    /**
-     * Limpa todos os dados atuais antes da restauração
-     */
     private suspend fun clearAllCurrentData() {
         try {
+            // Cancelar alarmes existentes e limpar o repositório de alarmes
+            val alarmService = com.mss.thebigcalendar.service.AlarmService(
+                getApplication(),
+                alarmRepository,
+                NotificationService(getApplication())
+            )
+            val currentAlarms = alarmRepository.getAllAlarms()
+            currentAlarms.forEach { alarm ->
+                alarmService.cancelAlarm(alarm.id)
+            }
+            alarmRepository.clearAllAlarms()
+
             // Limpar todas as atividades
             val currentActivities = activityRepository.activities.first()
             currentActivities.forEach { activity ->
@@ -3210,23 +3200,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 val uri = currentState.selectedJsonUri
                 
                 if (fileName != null && uri != null) {
-                    // Criar e salvar o calendário JSON
-                    val jsonCalendar = JsonCalendar(
-                        id = UUID.randomUUID().toString(),
-                        title = title,
-                        color = color,
-                        fileName = fileName,
-                        importDate = System.currentTimeMillis(),
-                        isVisible = true
-                    )
-                    
-                    // Salvar o calendário JSON
-                    jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
-                    
-                    // Processar o arquivo JSON
+                    // Processar o arquivo JSON (salva atividades e depois o calendário)
                     processJsonFile(fileName, uri, title, color)
                 } else if (jsonContent.isNotBlank()) {
-                    // Processar conteúdo JSON digitado diretamente
+                    // Processar conteúdo JSON digitado diretamente (salva atividades e depois o calendário)
                     processJsonContent(jsonContent, title, color)
                 } else {
                     Log.e(TAG, "Nem arquivo nem conteúdo JSON fornecidos")
@@ -3295,14 +3272,22 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             
             // Converter para Activities
             val activities = schedules.map { jsonSchedule ->
-                jsonSchedule.toActivity(2025, calendarTitle, calendarColor)
+                jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
             }
             
-            // Salvar no banco de dados
-            activities.forEach { activity ->
-                activityRepository.saveActivity(activity)
-            }
+            // 1. Salvar no banco de dados primeiro!
+            activityRepository.saveAllActivities(activities)
             
+            // 2. Criar e salvar o calendário JSON depois, para que ao disparar o collect as atividades já existam
+            val jsonCalendar = JsonCalendar(
+                id = UUID.randomUUID().toString(),
+                title = calendarTitle,
+                color = calendarColor,
+                fileName = fileName,
+                importDate = System.currentTimeMillis(),
+                isVisible = true
+            )
+            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Recarregar atividades para atualizar a UI
             loadActivitiesForCurrentMonth()
@@ -3324,18 +3309,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private suspend fun processJsonContent(jsonContent: String, calendarTitle: String, calendarColor: androidx.compose.ui.graphics.Color) {
         try {
             
-            // Criar e salvar o calendário JSON
-            val jsonCalendar = JsonCalendar(
-                id = UUID.randomUUID().toString(),
-                title = calendarTitle,
-                color = calendarColor,
-                fileName = "conteudo_digitado.json",
-                importDate = System.currentTimeMillis(),
-                isVisible = true
-            )
             
-            // Salvar o calendário JSON
-            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Fazer parse do JSON
             Log.d(TAG, "JSON string length: ${jsonContent.length}")
@@ -3379,14 +3353,22 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             
             // Converter para Activities
             val activities = schedules.map { jsonSchedule ->
-                jsonSchedule.toActivity(2025, calendarTitle, calendarColor)
+                jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
             }
             
-            // Salvar no banco de dados
-            activities.forEach { activity ->
-                activityRepository.saveActivity(activity)
-            }
+            // 1. Salvar no banco de dados primeiro!
+            activityRepository.saveAllActivities(activities)
             
+            // 2. Criar e salvar o calendário JSON depois
+            val jsonCalendar = JsonCalendar(
+                id = UUID.randomUUID().toString(),
+                title = calendarTitle,
+                color = calendarColor,
+                fileName = "conteudo_digitado.json",
+                importDate = System.currentTimeMillis(),
+                isVisible = true
+            )
+            jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
             
             // Recarregar atividades para atualizar a UI
             loadActivitiesForCurrentMonth()
@@ -3479,6 +3461,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
         
         _uiState.update { it.copy(jsonHolidays = jsonHolidaysMap) }
+        updateAllDateDependentUI()
     }
     
     /**
@@ -3500,10 +3483,13 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         return@filter false
                     }
                     
-                    // Comparar cores usando strings para evitar problemas de precisão
+                    // Comparar por título/location (preferencial) ou cor
+                    val matchesLocation = activity.location == "JSON_IMPORTED_${calendar.title}"
                     val activityColorString = activity.categoryColor
                     val calendarColorString = String.format("#%08X", calendar.color.toArgb())
-                    activityColorString == calendarColorString
+                    val matchesColor = activityColorString.equals(calendarColorString, ignoreCase = true)
+                    
+                    matchesLocation || matchesColor
                 } catch (e: Exception) {
                     false
                 }
@@ -3522,7 +3508,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         val selectedDate = currentState.selectedDate
         val visibleJsonCalendars = currentState.jsonCalendars.filter { it.isVisible }
         
-        
         val jsonCalendarActivities = mutableMapOf<String, List<Activity>>()
         
         visibleJsonCalendars.forEach { jsonCalendar ->
@@ -3530,7 +3515,6 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             // Filtrar atividades que pertencem a este calendário JSON
             val calendarActivities = currentState.activities.filter { activity ->
                 // Verificar se a atividade pertence a este calendário JSON
-                // Podemos identificar pela cor ou por algum campo específico
                 val activityColor = try {
                     Color(android.graphics.Color.parseColor(activity.categoryColor))
                 } catch (e: Exception) {
@@ -3544,9 +3528,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
                 
                 val isJsonImported = activity.location?.startsWith("JSON_IMPORTED_") == true
-                val dateMatches = activityDate?.isEqual(selectedDate) == true
+                val dateMatches = activityDate != null && 
+                                  activityDate.month == selectedDate.month && 
+                                  activityDate.dayOfMonth == selectedDate.dayOfMonth
                 val colorMatches = activityColor == jsonCalendar.color
-                
                 
                 dateMatches && colorMatches && activity.showInCalendar && isJsonImported
             }
@@ -3645,6 +3630,213 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             
         } catch (e: Exception) {
             Log.e("CalendarViewModel", "Erro ao limpar atividades JSON antigas", e)
+        }
+    }
+
+    fun importPredefinedMilitaryCalendar() {
+        viewModelScope.launch {
+            try {
+                val alreadyImported = jsonCalendarRepository.getAllJsonCalendars().first().any { it.id == "PREDEFINED_MILITARY_HOLIDAYS" }
+                if (alreadyImported) return@launch
+                
+                val context = getApplication<Application>()
+                val rawId = context.resources.getIdentifier("military_holidays", "raw", context.packageName)
+                if (rawId == 0) {
+                    Log.e(TAG, "Recurso raw/military_holidays não encontrado")
+                    return@launch
+                }
+                val inputStream = context.resources.openRawResource(rawId)
+                val jsonString = inputStream.use { it.bufferedReader().readText() }
+                
+                val calendarTitle = getApplication<Application>().getString(R.string.military_holidays)
+                val calendarColor = androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                
+                val jsonArray = JSONArray(jsonString)
+                val schedules = mutableListOf<JsonSchedule>()
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val name = jsonObject.getString("name")
+                    val date = jsonObject.getString("date")
+                    val summary = try {
+                        jsonObject.optString("summary", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val wikipediaLink = try {
+                        jsonObject.optString("wikipediaLink", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    schedules.add(JsonSchedule(name, date, summary, wikipediaLink))
+                }
+                
+                val activities = schedules.map { jsonSchedule ->
+                    jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
+                }
+                
+                // 1. Salvar no banco de dados primeiro!
+                activityRepository.saveAllActivities(activities)
+                
+                // 2. Salvar o calendário depois
+                val jsonCalendar = JsonCalendar(
+                    id = "PREDEFINED_MILITARY_HOLIDAYS",
+                    title = calendarTitle,
+                    color = calendarColor,
+                    fileName = "military_holidays.json",
+                    importDate = System.currentTimeMillis(),
+                    isVisible = true
+                )
+                jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
+                
+                // Recarregar atividades para atualizar a UI
+                loadActivitiesForCurrentMonth()
+                updateJsonCalendarActivitiesForSelectedDate()
+                
+                viewModelScope.launch {
+                    delay(500)
+                    notifyWidgetsDataChanged()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao importar feriados militares predefinidos", e)
+            }
+        }
+    }
+
+    fun importPredefinedSaintsCalendar() {
+        viewModelScope.launch {
+            try {
+                val alreadyImported = jsonCalendarRepository.getAllJsonCalendars().first().any { it.id == "PREDEFINED_SAINTS" }
+                if (alreadyImported) return@launch
+                
+                val context = getApplication<Application>()
+                val rawId = context.resources.getIdentifier("saints_data", "raw", context.packageName)
+                if (rawId == 0) {
+                    Log.e(TAG, "Recurso raw/saints_data não encontrado")
+                    return@launch
+                }
+                val inputStream = context.resources.openRawResource(rawId)
+                val jsonString = inputStream.use { it.bufferedReader().readText() }
+                
+                val calendarTitle = getApplication<Application>().getString(R.string.catholic_saint_days)
+                val calendarColor = androidx.compose.ui.graphics.Color(0xFFFFA000)
+                
+                val jsonArray = JSONArray(jsonString)
+                val schedules = mutableListOf<JsonSchedule>()
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val name = jsonObject.getString("name")
+                    val date = jsonObject.getString("date")
+                    val summary = try {
+                        jsonObject.optString("summary", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val wikipediaLink = try {
+                        jsonObject.optString("wikipediaLink", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    schedules.add(JsonSchedule(name, date, summary, wikipediaLink))
+                }
+                
+                val activities = schedules.map { jsonSchedule ->
+                    jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
+                }
+                
+                // 1. Salvar no banco de dados primeiro!
+                activityRepository.saveAllActivities(activities)
+                
+                // 2. Salvar o calendário depois
+                val jsonCalendar = JsonCalendar(
+                    id = "PREDEFINED_SAINTS",
+                    title = calendarTitle,
+                    color = calendarColor,
+                    fileName = "saints_data.json",
+                    importDate = System.currentTimeMillis(),
+                    isVisible = true
+                )
+                jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
+                
+                // Recarregar atividades para atualizar a UI
+                loadActivitiesForCurrentMonth()
+                updateJsonCalendarActivitiesForSelectedDate()
+                
+                viewModelScope.launch {
+                    delay(500)
+                    notifyWidgetsDataChanged()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao importar santos católicos predefinidos", e)
+            }
+        }
+    }
+
+    fun importPredefinedProfessionalDaysCalendar() {
+        viewModelScope.launch {
+            try {
+                val alreadyImported = jsonCalendarRepository.getAllJsonCalendars().first().any { it.id == "PREDEFINED_PROFESSIONAL_DAYS" }
+                if (alreadyImported) return@launch
+                
+                val context = getApplication<Application>()
+                val rawId = context.resources.getIdentifier("professional_days", "raw", context.packageName)
+                if (rawId == 0) {
+                    Log.e(TAG, "Recurso raw/professional_days não encontrado")
+                    return@launch
+                }
+                val inputStream = context.resources.openRawResource(rawId)
+                val jsonString = inputStream.use { it.bufferedReader().readText() }
+                
+                val calendarTitle = getApplication<Application>().getString(R.string.professional_days)
+                val calendarColor = androidx.compose.ui.graphics.Color(0xFF1976D2)
+                
+                val jsonArray = JSONArray(jsonString)
+                val schedules = mutableListOf<JsonSchedule>()
+                for (i in 0 until jsonArray.length()) {
+                    val jsonObject = jsonArray.getJSONObject(i)
+                    val name = jsonObject.getString("name")
+                    val date = jsonObject.getString("date")
+                    val summary = try {
+                        jsonObject.optString("summary", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    val wikipediaLink = try {
+                        jsonObject.optString("wikipediaLink", null).takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    schedules.add(JsonSchedule(name, date, summary, wikipediaLink))
+                }
+                
+                val activities = schedules.map { jsonSchedule ->
+                    jsonSchedule.toActivity(java.time.LocalDate.now().year, calendarTitle, calendarColor)
+                }
+                
+                // 1. Salvar no banco de dados primeiro!
+                activityRepository.saveAllActivities(activities)
+                
+                // 2. Salvar o calendário depois
+                val jsonCalendar = JsonCalendar(
+                    id = "PREDEFINED_PROFESSIONAL_DAYS",
+                    title = calendarTitle,
+                    color = calendarColor,
+                    fileName = "professional_days.json",
+                    importDate = System.currentTimeMillis(),
+                    isVisible = true
+                )
+                jsonCalendarRepository.saveJsonCalendar(jsonCalendar)
+                
+                // Recarregar atividades para atualizar a UI
+                loadActivitiesForCurrentMonth()
+                updateJsonCalendarActivitiesForSelectedDate()
+                
+                viewModelScope.launch {
+                    delay(500)
+                    notifyWidgetsDataChanged()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao importar datas profissionais predefinidas", e)
+            }
         }
     }
 
