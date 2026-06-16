@@ -27,7 +27,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debian Package
-        run: ./gradlew :desktop:packageDeb
+        run: |
+          sed -i '/org.gradle.java.home/d' gradle.properties
+          ./gradlew :desktop:packageDeb
 
       - name: Upload DEB to GitHub Release
         uses: softprops/action-gh-release@v2
