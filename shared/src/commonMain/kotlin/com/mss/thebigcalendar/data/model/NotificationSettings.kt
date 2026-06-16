@@ -1,12 +1,15 @@
 package com.mss.thebigcalendar.data.model
 
 import java.time.LocalTime
+import kotlinx.serialization.Serializable
 
 /**
  * Configurações de notificação para uma atividade
  */
+@Serializable
 data class NotificationSettings(
     val isEnabled: Boolean = false,
+    @Serializable(with = LocalTimeSerializer::class)
     val notificationTime: LocalTime? = null,
     val notificationType: NotificationType = NotificationType.BEFORE_ACTIVITY,
     val customMinutesBefore: Int? = null
@@ -15,6 +18,7 @@ data class NotificationSettings(
 /**
  * Tipos de notificação disponíveis
  */
+@Serializable
 enum class NotificationType(val displayName: String, val minutesBefore: Int?) {
     NONE("Sem notificação", null),
     BEFORE_ACTIVITY("Antes da atividade", 0),

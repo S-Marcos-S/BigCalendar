@@ -1,0 +1,329 @@
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.mss.thebigcalendar.data.getDataStoreProvider
+import com.mss.thebigcalendar.data.model.Activity
+import com.mss.thebigcalendar.data.model.ActivityType
+import com.mss.thebigcalendar.data.model.Holiday
+import com.mss.thebigcalendar.data.model.HolidayType
+import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.VisibilityLevel
+import com.mss.thebigcalendar.data.model.NotificationSettings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.YearMonth
+import java.util.UUID
+
+@Serializable
+data class DesktopFilterOptions(
+    val showHolidays: Boolean = true,
+    val showSaintDays: Boolean = false,
+    val showEvents: Boolean = true,
+    val showTasks: Boolean = true,
+    val showNotes: Boolean = true,
+    val showBirthdays: Boolean = true,
+    val showProfessionalDays: Boolean = false,
+    val showMilitaryHolidays: Boolean = false
+)
+
+data class DesktopUiState(
+    val displayedYearMonth: YearMonth = YearMonth.now(),
+    val selectedDate: LocalDate = LocalDate.now(),
+    val activities: List<Activity> = emptyList(),
+    val filterOptions: DesktopFilterOptions = DesktopFilterOptions(),
+    val theme: Theme = Theme.SYSTEM,
+    val pureBlackTheme: Boolean = false,
+    val welcomeName: String = "Usuário",
+    val searchQuery: String = "",
+    val activityToEdit: Activity? = null,
+    val showSettings: Boolean = false
+)
+
+class DesktopCalendarViewModel(private val scope: CoroutineScope) {
+
+    private val dataStore = getDataStoreProvider().create("desktop_calendar_settings")
+
+    private val _uiState = MutableStateFlow(DesktopUiState())
+    val uiState: StateFlow<DesktopUiState> = _uiState.asStateFlow()
+
+    // Chaves do DataStore
+    private val KEY_ACTIVITIES = stringPreferencesKey("activities")
+    private val KEY_THEME = stringPreferencesKey("theme")
+    private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black_theme")
+    private val KEY_WELCOME_NAME = stringPreferencesKey("welcome_name")
+    private val KEY_FILTERS = stringPreferencesKey("filters")
+
+    // Listas pré-carregadas de feriados e datas especiais
+    var nationalHolidays: List<Holiday> = emptyList()
+        private set
+    var saintDays: List<Holiday> = emptyList()
+        private set
+    var professionalDays: List<Holiday> = emptyList()
+        private set
+    var militaryHolidays: List<Holiday> = emptyList()
+        private set
+    var commemorativeDates: List<Holiday> = emptyList()
+        private set
+
+    init {
+        loadPredefinedData()
+        loadData()
+    }
+
+    private fun loadPredefinedData() {
+        // Feriados Nacionais fixos
+        nationalHolidays = listOf(
+            Holiday("Confraternização Universal", "01-01", HolidayType.NATIONAL, "Ano Novo - Celebração universal do início do ano civil."),
+            Holiday("Carnaval", "03-03", HolidayType.NATIONAL, "Carnaval - Ponto facultativo / Festividade nacional."),
+            Holiday("Carnaval", "03-04", HolidayType.NATIONAL, "Carnaval - Terça-feira de Carnaval."),
+            Holiday("Paixão de Cristo", "04-18", HolidayType.NATIONAL, "Sexta-feira Santa - Celebração religiosa cristã."),
+            Holiday("Tiradentes", "04-21", HolidayType.NATIONAL, "Homenagem a Joaquim José da Silva Xavier (Tiradentes), mártir da Inconfidência Mineira."),
+            Holiday("Dia do Trabalho", "05-01", HolidayType.NATIONAL, "Dia do Trabalhador - Celebração dos direitos trabalhistas."),
+            Holiday("Corpus Christi", "06-19", HolidayType.NATIONAL, "Corpus Christi - Celebração religiosa católica."),
+            Holiday("Independência do Brasil", "09-07", HolidayType.NATIONAL, "Proclamação da Independência do Brasil em relação a Portugal (1822)."),
+            Holiday("Nossa Sr.a Aparecida - Padroeira do Brasil", "10-12", HolidayType.NATIONAL, "Dia das Crianças / Dia de Nossa Senhora Aparecida, padroeira do país."),
+            Holiday("Finados", "11-02", HolidayType.NATIONAL, "Dia de Finados - Dia de recordação dos fiéis falecidos."),
+            Holiday("Proclamação da República", "11-15", HolidayType.NATIONAL, "Proclamação da República Brasileira (1889)."),
+            Holiday("Dia Nacional de Zumbi e da Consciência Negra", "11-20", HolidayType.NATIONAL, "Homenagem a Zumbi dos Palmares e reflexão sobre a cultura e inserção negra."),
+            Holiday("Natal", "12-25", HolidayType.NATIONAL, "Celebração cristã do nascimento de Jesus Cristo.")
+        )
+
+        // Datas comemorativas
+        commemorativeDates = listOf(
+            Holiday("Dia Internacional da Mulher", "03-08", HolidayType.COMMEMORATIVE, "Celebração das conquistas sociais, políticas e econômicas das mulheres."),
+            Holiday("Dia das Mães", "05-11", HolidayType.COMMEMORATIVE, "Homenagem especial a todas as mães."),
+            Holiday("Dia dos Namorados", "06-12", HolidayType.COMMEMORATIVE, "Celebração do amor e da união entre casais."),
+            Holiday("Dia do Amigo", "07-20", HolidayType.COMMEMORATIVE, "Celebração da amizade."),
+            Holiday("Dia dos Pais", "08-10", HolidayType.COMMEMORATIVE, "Homenagem especial a todos os pais."),
+            Holiday("Dia das Crianças", "10-12", HolidayType.COMMEMORATIVE, "Celebração da infância e direitos da criança.")
+        )
+
+        // Carregar do classpath
+        saintDays = parsePredefinedJson("saints_data.json", HolidayType.SAINT)
+        professionalDays = parsePredefinedJson("professional_days.json", HolidayType.JSON_IMPORT)
+        militaryHolidays = parsePredefinedJson("military_holidays.json", HolidayType.JSON_IMPORT)
+    }
+
+    private fun parsePredefinedJson(fileName: String, type: HolidayType): List<Holiday> {
+        return try {
+            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(fileName)
+                ?: return emptyList()
+            val jsonString = stream.bufferedReader().use { it.readText() }
+            
+            val items = Json { ignoreUnknownKeys = true }.decodeFromString<List<JsonPredefinedItem>>(jsonString)
+            items.map {
+                Holiday(
+                    name = it.name,
+                    date = it.date,
+                    type = type,
+                    summary = it.summary,
+                    wikipediaLink = it.wikipediaLink
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    @Serializable
+    private data class JsonPredefinedItem(
+        val name: String,
+        val date: String,
+        val summary: String? = null,
+        val wikipediaLink: String? = null
+    )
+
+    private fun loadData() {
+        scope.launch {
+            dataStore.data.catch { e ->
+                e.printStackTrace()
+            }.collect { preferences ->
+                val themeStr = preferences[KEY_THEME] ?: "SYSTEM"
+                val theme = try { Theme.valueOf(themeStr) } catch(e: Exception) { Theme.SYSTEM }
+                val pureBlack = preferences[KEY_PURE_BLACK] ?: false
+                val welcomeName = preferences[KEY_WELCOME_NAME] ?: "Usuário"
+                
+                val filterStr = preferences[KEY_FILTERS]
+                val filters = if (filterStr != null) {
+                    try {
+                        Json.decodeFromString<DesktopFilterOptions>(filterStr)
+                    } catch(e: Exception) {
+                        DesktopFilterOptions()
+                    }
+                } else {
+                    DesktopFilterOptions()
+                }
+
+                val activitiesStr = preferences[KEY_ACTIVITIES]
+                val activitiesList = if (activitiesStr != null) {
+                    try {
+                        Json.decodeFromString<List<Activity>>(activitiesStr)
+                    } catch(e: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+
+                _uiState.update {
+                    it.copy(
+                        theme = theme,
+                        pureBlackTheme = pureBlack,
+                        welcomeName = welcomeName,
+                        filterOptions = filters,
+                        activities = activitiesList
+                    )
+                }
+            }
+        }
+    }
+
+    private fun saveData() {
+        scope.launch {
+            dataStore.edit { preferences ->
+                preferences[KEY_THEME] = _uiState.value.theme.name
+                preferences[KEY_PURE_BLACK] = _uiState.value.pureBlackTheme
+                preferences[KEY_WELCOME_NAME] = _uiState.value.welcomeName
+                preferences[KEY_FILTERS] = Json.encodeToString(_uiState.value.filterOptions)
+                preferences[KEY_ACTIVITIES] = Json.encodeToString(_uiState.value.activities)
+            }
+        }
+    }
+
+    fun selectDate(date: LocalDate) {
+        _uiState.update { it.copy(selectedDate = date) }
+    }
+
+    fun updateDisplayedMonth(offset: Int) {
+        _uiState.update {
+            val newMonth = it.displayedYearMonth.plusMonths(offset.toLong())
+            it.copy(displayedYearMonth = newMonth)
+        }
+    }
+
+    fun setDisplayedMonth(yearMonth: YearMonth) {
+        _uiState.update { it.copy(displayedYearMonth = yearMonth) }
+    }
+
+    fun addOrUpdateActivity(
+        title: String,
+        description: String?,
+        date: String,
+        startTime: LocalTime?,
+        endTime: LocalTime?,
+        isAllDay: Boolean,
+        categoryColor: String,
+        type: ActivityType
+    ) {
+        val currentList = _uiState.value.activities.toMutableList()
+        val editingActivity = _uiState.value.activityToEdit
+
+        if (editingActivity != null) {
+            val updated = editingActivity.copy(
+                title = title,
+                description = description,
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                isAllDay = isAllDay,
+                categoryColor = categoryColor,
+                activityType = type
+            )
+            val index = currentList.indexOfFirst { it.id == editingActivity.id }
+            if (index != -1) {
+                currentList[index] = updated
+            }
+        } else {
+            val newActivity = Activity(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                description = description,
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                isAllDay = isAllDay,
+                location = null,
+                categoryColor = categoryColor,
+                activityType = type,
+                recurrenceRule = null
+            )
+            currentList.add(newActivity)
+        }
+
+        _uiState.update { it.copy(activities = currentList, activityToEdit = null) }
+        saveData()
+    }
+
+    fun deleteActivity(id: String) {
+        val currentList = _uiState.value.activities.filter { it.id != id }
+        _uiState.update { it.copy(activities = currentList) }
+        saveData()
+    }
+
+    fun toggleActivityCompletion(activity: Activity) {
+        val currentList = _uiState.value.activities.map {
+            if (it.id == activity.id) {
+                it.copy(isCompleted = !it.isCompleted)
+            } else {
+                it
+            }
+        }
+        _uiState.update { it.copy(activities = currentList) }
+        saveData()
+    }
+
+    fun setActivityToEdit(activity: Activity?) {
+        _uiState.update { it.copy(activityToEdit = activity) }
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun setWelcomeName(name: String) {
+        _uiState.update { it.copy(welcomeName = name) }
+        saveData()
+    }
+
+    fun setTheme(theme: Theme) {
+        _uiState.update { it.copy(theme = theme) }
+        saveData()
+    }
+
+    fun setPureBlackTheme(enabled: Boolean) {
+        _uiState.update { it.copy(pureBlackTheme = enabled) }
+        saveData()
+    }
+
+    fun setShowSettings(show: Boolean) {
+        _uiState.update { it.copy(showSettings = show) }
+    }
+
+    fun toggleFilter(type: String) {
+        val current = _uiState.value.filterOptions
+        val updated = when(type) {
+            "holidays" -> current.copy(showHolidays = !current.showHolidays)
+            "saintDays" -> current.copy(showSaintDays = !current.showSaintDays)
+            "events" -> current.copy(showEvents = !current.showEvents)
+            "tasks" -> current.copy(showTasks = !current.showTasks)
+            "notes" -> current.copy(showNotes = !current.showNotes)
+            "birthdays" -> current.copy(showBirthdays = !current.showBirthdays)
+            "professionalDays" -> current.copy(showProfessionalDays = !current.showProfessionalDays)
+            "militaryHolidays" -> current.copy(showMilitaryHolidays = !current.showMilitaryHolidays)
+            else -> current
+        }
+        _uiState.update { it.copy(filterOptions = updated) }
+        saveData()
+    }
+}

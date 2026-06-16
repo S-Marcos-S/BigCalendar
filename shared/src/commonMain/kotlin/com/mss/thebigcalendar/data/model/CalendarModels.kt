@@ -4,7 +4,9 @@ import androidx.compose.runtime.Immutable
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ActivityType {
     EVENT,
     TASK,
@@ -12,25 +14,29 @@ enum class ActivityType {
     BIRTHDAY
 }
 
+@Serializable
 enum class VisibilityLevel {
     LOW,    // Baixa
     MEDIUM, // Média
     HIGH    // Alta
 }
 
+@Serializable
 data class Activity(
     val id: String,
     val title: String,
     val description: String?,
     val date: String, // "yyyy-MM-dd"
+    @Serializable(with = LocalTimeSerializer::class)
     val startTime: LocalTime?,
+    @Serializable(with = LocalTimeSerializer::class)
     val endTime: LocalTime?,
     val isAllDay: Boolean,
     val location: String?,
     val categoryColor: String,
     val activityType: ActivityType,
     val recurrenceRule: String?,
-    // Move logic related to NotificationSettings if it's too platform-specific
+    val notificationSettings: NotificationSettings = NotificationSettings(),
     val isCompleted: Boolean = false,
     val visibility: VisibilityLevel = VisibilityLevel.LOW,
     val showInCalendar: Boolean = true,
