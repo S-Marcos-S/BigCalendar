@@ -35,6 +35,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -366,6 +368,7 @@ enum class OnboardingStep {
     CHECK_BACKUP,
     RESTORE_BACKUP_PROMPT,
     RESTORE_LOCAL_BACKUP_PROMPT,
+    CRASH_REPORT_CONSENT,
     COMPLETED
 }
 
@@ -745,6 +748,114 @@ fun RestoreLocalBackupPromptDialog(
 }
 
 /**
+ * Composable para a janela de consentimento de envio de relatórios de erros
+ */
+@Composable
+fun CrashlyticsConsentDialog(
+    initialEnabled: Boolean = true,
+    onComplete: (Boolean) -> Unit
+) {
+    var isEnabled by remember { mutableStateOf(initialEnabled) }
+    
+    Dialog(
+        onDismissRequest = { onComplete(isEnabled) },
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Ícone/Emoji
+                Text(
+                    text = "📊",
+                    fontSize = 48.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                // Título
+                Text(
+                    text = stringResource(R.string.crashlytics_setting_title),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                // Descrição
+                Text(
+                    text = stringResource(R.string.onboarding_crash_desc),
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+                
+                // Opção (Switch)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable { isEnabled = !isEnabled }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.crashlytics_setting_title),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.crashlytics_setting_description),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { isEnabled = it }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Botão Concluir
+                Button(
+                    onClick = { onComplete(isEnabled) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_restore_local_finish),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Composable para gerenciar o fluxo de onboarding
  */
 @Composable
@@ -766,7 +877,9 @@ fun OnboardingFlow(
     localBackupUriBeingRestored: String? = null,
     onBackupDirectorySelected: (Uri) -> Unit = {},
     onRestoreLocalBackup: (String) -> Unit = {},
-    onLoadLocalBackups: () -> Unit = {}
+    onLoadLocalBackups: () -> Unit = {},
+    isCrashlyticsEnabled: Boolean = false,
+    onCrashlyticsToggle: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val onboardingManager = remember { OnboardingManager(context) }
@@ -838,9 +951,7 @@ fun OnboardingFlow(
             if (cloudBackupFiles.isNotEmpty()) {
                 currentStep = OnboardingStep.RESTORE_BACKUP_PROMPT
             } else {
-                currentStep = OnboardingStep.COMPLETED
-                onboardingManager.markOnboardingCompleted()
-                onComplete()
+                currentStep = OnboardingStep.CRASH_REPORT_CONSENT
             }
         }
         wasListingBackups = isListingCloudBackups
@@ -849,9 +960,7 @@ fun OnboardingFlow(
     // Monitorar a restauração do backup
     LaunchedEffect(isRestoring) {
         if (wasRestoring && !isRestoring && currentStep == OnboardingStep.RESTORE_BACKUP_PROMPT) {
-            currentStep = OnboardingStep.COMPLETED
-            onboardingManager.markOnboardingCompleted()
-            onComplete()
+            currentStep = OnboardingStep.CRASH_REPORT_CONSENT
         }
         wasRestoring = isRestoring
     }
@@ -859,9 +968,13 @@ fun OnboardingFlow(
     // Monitorar a restauração do backup local
     LaunchedEffect(isRestoringLocalBackup) {
         if (wasRestoringLocal && !isRestoringLocalBackup && currentStep == OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT) {
-            currentStep = OnboardingStep.COMPLETED
-            onboardingManager.markOnboardingCompleted()
-            onComplete()
+            if (googleSignInAccount != null) {
+                currentStep = OnboardingStep.CRASH_REPORT_CONSENT
+            } else {
+                currentStep = OnboardingStep.COMPLETED
+                onboardingManager.markOnboardingCompleted()
+                onComplete()
+            }
         }
         wasRestoringLocal = isRestoringLocalBackup
     }
@@ -1010,9 +1123,7 @@ fun OnboardingFlow(
                         directoryPickerLauncher.launch(null)
                     },
                     onSkip = {
-                        currentStep = OnboardingStep.COMPLETED
-                        onboardingManager.markOnboardingCompleted()
-                        onComplete()
+                        currentStep = OnboardingStep.CRASH_REPORT_CONSENT
                     }
                 )
             }
@@ -1030,6 +1141,23 @@ fun OnboardingFlow(
                     },
                     onRestoreBackup = onRestoreLocalBackup,
                     onSkip = {
+                        if (googleSignInAccount != null) {
+                            currentStep = OnboardingStep.CRASH_REPORT_CONSENT
+                        } else {
+                            currentStep = OnboardingStep.COMPLETED
+                            onboardingManager.markOnboardingCompleted()
+                            onComplete()
+                        }
+                    }
+                )
+            }
+
+            // Janela de consentimento de envio de relatórios de erros
+            if (currentStep == OnboardingStep.CRASH_REPORT_CONSENT) {
+                CrashlyticsConsentDialog(
+                    initialEnabled = true,
+                    onComplete = { enabled ->
+                        onCrashlyticsToggle(enabled)
                         currentStep = OnboardingStep.COMPLETED
                         onboardingManager.markOnboardingCompleted()
                         onComplete()

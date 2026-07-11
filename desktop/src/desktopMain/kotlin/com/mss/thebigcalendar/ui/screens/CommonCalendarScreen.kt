@@ -2,6 +2,7 @@ package com.mss.thebigcalendar.ui.screens
 
 import DesktopCalendarViewModel
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,6 +43,15 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import java.awt.FileDialog
 import java.awt.Frame
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.gestures.detectTapGestures
 
 // Função utilitária para converter cores hexadecimais em Color do Compose sem depender de APIs do Android
 fun parseHexColor(colorStr: String): Color {
@@ -138,288 +148,561 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
             .fillMaxSize()
             .background(if (uiState.pureBlackTheme && uiState.theme == Theme.DARK) Color.Black else MaterialTheme.colorScheme.background)
     ) {
-        // SIDEBAR ESQUERDA: Filtros, Busca e Configurações
-        Column(
+        val scrollState = rememberScrollState()
+
+        Box(
             modifier = Modifier
-                .width(260.dp)
+                .width(320.dp)
                 .fillMaxHeight()
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
         ) {
-            // Boas Vindas Editável
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+                    .verticalScroll(scrollState)
             ) {
-                Icon(Icons.Default.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                if (editingWelcomeName) {
-                    OutlinedTextField(
-                        value = tempWelcomeName,
-                        onValueChange = { tempWelcomeName = it },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                viewModel.setWelcomeName(tempWelcomeName)
-                                editingWelcomeName = false
-                            }) {
-                                Icon(Icons.Default.Check, contentDescription = "Salvar")
+                // 1. Cabeçalho de Boas-vindas com emoji
+                val greetingEmoji = remember {
+                    val hour = java.time.LocalTime.now().hour
+                    when (hour) {
+                        in 5..11 -> "🌅"
+                        in 12..17 -> "☀️"
+                        in 18..23 -> "🌙"
+                        else -> "🌃"
+                    }
+                }
+                val greetingText = remember {
+                    val hour = java.time.LocalTime.now().hour
+                    when (hour) {
+                        in 5..11 -> "Bom dia"
+                        in 12..17 -> "Boa tarde"
+                        in 18..23 -> "Boa noite"
+                        else -> "Boa madrugada"
+                    }
+                }
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    if (editingWelcomeName) {
+                        OutlinedTextField(
+                            value = tempWelcomeName,
+                            onValueChange = { tempWelcomeName = it },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    viewModel.setWelcomeName(tempWelcomeName)
+                                    editingWelcomeName = false
+                                }) {
+                                    Icon(Icons.Default.Check, contentDescription = "Salvar")
+                                }
+                            }
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.weight(1f).clickable {
+                                tempWelcomeName = uiState.welcomeName
+                                editingWelcomeName = true
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "$greetingEmoji $greetingText, ${uiState.welcomeName}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Default.Edit, contentDescription = "Editar nome", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                
+                // 2. Frase do Dia
+                uiState.quote?.let { quote ->
+                    Column(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = quote.frase,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Text(
+                            text = "— ${quote.autor}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // 3. Busca
+                OutlinedTextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                    trailingIcon = {
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
                             }
                         }
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+
+                if (uiState.searchQuery.isNotBlank()) {
+                    // Resultados da Busca
+                    Text(
+                        text = "Resultados da Busca",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                } else {
-                    Row(
-                        modifier = Modifier.weight(1f).clickable {
-                            tempWelcomeName = uiState.welcomeName
-                            editingWelcomeName = true
-                        },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Olá,", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    if (uiState.searchResults.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                uiState.welcomeName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                text = "Nenhum resultado encontrado",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Default.Edit, contentDescription = "Editar nome", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            uiState.searchResults.forEach { result ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.selectSearchResult(result) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = result.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${result.subtitle} • ${result.date}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-
-            // Busca
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodyMedium) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            // Botão de Sincronização Google Calendar
-            Button(
-                onClick = { viewModel.syncGoogleCalendar() },
-                enabled = !uiState.isSyncing,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            ) {
-                if (uiState.isSyncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sincronizando...", style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sincronizar",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sincronizar Google", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-
-            // Mensagem de Sincronização
-            if (uiState.syncMessage != null) {
-                val msg = uiState.syncMessage!!
-                val isError = msg.contains("Erro", ignoreCase = true)
-                val isWarning = msg.contains("Aviso", ignoreCase = true)
-                val isSuccess = msg.contains("concluída", ignoreCase = true)
-
-                val containerColor = when {
-                    isError -> MaterialTheme.colorScheme.errorContainer
-                    isWarning -> MaterialTheme.colorScheme.tertiaryContainer
-                    isSuccess -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
-
-                val contentColor = when {
-                    isError -> MaterialTheme.colorScheme.onErrorContainer
-                    isWarning -> MaterialTheme.colorScheme.onTertiaryContainer
-                    isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
-
-                val icon = when {
-                    isError -> Icons.Default.Error
-                    isWarning -> Icons.Default.Warning
-                    isSuccess -> Icons.Default.CheckCircle
-                    else -> Icons.Default.Info
-                }
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = containerColor,
-                        contentColor = contentColor
-                    )
+                
+                // 4. Seção de Visualização (Mensal/Anual/Anotações/Alarmes)
+                Text(
+                    text = "Visualização",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                NavigationDrawerItem(
+                    label = { Text("Mensal") },
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                    selected = true,
+                    onClick = { /* Já selecionado */ },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Anual") },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                    selected = false,
+                    onClick = { /* Em breve no Desktop */ },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Agendamentos") },
+                    icon = { Icon(Icons.Default.Note, contentDescription = null) },
+                    selected = false,
+                    onClick = { /* Em breve no Desktop */ },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Alarmes") },
+                    icon = { Icon(Icons.Default.Alarm, contentDescription = null) },
+                    selected = false,
+                    onClick = { /* Em breve no Desktop */ },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // 5. Seção de Filtros (Mostrar no Calendário)
+                Text(
+                    text = "Mostrar no Calendário",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                    if (uiState.sidebarFilterVisibility.showEvents) {
+                        FilterRow(
+                            label = "Eventos",
+                            checked = uiState.filterOptions.showEvents,
+                            colorHex = "#EF5350",
+                            icon = Icons.Default.Event,
+                            onCheckedChange = { viewModel.onFilterChange("showEvents", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showEvents") }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                lineHeight = 16.sp
-                            )
+                    }
+                    if (uiState.sidebarFilterVisibility.showTasks) {
+                        FilterRow(
+                            label = "Tarefas",
+                            checked = uiState.filterOptions.showTasks,
+                            colorHex = "#66BB6A",
+                            icon = Icons.Default.TaskAlt,
+                            onCheckedChange = { viewModel.onFilterChange("showTasks", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showTasks") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showNotes) {
+                        FilterRow(
+                            label = "Notas",
+                            checked = uiState.filterOptions.showNotes,
+                            colorHex = "#42A5F5",
+                            icon = Icons.Default.Description,
+                            onCheckedChange = { viewModel.onFilterChange("showNotes", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showNotes") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showBirthdays) {
+                        FilterRow(
+                            label = "Aniversários",
+                            checked = uiState.filterOptions.showBirthdays,
+                            colorHex = "#FFA726",
+                            icon = Icons.Default.Cake,
+                            onCheckedChange = { viewModel.onFilterChange("showBirthdays", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showBirthdays") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showHolidays) {
+                        FilterRow(
+                            label = "Feriados",
+                            checked = uiState.filterOptions.showHolidays,
+                            colorHex = "#FFCDD2",
+                            icon = Icons.Default.Star,
+                            onCheckedChange = { viewModel.onFilterChange("showHolidays", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showHolidays") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showSaintDays) {
+                        FilterRow(
+                            label = "Santos do Dia",
+                            checked = uiState.filterOptions.showSaintDays,
+                            colorHex = "#D1C4E9",
+                            icon = Icons.Default.Church,
+                            onCheckedChange = { viewModel.onFilterChange("showSaintDays", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showSaintDays") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showProfessionalDays) {
+                        FilterRow(
+                            label = "Profissões",
+                            checked = uiState.filterOptions.showProfessionalDays,
+                            colorHex = "#C8E6C9",
+                            icon = Icons.Default.Work,
+                            onCheckedChange = { viewModel.onFilterChange("showProfessionalDays", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showProfessionalDays") }
+                        )
+                    }
+                    if (uiState.sidebarFilterVisibility.showMilitaryHolidays) {
+                        FilterRow(
+                            label = "Feriados Militares",
+                            checked = uiState.filterOptions.showMilitaryHolidays,
+                            colorHex = "#FFE082",
+                            icon = Icons.Default.Shield,
+                            onCheckedChange = { viewModel.onFilterChange("showMilitaryHolidays", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showMilitaryHolidays") }
+                        )
+                    }
+                    
+                    // Opção para mostrar tarefas finalizadas
+                    if (uiState.sidebarFilterVisibility.showCompletedTasks) {
+                        FilterRow(
+                            label = "Tarefas finalizadas",
+                            checked = uiState.showCompletedActivities,
+                            colorHex = "#4CAF50",
+                            icon = Icons.Default.CheckCircle,
+                            onCheckedChange = { viewModel.onFilterChange("showCompletedActivities", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showCompletedActivities") }
+                        )
+                    }
+                    
+                    // Opção para mostrar fases da lua
+                    if (uiState.sidebarFilterVisibility.showMoonPhases) {
+                        FilterRow(
+                            label = "Fases da lua",
+                            checked = uiState.showMoonPhases,
+                            colorHex = "#FFF59D",
+                            icon = Icons.Default.Brightness4,
+                            onCheckedChange = { viewModel.onFilterChange("showMoonPhases", it) },
+                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showMoonPhases") }
+                        )
+                    }
+                }
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // 6. Configurações
+                Text(
+                    text = "Configurações",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                NavigationDrawerItem(
+                    label = { Text("Geral") },
+                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                    selected = false,
+                    onClick = { viewModel.setShowSettings(true) },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                NavigationDrawerItem(
+                    label = { Text("Imprimir Calendário") },
+                    icon = { Icon(Icons.Default.Print, contentDescription = null) },
+                    selected = false,
+                    onClick = { /* Ação de imprimir */ },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // 7. Backup
+                Text(
+                    text = "Backup",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                // Botão de Sincronização Google Calendar
+                NavigationDrawerItem(
+                    label = {
+                        if (uiState.isSyncing) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sincronizando...")
+                            }
+                        } else {
+                            Text("Sincronizar Google")
                         }
+                    },
+                    icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+                    selected = false,
+                    onClick = { if (!uiState.isSyncing) viewModel.syncGoogleCalendar() },
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .alpha(if (uiState.isSyncing) 0.38f else 1f)
+                )
+                
+                // Botão de Restaurar Backup Local
+                NavigationDrawerItem(
+                    label = { Text("Restaurar Local") },
+                    icon = { Icon(Icons.Outlined.Backup, contentDescription = null) },
+                    selected = false,
+                    onClick = {
                         if (!uiState.isSyncing) {
-                            Spacer(modifier = Modifier.width(4.dp))
+                            try {
+                                val fileDialog = FileDialog(null as Frame?, "Selecionar arquivo de backup", FileDialog.LOAD).apply {
+                                    file = "*.json"
+                                    isVisible = true
+                                }
+                                val directory = fileDialog.directory
+                                val filename = fileDialog.file
+                                if (directory != null && filename != null) {
+                                    val selectedFile = java.io.File(directory, filename)
+                                    viewModel.restoreBackup(selectedFile)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .alpha(if (uiState.isSyncing) 0.38f else 1f)
+                )
+                
+                // Botão de Restaurar Backup da Nuvem
+                NavigationDrawerItem(
+                    label = { Text("Restaurar da Nuvem") },
+                    icon = { Icon(Icons.Default.CloudDownload, contentDescription = null) },
+                    selected = false,
+                    onClick = { if (!uiState.isSyncing) viewModel.fetchCloudBackups() },
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .alpha(if (uiState.isSyncing) 0.38f else 1f)
+                )
+                
+                // Mensagem de Sincronização
+                if (uiState.syncMessage != null) {
+                    val msg = uiState.syncMessage!!
+                    val isError = msg.contains("Erro", ignoreCase = true)
+                    val isWarning = msg.contains("Aviso", ignoreCase = true)
+                    val isSuccess = msg.contains("concluída", ignoreCase = true)
+
+                    val containerColor = when {
+                        isError -> MaterialTheme.colorScheme.errorContainer
+                        isWarning -> MaterialTheme.colorScheme.tertiaryContainer
+                        isSuccess -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+
+                    val contentColor = when {
+                        isError -> MaterialTheme.colorScheme.onErrorContainer
+                        isWarning -> MaterialTheme.colorScheme.onTertiaryContainer
+                        isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    val icon = when {
+                        isError -> Icons.Default.Error
+                        isWarning -> Icons.Default.Warning
+                        isSuccess -> Icons.Default.CheckCircle
+                        else -> Icons.Default.Info
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = containerColor,
+                            contentColor = contentColor
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Fechar",
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clickable { viewModel.clearSyncMessage() }
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp).padding(top = 2.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            if (!uiState.isSyncing) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Fechar",
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { viewModel.clearSyncMessage() }
+                                )
+                            }
                         }
                     }
                 }
-            }
-
-            // Botão de Restaurar Backup Local
-            Button(
-                onClick = {
-                    try {
-                        val fileDialog = FileDialog(null as Frame?, "Selecionar arquivo de backup", FileDialog.LOAD).apply {
-                            file = "*.json"
-                            isVisible = true
-                        }
-                        val directory = fileDialog.directory
-                        val filename = fileDialog.file
-                        if (directory != null && filename != null) {
-                            val selectedFile = java.io.File(directory, filename)
-                            viewModel.restoreBackup(selectedFile)
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                },
-                enabled = !uiState.isSyncing,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Backup,
-                    contentDescription = "Restaurar Backup Local",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Restaurar Local", style = MaterialTheme.typography.bodyMedium)
-            }
-
-            // Botão de Restaurar Backup da Nuvem
-            Button(
-                onClick = {
-                    viewModel.fetchCloudBackups()
-                },
-                enabled = !uiState.isSyncing,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CloudDownload,
-                    contentDescription = "Restaurar Backup da Nuvem",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Restaurar da Nuvem", style = MaterialTheme.typography.bodyMedium)
-            }
-
-            Text(
-                "Filtros de Visualização",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // Lista de Filtros
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                item { FilterRow("Eventos", filters.showEvents, "#EF5350", Icons.Default.Event) { viewModel.toggleFilter("events") } }
-                item { FilterRow("Tarefas", filters.showTasks, "#66BB6A", Icons.Default.TaskAlt) { viewModel.toggleFilter("tasks") } }
-                item { FilterRow("Notas", filters.showNotes, "#42A5F5", Icons.Default.Description) { viewModel.toggleFilter("notes") } }
-                item { FilterRow("Aniversários", filters.showBirthdays, "#FFA726", Icons.Default.Cake) { viewModel.toggleFilter("birthdays") } }
-                item { FilterRow("Feriados", filters.showHolidays, "#FFCDD2", Icons.Default.Star) { viewModel.toggleFilter("holidays") } }
-                item { FilterRow("Santos do Dia", filters.showSaintDays, "#D1C4E9", Icons.Default.Church) { viewModel.toggleFilter("saintDays") } }
-                item { FilterRow("Profissões", filters.showProfessionalDays, "#C8E6C9", Icons.Default.Work) { viewModel.toggleFilter("professionalDays") } }
-                item { FilterRow("Feriados Militares", filters.showMilitaryHolidays, "#FFE082", Icons.Default.Shield) { viewModel.toggleFilter("militaryHolidays") } }
-            }
-
-            // Configurações de Tema no rodapé da Sidebar
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Tema", style = MaterialTheme.typography.bodyMedium)
-                Row {
-                    IconButton(
-                        onClick = { viewModel.setTheme(Theme.LIGHT) },
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = if (uiState.theme == Theme.LIGHT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    ) {
-                        Icon(Icons.Default.LightMode, contentDescription = "Claro")
-                    }
-                    IconButton(
-                        onClick = { viewModel.setTheme(Theme.DARK) },
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = if (uiState.theme == Theme.DARK) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    ) {
-                        Icon(Icons.Default.DarkMode, contentDescription = "Escuro")
-                    }
-                }
-            }
-            
-            if (uiState.theme == Theme.DARK) {
+                
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+                
+                // 8. Configurações de Tema no rodapé da Sidebar
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Preto Puro", style = MaterialTheme.typography.bodySmall)
-                    Switch(
-                        checked = uiState.pureBlackTheme,
-                        onCheckedChange = { viewModel.setPureBlackTheme(it) },
-                        modifier = Modifier.scale(0.8f)
-                    )
+                    Text("Tema", style = MaterialTheme.typography.bodyMedium)
+                    Row {
+                        IconButton(
+                            onClick = { viewModel.setTheme(Theme.LIGHT) },
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = if (uiState.theme == Theme.LIGHT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        ) {
+                            Icon(Icons.Default.LightMode, contentDescription = "Claro")
+                        }
+                        IconButton(
+                            onClick = { viewModel.setTheme(Theme.DARK) },
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = if (uiState.theme == Theme.DARK) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        ) {
+                            Icon(Icons.Default.DarkMode, contentDescription = "Escuro")
+                        }
+                    }
+                }
+                
+                if (uiState.theme == Theme.DARK) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Preto Puro", style = MaterialTheme.typography.bodySmall)
+                        Switch(
+                            checked = uiState.pureBlackTheme,
+                            onCheckedChange = { viewModel.setPureBlackTheme(it) },
+                            modifier = Modifier.scale(0.8f)
+                        )
+                    }
                 }
             }
+
+                }
+            
+            // CustomScrollbar
+            CustomScrollbar(
+                scrollState = scrollState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+            )
         }
 
         // SEÇÃO CENTRAL: Grade do Calendário Mensal
@@ -548,10 +831,10 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                         }
                                     )
                                     .border(
-                                        1.dp,
+                                        if (isSelected || isToday) 2.dp else 1.5.dp,
                                         if (isSelected) MaterialTheme.colorScheme.primary
-                                        else if (isToday) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
-                                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
+                                        else if (isToday) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                                         RoundedCornerShape(8.dp)
                                     )
                                     .clickable { viewModel.selectDate(date) }
@@ -1059,13 +1342,34 @@ fun FilterRow(
     checked: Boolean,
     colorHex: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onCheckedChange: () -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
+    var showRemoveIcon by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .clickable { onCheckedChange() }
+            .clickable {
+                if (!showRemoveIcon) {
+                    onCheckedChange(!checked)
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onLongPress = {
+                        showRemoveIcon = true
+                    },
+                    onTap = {
+                        if (showRemoveIcon) {
+                            showRemoveIcon = false
+                        } else {
+                            onCheckedChange(!checked)
+                        }
+                    }
+                )
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1084,11 +1388,85 @@ fun FilterRow(
             modifier = Modifier.weight(1f),
             color = if (checked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
         )
-        Checkbox(
-            checked = checked,
-            onCheckedChange = { onCheckedChange() },
-            modifier = Modifier.scale(0.8f)
-        )
+        if (showRemoveIcon) {
+            IconButton(
+                onClick = {
+                    showRemoveIcon = false
+                    onLongPress()
+                },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remover do menu",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = { onCheckedChange(it) },
+                modifier = Modifier.scale(0.8f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomScrollbar(
+    scrollState: androidx.compose.foundation.ScrollState,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    var isHovered by remember { mutableFloatStateOf(0f) }
+    
+    // Obter cor da scrollbar baseada no tema Material Design
+    val scrollbarColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+        alpha = (0.1f + isHovered * 0.2f).coerceIn(0.1f, 0.3f)
+    )
+    
+    // Anima a opacidade da scrollbar
+    LaunchedEffect(isHovered) {
+        // Implementação simples de hover - pode ser expandida
+    }
+    
+    Canvas(
+        modifier = modifier
+            .width(4.dp)
+            .pointerInput(Unit) {
+                // Detectar hover/interação se necessário
+            }
+    ) {
+        val canvasHeight = size.height
+        val canvasWidth = size.width
+        
+        // Calcular dimensões da scrollbar
+        val scrollbarThickness = with(density) { 4.dp.toPx() }
+        val scrollbarPadding = with(density) { 2.dp.toPx() }
+        
+        // Calcular posição e tamanho do thumb
+        val maxScrollValue = scrollState.maxValue.toFloat()
+        val currentScrollValue = scrollState.value.toFloat()
+        
+        if (maxScrollValue > 0) {
+            val thumbHeight = (canvasHeight * canvasHeight / (canvasHeight + maxScrollValue)).coerceAtLeast(scrollbarThickness * 2)
+            val thumbTop = (currentScrollValue / maxScrollValue) * (canvasHeight - thumbHeight)
+            
+            // Desenhar o thumb da scrollbar
+            drawRoundRect(
+                color = scrollbarColor,
+                topLeft = Offset(
+                    x = (canvasWidth - scrollbarThickness) / 2,
+                    y = thumbTop + scrollbarPadding
+                ),
+                size = Size(
+                    width = scrollbarThickness,
+                    height = thumbHeight - scrollbarPadding * 2
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(scrollbarThickness / 2)
+            )
+        }
     }
 }
 
@@ -1121,15 +1499,19 @@ fun ActivityItemCard(
     onDelete: () -> Unit
 ) {
     val categoryColor = parseHexColor(activity.categoryColor)
+    var isExpanded by remember { mutableStateOf(false) }
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded }
+            .animateContentSize()
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             val boxModifier = if (categoryColor == Color.White) {
                 Modifier
@@ -1186,19 +1568,21 @@ fun ActivityItemCard(
                         text = desc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 2,
+                        overflow = if (isExpanded) TextOverflow.Clip else TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
 
-            Row {
-                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Excluir", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+            if (activity.location?.startsWith("JSON_IMPORTED_") != true) {
+                Row {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Excluir", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }

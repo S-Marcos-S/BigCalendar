@@ -163,8 +163,8 @@ private fun DayCell(
         .clip(MaterialTheme.shapes.small)
         .then(
             when {
-                day.isToday -> Modifier.border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
-                day.isCurrentMonth -> Modifier.border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), MaterialTheme.shapes.small)
+                day.isToday -> Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                day.isCurrentMonth -> Modifier.border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), MaterialTheme.shapes.small)
                 else -> Modifier
             }
         )

@@ -265,7 +265,9 @@ class MainActivity : ComponentActivity() {
                             localBackupUriBeingRestored = uiState.localBackupUriBeingRestored,
                             onBackupDirectorySelected = { uri -> viewModel.onBackupDirectorySelected(uri) },
                             onRestoreLocalBackup = { uriString -> viewModel.restoreFromBackup(uriString) },
-                            onLoadLocalBackups = { viewModel.loadBackupFiles() }
+                            onLoadLocalBackups = { viewModel.loadBackupFiles() },
+                            isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
+                            onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) }
                         )
                     } else {
 //... existing code ...

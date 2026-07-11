@@ -1,6 +1,7 @@
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import com.mss.thebigcalendar.data.getDataStoreProvider
 import com.mss.thebigcalendar.data.model.Activity
 import com.mss.thebigcalendar.data.model.ActivityType
@@ -44,6 +45,47 @@ data class DesktopFilterOptions(
 )
 
 @Serializable
+data class DesktopSidebarFilterVisibility(
+    val showHolidays: Boolean = true,
+    val showSaintDays: Boolean = true,
+    val showEvents: Boolean = true,
+    val showTasks: Boolean = true,
+    val showNotes: Boolean = true,
+    val showBirthdays: Boolean = true,
+    val showProfessionalDays: Boolean = true,
+    val showMilitaryHolidays: Boolean = true,
+    val showCompletedTasks: Boolean = true,
+    val showMoonPhases: Boolean = true
+)
+
+@Serializable
+data class DesktopQuote(
+    val autor: String,
+    val frase: String
+)
+
+@Serializable
+data class DesktopJsonCalendar(
+    val id: String,
+    val title: String,
+    val isVisible: Boolean
+)
+
+@Serializable
+data class DesktopSearchResult(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val date: String, // "yyyy-MM-dd"
+    val type: Type
+) {
+    enum class Type {
+        ACTIVITY,
+        HOLIDAY
+    }
+}
+
+@Serializable
 data class DesktopCloudBackupInfo(
     val id: String,
     val name: String,
@@ -59,13 +101,19 @@ data class DesktopUiState(
     val pureBlackTheme: Boolean = false,
     val welcomeName: String = "Usuário",
     val searchQuery: String = "",
+    val searchResults: List<DesktopSearchResult> = emptyList(),
     val activityToEdit: Activity? = null,
     val showSettings: Boolean = false,
     val isSyncing: Boolean = false,
     val syncMessage: String? = null,
     val cloudBackups: List<DesktopCloudBackupInfo> = emptyList(),
     val showCloudBackupDialog: Boolean = false,
-    val isFetchingCloudBackups: Boolean = false
+    val isFetchingCloudBackups: Boolean = false,
+    val quote: DesktopQuote? = null,
+    val sidebarFilterVisibility: DesktopSidebarFilterVisibility = DesktopSidebarFilterVisibility(),
+    val showCompletedActivities: Boolean = false,
+    val showMoonPhases: Boolean = false,
+    val jsonCalendars: List<DesktopJsonCalendar> = emptyList()
 )
 
 class DesktopCalendarViewModel(private val scope: CoroutineScope) {
@@ -81,6 +129,11 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black_theme")
     private val KEY_WELCOME_NAME = stringPreferencesKey("welcome_name")
     private val KEY_FILTERS = stringPreferencesKey("filters")
+    private val KEY_SIDEBAR_FILTER_VISIBILITY = stringPreferencesKey("sidebar_filter_visibility")
+    private val KEY_SHOW_COMPLETED_ACTIVITIES = booleanPreferencesKey("show_completed_activities")
+    private val KEY_SHOW_MOON_PHASES = booleanPreferencesKey("show_moon_phases")
+    private val KEY_LAST_QUOTE_DATE = stringPreferencesKey("last_quote_date")
+    private val KEY_LAST_QUOTE_INDEX = intPreferencesKey("last_quote_index")
 
     // Listas pré-carregadas de feriados e datas especiais
     var nationalHolidays: List<Holiday> = emptyList()
@@ -131,6 +184,21 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         saintDays = parsePredefinedJson("saints_data.json", HolidayType.SAINT)
         professionalDays = parsePredefinedJson("professional_days.json", HolidayType.JSON_IMPORT)
         militaryHolidays = parsePredefinedJson("military_holidays.json", HolidayType.JSON_IMPORT)
+        loadQuotes()
+    }
+
+    private var quotes: List<DesktopQuote> = emptyList()
+
+    private fun loadQuotes() {
+        try {
+            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("frases.json")
+            if (stream != null) {
+                val jsonString = stream.bufferedReader().use { it.readText() }
+                quotes = Json { ignoreUnknownKeys = true }.decodeFromString<List<DesktopQuote>>(jsonString)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun parsePredefinedJson(fileName: String, type: HolidayType): List<Holiday> {
@@ -184,6 +252,20 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     DesktopFilterOptions()
                 }
 
+                val sidebarFilterVisibilityStr = preferences[KEY_SIDEBAR_FILTER_VISIBILITY]
+                val sidebarFilterVisibility = if (sidebarFilterVisibilityStr != null) {
+                    try {
+                        Json.decodeFromString<DesktopSidebarFilterVisibility>(sidebarFilterVisibilityStr)
+                    } catch(e: Exception) {
+                        DesktopSidebarFilterVisibility()
+                    }
+                } else {
+                    DesktopSidebarFilterVisibility()
+                }
+
+                val showCompletedActivities = preferences[KEY_SHOW_COMPLETED_ACTIVITIES] ?: false
+                val showMoonPhases = preferences[KEY_SHOW_MOON_PHASES] ?: false
+
                 val activitiesStr = preferences[KEY_ACTIVITIES]
                 val activitiesList = if (activitiesStr != null) {
                     try {
@@ -195,13 +277,36 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     emptyList()
                 }
 
+                val lastDate = preferences[KEY_LAST_QUOTE_DATE] ?: ""
+                val lastIndex = preferences[KEY_LAST_QUOTE_INDEX] ?: 0
+                
+                val today = LocalDate.now().toString()
+                val selectedQuote = if (quotes.isNotEmpty()) {
+                    if (today != lastDate) {
+                        val nextIndex = (lastIndex + 1) % quotes.size
+                        scope.launch {
+                            dataStore.edit { prefs ->
+                                prefs[KEY_LAST_QUOTE_DATE] = today
+                                prefs[KEY_LAST_QUOTE_INDEX] = nextIndex
+                            }
+                        }
+                        quotes[nextIndex]
+                    } else {
+                        quotes[lastIndex]
+                    }
+                } else null
+
                 _uiState.update {
                     it.copy(
                         theme = theme,
                         pureBlackTheme = pureBlack,
                         welcomeName = welcomeName,
                         filterOptions = filters,
-                        activities = activitiesList
+                        activities = activitiesList,
+                        sidebarFilterVisibility = sidebarFilterVisibility,
+                        showCompletedActivities = showCompletedActivities,
+                        showMoonPhases = showMoonPhases,
+                        quote = selectedQuote
                     )
                 }
 
@@ -231,6 +336,9 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 preferences[KEY_WELCOME_NAME] = _uiState.value.welcomeName
                 preferences[KEY_FILTERS] = Json.encodeToString(_uiState.value.filterOptions)
                 preferences[KEY_ACTIVITIES] = activitiesJson
+                preferences[KEY_SIDEBAR_FILTER_VISIBILITY] = Json.encodeToString(_uiState.value.sidebarFilterVisibility)
+                preferences[KEY_SHOW_COMPLETED_ACTIVITIES] = _uiState.value.showCompletedActivities
+                preferences[KEY_SHOW_MOON_PHASES] = _uiState.value.showMoonPhases
             }
 
             try {
@@ -276,6 +384,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         val editingActivity = _uiState.value.activityToEdit
 
         if (editingActivity != null) {
+            if (editingActivity.location?.startsWith("JSON_IMPORTED_") == true) return
             val updated = editingActivity.copy(
                 title = title,
                 description = description,
@@ -312,12 +421,15 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     }
 
     fun deleteActivity(id: String) {
+        val activity = _uiState.value.activities.find { it.id == id }
+        if (activity?.location?.startsWith("JSON_IMPORTED_") == true) return
         val currentList = _uiState.value.activities.filter { it.id != id }
         _uiState.update { it.copy(activities = currentList) }
         saveData()
     }
 
     fun toggleActivityCompletion(activity: Activity) {
+        if (activity.location?.startsWith("JSON_IMPORTED_") == true) return
         val currentList = _uiState.value.activities.map {
             if (it.id == activity.id) {
                 it.copy(isCompleted = !it.isCompleted)
@@ -335,6 +447,160 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
     fun setSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+        performSearch(query)
+    }
+
+    private fun performSearch(query: String) {
+        if (query.isBlank()) {
+            _uiState.update { it.copy(searchResults = emptyList()) }
+            return
+        }
+
+        val normalized = query.trim().lowercase()
+        val results = mutableListOf<DesktopSearchResult>()
+
+        // 1. Pesquisar em atividades (excluindo atividades de calendário JSON pré-importadas)
+        _uiState.value.activities.filter { activity ->
+            activity.location?.startsWith("JSON_IMPORTED_") != true && (
+                activity.title.lowercase().contains(normalized) ||
+                (activity.description?.lowercase()?.contains(normalized) == true)
+            )
+        }.forEach { activity ->
+            val subtitle = when (activity.activityType) {
+                ActivityType.EVENT -> "Evento"
+                ActivityType.TASK -> "Tarefa"
+                ActivityType.BIRTHDAY -> "Aniversário"
+                ActivityType.NOTE -> "Nota"
+            }
+            results.add(
+                DesktopSearchResult(
+                    id = activity.id,
+                    title = activity.title,
+                    subtitle = subtitle,
+                    date = activity.date,
+                    type = DesktopSearchResult.Type.ACTIVITY
+                )
+            )
+        }
+
+        // 2. Pesquisar em feriados nacionais
+        nationalHolidays.filter { holiday ->
+            holiday.name.lowercase().contains(normalized) ||
+            (holiday.summary?.lowercase()?.contains(normalized) == true)
+        }.forEach { holiday ->
+            results.add(
+                DesktopSearchResult(
+                    id = "holiday_${holiday.name}_${holiday.date}",
+                    title = holiday.name,
+                    subtitle = "Feriado Nacional",
+                    date = resolveHolidayDate(holiday.date),
+                    type = DesktopSearchResult.Type.HOLIDAY
+                )
+            )
+        }
+
+        // 3. Pesquisar em datas comemorativas
+        commemorativeDates.filter { holiday ->
+            holiday.name.lowercase().contains(normalized) ||
+            (holiday.summary?.lowercase()?.contains(normalized) == true)
+        }.forEach { holiday ->
+            results.add(
+                DesktopSearchResult(
+                    id = "commemorative_${holiday.name}_${holiday.date}",
+                    title = holiday.name,
+                    subtitle = "Data Comemorativa",
+                    date = resolveHolidayDate(holiday.date),
+                    type = DesktopSearchResult.Type.HOLIDAY
+                )
+            )
+        }
+
+        // 4. Pesquisar em santos do dia
+        saintDays.filter { holiday ->
+            holiday.name.lowercase().contains(normalized) ||
+            (holiday.summary?.lowercase()?.contains(normalized) == true)
+        }.forEach { holiday ->
+            results.add(
+                DesktopSearchResult(
+                    id = "saint_${holiday.name}_${holiday.date}",
+                    title = holiday.name,
+                    subtitle = "Santo do Dia",
+                    date = resolveHolidayDate(holiday.date),
+                    type = DesktopSearchResult.Type.HOLIDAY
+                )
+            )
+        }
+
+        // 5. Pesquisar em profissões
+        professionalDays.filter { holiday ->
+            holiday.name.lowercase().contains(normalized) ||
+            (holiday.summary?.lowercase()?.contains(normalized) == true)
+        }.forEach { holiday ->
+            results.add(
+                DesktopSearchResult(
+                    id = "professional_${holiday.name}_${holiday.date}",
+                    title = holiday.name,
+                    subtitle = "Profissões",
+                    date = resolveHolidayDate(holiday.date),
+                    type = DesktopSearchResult.Type.HOLIDAY
+                )
+            )
+        }
+
+        // 6. Pesquisar em feriados militares
+        militaryHolidays.filter { holiday ->
+            holiday.name.lowercase().contains(normalized) ||
+            (holiday.summary?.lowercase()?.contains(normalized) == true)
+        }.forEach { holiday ->
+            results.add(
+                DesktopSearchResult(
+                    id = "military_${holiday.name}_${holiday.date}",
+                    title = holiday.name,
+                    subtitle = "Feriado Militar",
+                    date = resolveHolidayDate(holiday.date),
+                    type = DesktopSearchResult.Type.HOLIDAY
+                )
+            )
+        }
+
+        // Ordenar resultados
+        val sortedResults = results.sortedWith(
+            compareBy<DesktopSearchResult> { result ->
+                if (result.title.lowercase().startsWith(normalized)) 0 else 1
+            }.thenBy { result ->
+                val today = LocalDate.now()
+                val targetDate = try { LocalDate.parse(result.date) } catch(e: Exception) { today }
+                kotlin.math.abs(targetDate.toEpochDay() - today.toEpochDay())
+            }
+        )
+
+        _uiState.update { it.copy(searchResults = sortedResults) }
+    }
+
+    private fun resolveHolidayDate(dateString: String): String {
+        val currentYear = LocalDate.now().year
+        return try {
+            if (dateString.matches(Regex("\\d{2}-\\d{2}"))) {
+                val parts = dateString.split("-")
+                LocalDate.of(currentYear, parts[0].toInt(), parts[1].toInt()).toString()
+            } else {
+                LocalDate.parse(dateString).toString()
+            }
+        } catch (e: Exception) {
+            LocalDate.now().toString()
+        }
+    }
+
+    fun selectSearchResult(result: DesktopSearchResult) {
+        val targetDate = try { LocalDate.parse(result.date) } catch(e: Exception) { LocalDate.now() }
+        _uiState.update {
+            it.copy(
+                selectedDate = targetDate,
+                displayedYearMonth = YearMonth.from(targetDate),
+                searchQuery = "",
+                searchResults = emptyList()
+            )
+        }
     }
 
     fun setWelcomeName(name: String) {
@@ -941,5 +1207,70 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
     fun dismissCloudBackupDialog() {
         _uiState.update { it.copy(showCloudBackupDialog = false) }
+    }
+
+    fun onFilterChange(key: String, value: Boolean) {
+        val current = _uiState.value.filterOptions
+        val updated = when(key) {
+            "showHolidays" -> current.copy(showHolidays = value)
+            "showSaintDays" -> current.copy(showSaintDays = value)
+            "showEvents" -> current.copy(showEvents = value)
+            "showTasks" -> current.copy(showTasks = value)
+            "showNotes" -> current.copy(showNotes = value)
+            "showBirthdays" -> current.copy(showBirthdays = value)
+            "showProfessionalDays" -> current.copy(showProfessionalDays = value)
+            "showMilitaryHolidays" -> current.copy(showMilitaryHolidays = value)
+            else -> current
+        }
+        _uiState.update { it.copy(filterOptions = updated) }
+        
+        if (key == "showCompletedActivities") {
+            _uiState.update { it.copy(showCompletedActivities = value) }
+        }
+        if (key == "showMoonPhases") {
+            _uiState.update { it.copy(showMoonPhases = value) }
+        }
+        
+        saveData()
+    }
+
+    fun toggleSidebarFilterVisibility(filterKey: String) {
+        val currentVisibility = _uiState.value.sidebarFilterVisibility
+        val newVisibility = when (filterKey) {
+            "showHolidays" -> currentVisibility.copy(showHolidays = !currentVisibility.showHolidays)
+            "showEvents" -> currentVisibility.copy(showEvents = !currentVisibility.showEvents)
+            "showTasks" -> currentVisibility.copy(showTasks = !currentVisibility.showTasks)
+            "showBirthdays" -> currentVisibility.copy(showBirthdays = !currentVisibility.showBirthdays)
+            "showNotes" -> currentVisibility.copy(showNotes = !currentVisibility.showNotes)
+            "showSaintDays" -> currentVisibility.copy(showSaintDays = !currentVisibility.showSaintDays)
+            "showProfessionalDays" -> currentVisibility.copy(showProfessionalDays = !currentVisibility.showProfessionalDays)
+            "showMilitaryHolidays" -> currentVisibility.copy(showMilitaryHolidays = !currentVisibility.showMilitaryHolidays)
+            "showCompletedActivities" -> currentVisibility.copy(showCompletedTasks = !currentVisibility.showCompletedTasks)
+            "showMoonPhases" -> currentVisibility.copy(showMoonPhases = !currentVisibility.showMoonPhases)
+            else -> currentVisibility
+        }
+        
+        // Se a opção foi removida do sidebar, desativar o filtro correspondente
+        val shouldDisableFilter = when (filterKey) {
+            "showHolidays" -> !newVisibility.showHolidays && currentVisibility.showHolidays
+            "showEvents" -> !newVisibility.showEvents && currentVisibility.showEvents
+            "showTasks" -> !newVisibility.showTasks && currentVisibility.showTasks
+            "showBirthdays" -> !newVisibility.showBirthdays && currentVisibility.showBirthdays
+            "showNotes" -> !newVisibility.showNotes && currentVisibility.showNotes
+            "showSaintDays" -> !newVisibility.showSaintDays && currentVisibility.showSaintDays
+            "showProfessionalDays" -> !newVisibility.showProfessionalDays && currentVisibility.showProfessionalDays
+            "showMilitaryHolidays" -> !newVisibility.showMilitaryHolidays && currentVisibility.showMilitaryHolidays
+            "showCompletedActivities" -> !newVisibility.showCompletedTasks && currentVisibility.showCompletedTasks
+            "showMoonPhases" -> !newVisibility.showMoonPhases && currentVisibility.showMoonPhases
+            else -> false
+        }
+        
+        _uiState.update { it.copy(sidebarFilterVisibility = newVisibility) }
+        
+        if (shouldDisableFilter) {
+            onFilterChange(filterKey, false)
+        }
+        
+        saveData()
     }
 }

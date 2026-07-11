@@ -850,4 +850,5 @@
     <string name="import_predefined_desc">Clique para importar este calendário</string>
     <string name="predefined_calendars_desc">Importe calendários temáticos predefinidos de forma rápida</string>
     <string name="professional_days">Dias das Profissões</string>
+    <string name="onboarding_crash_desc">Para nos ajudar a identificar e corrigir problemas rapidamente, deseja ativar o envio automático de relatórios de erros?</string>
 </resources>
