@@ -27,6 +27,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -1447,6 +1448,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     var remoteActivities = emptyList<Activity>()
                     var remoteCompleted = emptyList<Activity>()
                     var remoteDeletedIds = emptySet<String>()
+                    var remoteDevicesArray = emptyList<kotlinx.serialization.json.JsonElement>()
                     var fileId: String? = null
 
                     if (files.isNotEmpty()) {
@@ -1459,6 +1461,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                             if (content.isNotEmpty()) {
                                 val jsonObject = Json.parseToJsonElement(content).jsonObject
                                 
+                                remoteDevicesArray = jsonObject["devices"]?.jsonArray ?: emptyList()
                                 val activitiesArray = jsonObject["activities"]?.jsonArray ?: emptyList()
                                 val parsedActs = mutableListOf<Activity>()
                                 for (element in activitiesArray) {
@@ -1551,6 +1554,48 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     saveData()
                     checkGoogleAccount()
 
+                    // 3b. Mesclar lista de dispositivos
+                    val mergedDevices = mutableListOf<kotlinx.serialization.json.JsonObject>()
+                    
+                    val osName = System.getProperty("os.name").lowercase()
+                    val currentPlatform = when {
+                        osName.contains("linux") -> "linux"
+                        osName.contains("windows") -> "windows"
+                        else -> "desktop"
+                    }
+                    
+                    val currentDeviceName = try {
+                        java.net.InetAddress.getLocalHost().hostName
+                    } catch (e: Exception) {
+                        System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "Desktop-PC"
+                    }
+                    
+                    val currentTime = System.currentTimeMillis()
+                    val thirtyDaysAgo = currentTime - (30L * 24L * 60L * 60L * 1000L)
+                    
+                    for (element in remoteDevicesArray) {
+                        try {
+                            val devObj = element.jsonObject
+                            val p = devObj["platform"]?.jsonPrimitive?.content ?: ""
+                            val n = devObj["deviceName"]?.jsonPrimitive?.content ?: ""
+                            val t = devObj["lastSyncTime"]?.jsonPrimitive?.longOrNull ?: 0L
+                            
+                            if ((p == currentPlatform && n == currentDeviceName) || t < thirtyDaysAgo) {
+                                continue
+                            }
+                            mergedDevices.add(devObj)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    
+                    val currentDeviceJson = kotlinx.serialization.json.buildJsonObject {
+                        put("platform", kotlinx.serialization.json.JsonPrimitive(currentPlatform))
+                        put("deviceName", kotlinx.serialization.json.JsonPrimitive(currentDeviceName))
+                        put("lastSyncTime", kotlinx.serialization.json.JsonPrimitive(currentTime))
+                    }
+                    mergedDevices.add(currentDeviceJson)
+
                     // 4. Upload do arquivo atualizado
                     val activitiesJsonList = mergedCustomActive
                     val completedJsonList = mergedCustomCompleted
@@ -1578,6 +1623,10 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                                 finalDeletedIds.forEach { id ->
                                     add(kotlinx.serialization.json.JsonPrimitive(id))
                                 }
+                            })
+
+                            put("devices", kotlinx.serialization.json.buildJsonArray {
+                                mergedDevices.forEach { add(it) }
                             })
                         }
 

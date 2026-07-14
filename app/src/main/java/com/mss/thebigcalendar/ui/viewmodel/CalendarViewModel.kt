@@ -603,6 +603,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.syncedDevicesJson.collect { json ->
+                _uiState.update { it.copy(syncedDevices = parseSyncedDevices(json)) }
+            }
+        }
+        viewModelScope.launch {
             // Observar o estado de login do Google e o nome de boas-vindas
             _uiState.collect { uiState ->
                 val googleAccount = uiState.googleSignInAccount
@@ -616,6 +621,27 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+    }
+
+    private fun parseSyncedDevices(jsonString: String): List<com.mss.thebigcalendar.data.model.SyncedDevice> {
+        val list = mutableListOf<com.mss.thebigcalendar.data.model.SyncedDevice>()
+        if (jsonString.isBlank()) return list
+        try {
+            val jsonArray = org.json.JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.optJSONObject(i) ?: continue
+                list.add(
+                    com.mss.thebigcalendar.data.model.SyncedDevice(
+                        platform = obj.optString("platform", ""),
+                        deviceName = obj.optString("deviceName", ""),
+                        lastSyncTime = obj.optLong("lastSyncTime", 0L)
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
     }
 
 

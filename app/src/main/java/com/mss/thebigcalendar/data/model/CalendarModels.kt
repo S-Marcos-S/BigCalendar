@@ -171,7 +171,14 @@ data class CalendarUiState(
         backupType = com.mss.thebigcalendar.data.repository.BackupType.LOCAL
     ),
     val isCrashlyticsEnabled: Boolean = false,
-    val hasSeenMainOnboarding: Boolean = false
+    val hasSeenMainOnboarding: Boolean = false,
+    val syncedDevices: List<SyncedDevice> = emptyList()
+)
+
+data class SyncedDevice(
+    val platform: String,    // "windows", "linux", "wearos", "android"
+    val deviceName: String,
+    val lastSyncTime: Long
 )
 
 enum class Theme { LIGHT, DARK, SYSTEM }

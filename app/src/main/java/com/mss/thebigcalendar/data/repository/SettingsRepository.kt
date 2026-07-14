@@ -61,6 +61,18 @@ class SettingsRepository(private val context: Context) {
         val CRASHLYTICS_ENABLED = booleanPreferencesKey("crashlytics_enabled")
         val HAS_SEEN_MAIN_ONBOARDING = booleanPreferencesKey("has_seen_main_onboarding")
         val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
+        val SYNCED_DEVICES_JSON = stringPreferencesKey("synced_devices_json")
+    }
+
+    val syncedDevicesJson: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.SYNCED_DEVICES_JSON] ?: "[]"
+        }
+
+    suspend fun saveSyncedDevicesJson(jsonString: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SYNCED_DEVICES_JSON] = jsonString
+        }
     }
 
     val backupDirectoryUri: Flow<String?> = context.dataStore.data

@@ -926,6 +926,7 @@ class BackupService(
             var remoteActivities = emptyList<Activity>()
             var remoteCompleted = emptyList<Activity>()
             var remoteDeletedIds = emptySet<String>()
+            var remoteDevicesJsonArray = JSONArray()
             var fileId: String? = null
             
             if (files.isNotEmpty()) {
@@ -938,6 +939,11 @@ class BackupService(
                     if (content.isNotEmpty()) {
                         val json = JSONObject(content)
                         
+                        val devArray = json.optJSONArray("devices")
+                        if (devArray != null) {
+                            remoteDevicesJsonArray = devArray
+                        }
+
                         // Parsear atividades remotas
                         val parsedActs = mutableListOf<Activity>()
                         val actsArray = json.optJSONArray("activities")
@@ -1070,6 +1076,36 @@ class BackupService(
             }
             deletedActivityRepository.saveAllDeletedActivities(updatedDeletedActivities)
             
+            // 3b. Mesclar lista de dispositivos
+            val mergedDevices = mutableListOf<JSONObject>()
+            val currentPlatform = "android"
+            val currentDeviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+            val currentTime = System.currentTimeMillis()
+            val thirtyDaysAgo = currentTime - (30L * 24L * 60L * 60L * 1000L)
+
+            for (i in 0 until remoteDevicesJsonArray.length()) {
+                val devObj = remoteDevicesJsonArray.optJSONObject(i) ?: continue
+                val p = devObj.optString("platform", "")
+                val n = devObj.optString("deviceName", "")
+                val t = devObj.optLong("lastSyncTime", 0L)
+                
+                if ((p == currentPlatform && n == currentDeviceName) || t < thirtyDaysAgo) {
+                    continue
+                }
+                mergedDevices.add(devObj)
+            }
+
+            val currentDeviceJson = JSONObject().apply {
+                put("platform", currentPlatform)
+                put("deviceName", currentDeviceName)
+                put("lastSyncTime", currentTime)
+            }
+            mergedDevices.add(currentDeviceJson)
+
+            val updatedDevicesArray = JSONArray()
+            mergedDevices.forEach { updatedDevicesArray.put(it) }
+            settingsRepository.saveSyncedDevicesJson(updatedDevicesArray.toString())
+
             // 4. Upload do arquivo atualizado
             val syncJson = JSONObject().apply {
                 put("backupVersion", "1.1")
@@ -1087,6 +1123,8 @@ class BackupService(
                 val deletedJsonArray = JSONArray()
                 finalDeletedIds.forEach { deletedJsonArray.put(it) }
                 put("deletedActivities", deletedJsonArray)
+                
+                put("devices", updatedDevicesArray)
             }
             
             val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)

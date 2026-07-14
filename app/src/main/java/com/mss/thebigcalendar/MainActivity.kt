@@ -451,7 +451,8 @@ class MainActivity : ComponentActivity() {
                                 isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
                                 onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) },
                                 onBackClick = { viewModel.closeSyncSettings() },
-                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
+                                unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
+                                syncedDevices = uiState.syncedDevices
                             )
                         }
                         uiState.isBackupScreenOpen -> {

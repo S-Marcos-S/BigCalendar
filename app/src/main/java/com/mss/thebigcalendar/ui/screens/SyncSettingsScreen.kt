@@ -40,6 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.mss.thebigcalendar.R
+import com.mss.thebigcalendar.data.model.SyncedDevice
+import androidx.compose.ui.res.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +55,8 @@ fun SyncSettingsScreen(
     isCrashlyticsEnabled: Boolean,
     onCrashlyticsToggle: (Boolean) -> Unit,
     onBackClick: () -> Unit,
-    unfixHeadersOnScroll: Boolean
+    unfixHeadersOnScroll: Boolean,
+    syncedDevices: List<SyncedDevice>
 ) {
     Log.d("SyncSettingsScreen", "📱 SyncSettingsScreen iniciada")
 
@@ -216,7 +219,81 @@ fun SyncSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Seção de Dispositivos Sincronizados
+            Text(
+                text = "Dispositivos Sincronizados",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            val platforms = listOf(
+                Triple("windows", "Windows Desktop", R.drawable.ic_windows),
+                Triple("linux", "Linux Desktop", R.drawable.ic_linux),
+                Triple("wearos", "WearOS Smartwatch", R.drawable.ic_wearos)
+            )
+
+            platforms.forEach { (platformKey, platformName, iconRes) ->
+                val activeDevice = syncedDevices.filter { it.platform == platformKey }
+                    .maxByOrNull { it.lastSyncTime }
+                
+                val isConnected = activeDevice != null && (System.currentTimeMillis() - activeDevice.lastSyncTime < 30L * 24L * 60L * 60L * 1000L)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = platformName,
+                        modifier = Modifier.size(32.dp),
+                        tint = if (isConnected) {
+                            when (platformKey) {
+                                "windows" -> Color(0xFF0078D7)
+                                "linux" -> Color.Unspecified
+                                "wearos" -> Color(0xFF4285F4)
+                                else -> MaterialTheme.colorScheme.primary
+                            }
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = platformName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isConnected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        if (isConnected && activeDevice != null) {
+                            Text(
+                                text = activeDevice.deviceName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                                .format(java.util.Date(activeDevice.lastSyncTime))
+                            Text(
+                                text = "Última sincronização: $dateStr",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = "Não conectado",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Envio de Relatório de Erros (Crashlytics Opt-in)
             Row(

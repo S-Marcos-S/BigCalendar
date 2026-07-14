@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Watch Straps -->
+    <path
+        android:fillColor="#888888"
+        android:pathData="M9,2 L15,2 L15,5 L9,5 Z M9,19 L15,19 L15,22 L9,22 Z" />
+    <!-- Watch Body (Circle) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M12,5 C8.13,5 5,8.13 5,12 C5,15.87 8.13,19 12,19 C15.87,19 19,15.87 19,12 C19,8.13 15.87,5 12,5 Z" />
+    <!-- Inner Watch Face details -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,8 L12,12 L14,14"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round" />
+</vector>
