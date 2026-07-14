@@ -110,6 +110,10 @@ data class DesktopUiState(
     val showCloudBackupDialog: Boolean = false,
     val isFetchingCloudBackups: Boolean = false,
     val quote: DesktopQuote? = null,
+    val isRestoringBackup: Boolean = false,
+    val restoreProgress: Float = 0f,
+    val deletedActivityIds: List<String> = emptyList(),
+    val googleAccountEmail: String? = null,
     val sidebarFilterVisibility: DesktopSidebarFilterVisibility = DesktopSidebarFilterVisibility(),
     val showCompletedActivities: Boolean = false,
     val showMoonPhases: Boolean = false,
@@ -125,6 +129,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
     // Chaves do DataStore
     private val KEY_ACTIVITIES = stringPreferencesKey("activities")
+    private val KEY_DELETED_ACTIVITIES = stringPreferencesKey("deleted_activities")
     private val KEY_THEME = stringPreferencesKey("theme")
     private val KEY_PURE_BLACK = booleanPreferencesKey("pure_black_theme")
     private val KEY_WELCOME_NAME = stringPreferencesKey("welcome_name")
@@ -150,6 +155,10 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     init {
         loadPredefinedData()
         loadData()
+        if (hasTokens()) {
+            checkGoogleAccount()
+            syncActivitiesWithCloud()
+        }
     }
 
     private fun loadPredefinedData() {
@@ -277,6 +286,17 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     emptyList()
                 }
 
+                val deletedStr = preferences[KEY_DELETED_ACTIVITIES]
+                val deletedList = if (deletedStr != null) {
+                    try {
+                        Json.decodeFromString<List<String>>(deletedStr)
+                    } catch(e: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+
                 val lastDate = preferences[KEY_LAST_QUOTE_DATE] ?: ""
                 val lastIndex = preferences[KEY_LAST_QUOTE_INDEX] ?: 0
                 
@@ -306,7 +326,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         sidebarFilterVisibility = sidebarFilterVisibility,
                         showCompletedActivities = showCompletedActivities,
                         showMoonPhases = showMoonPhases,
-                        quote = selectedQuote
+                        quote = selectedQuote,
+                        deletedActivityIds = deletedList
                     )
                 }
 
@@ -330,12 +351,14 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     private fun saveData() {
         scope.launch {
             val activitiesJson = Json.encodeToString(_uiState.value.activities)
+            val deletedJson = Json.encodeToString(_uiState.value.deletedActivityIds)
             dataStore.edit { preferences ->
                 preferences[KEY_THEME] = _uiState.value.theme.name
                 preferences[KEY_PURE_BLACK] = _uiState.value.pureBlackTheme
                 preferences[KEY_WELCOME_NAME] = _uiState.value.welcomeName
                 preferences[KEY_FILTERS] = Json.encodeToString(_uiState.value.filterOptions)
                 preferences[KEY_ACTIVITIES] = activitiesJson
+                preferences[KEY_DELETED_ACTIVITIES] = deletedJson
                 preferences[KEY_SIDEBAR_FILTER_VISIBILITY] = Json.encodeToString(_uiState.value.sidebarFilterVisibility)
                 preferences[KEY_SHOW_COMPLETED_ACTIVITIES] = _uiState.value.showCompletedActivities
                 preferences[KEY_SHOW_MOON_PHASES] = _uiState.value.showMoonPhases
@@ -418,14 +441,25 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
         _uiState.update { it.copy(activities = currentList, activityToEdit = null) }
         saveData()
+        if (hasTokens()) {
+            syncActivitiesWithCloud()
+        }
     }
 
     fun deleteActivity(id: String) {
         val activity = _uiState.value.activities.find { it.id == id }
         if (activity?.location?.startsWith("JSON_IMPORTED_") == true) return
         val currentList = _uiState.value.activities.filter { it.id != id }
-        _uiState.update { it.copy(activities = currentList) }
+        val newDeleted = if (id !in _uiState.value.deletedActivityIds) {
+            _uiState.value.deletedActivityIds + id
+        } else {
+            _uiState.value.deletedActivityIds
+        }
+        _uiState.update { it.copy(activities = currentList, deletedActivityIds = newDeleted) }
         saveData()
+        if (hasTokens()) {
+            syncActivitiesWithCloud()
+        }
     }
 
     fun toggleActivityCompletion(activity: Activity) {
@@ -439,6 +473,9 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
         _uiState.update { it.copy(activities = currentList) }
         saveData()
+        if (hasTokens()) {
+            syncActivitiesWithCloud()
+        }
     }
 
     fun setActivityToEdit(activity: Activity?) {
@@ -1272,5 +1309,307 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
         
         saveData()
+    }
+
+    fun hasTokens(): Boolean {
+        val home = System.getProperty("user.home")
+        val tokensDir = java.io.File(home, ".thebigcalendar/tokens")
+        if (!tokensDir.exists() || !tokensDir.isDirectory) return false
+        val files = tokensDir.listFiles()
+        return files != null && files.any { it.isFile && it.name != "lock" }
+    }
+
+    private fun getDriveService(): com.google.api.services.drive.Drive {
+        val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+            ?: java.io.File("client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+            ?: java.io.File("desktop/src/desktopMain/resources/client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+            ?: throw Exception("Arquivo client_secrets.json não encontrado.")
+
+        val transport = com.google.api.client.googleapis.javanet.GoogleNetHttpTransport.newTrustedTransport()
+        val jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+        val clientSecrets = com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.load(
+            jsonFactory, java.io.InputStreamReader(secretStream)
+        )
+
+        val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
+            transport, jsonFactory, clientSecrets,
+            listOf(
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/drive.appdata"
+            )
+        )
+            .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
+            .setAccessType("offline")
+            .build()
+
+        val receiver = com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder().setPort(8888).build()
+        val credential = com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+
+        return com.google.api.services.drive.Drive.Builder(transport, jsonFactory, credential)
+            .setApplicationName("The Big Calendar")
+            .build()
+    }
+
+    private fun getCalendarService(): com.google.api.services.calendar.Calendar {
+        val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+            ?: java.io.File("client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+            ?: java.io.File("desktop/src/desktopMain/resources/client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+            ?: throw Exception("Arquivo client_secrets.json não encontrado.")
+
+        val transport = com.google.api.client.googleapis.javanet.GoogleNetHttpTransport.newTrustedTransport()
+        val jsonFactory = com.google.api.client.json.gson.GsonFactory.getDefaultInstance()
+        val clientSecrets = com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.load(
+            jsonFactory, java.io.InputStreamReader(secretStream)
+        )
+
+        val flow = com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow.Builder(
+            transport, jsonFactory, clientSecrets,
+            listOf(
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/drive.appdata"
+            )
+        )
+            .setDataStoreFactory(com.google.api.client.util.store.FileDataStoreFactory(java.io.File(System.getProperty("user.home"), ".thebigcalendar/tokens")))
+            .setAccessType("offline")
+            .build()
+
+        val receiver = com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver.Builder().setPort(8888).build()
+        val credential = com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+
+        return com.google.api.services.calendar.Calendar.Builder(transport, jsonFactory, credential)
+            .setApplicationName("The Big Calendar")
+            .build()
+    }
+
+    fun checkGoogleAccount() {
+        if (!hasTokens()) {
+            _uiState.update { it.copy(googleAccountEmail = null) }
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val calendarService = getCalendarService()
+                val calendar = calendarService.calendars().get("primary").execute()
+                val email = calendar.id
+                _uiState.update { it.copy(googleAccountEmail = email) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun disconnectGoogleAccount() {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val home = System.getProperty("user.home")
+                val tokensDir = java.io.File(home, ".thebigcalendar/tokens")
+                if (tokensDir.exists() && tokensDir.isDirectory) {
+                    tokensDir.listFiles()?.forEach { it.delete() }
+                }
+                _uiState.update { it.copy(googleAccountEmail = null) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun syncActivitiesWithCloud() {
+        scope.launch {
+            _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando sincronização...") }
+            try {
+                val secretStream = Thread.currentThread().contextClassLoader.getResourceAsStream("client_secrets.json")
+                    ?: java.io.File("client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+                    ?: java.io.File("desktop/src/desktopMain/resources/client_secrets.json").let { if (it.exists()) it.inputStream() else null }
+
+                if (secretStream == null) {
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            syncMessage = "Aviso: arquivo 'client_secrets.json' não encontrado. Não é possível acessar a nuvem."
+                        )
+                    }
+                    return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    val driveService = getDriveService()
+
+                    // 1. Procurar arquivo TBCalendar_Sync_Data.json
+                    val resultList = driveService.files().list()
+                        .setSpaces("appDataFolder")
+                        .setQ("name = 'TBCalendar_Sync_Data.json'")
+                        .setFields("files(id, name)")
+                        .execute()
+                    val files = resultList.files ?: emptyList()
+
+                    var remoteActivities = emptyList<Activity>()
+                    var remoteCompleted = emptyList<Activity>()
+                    var remoteDeletedIds = emptySet<String>()
+                    var fileId: String? = null
+
+                    if (files.isNotEmpty()) {
+                        val foundFile = files[0]
+                        fileId = foundFile.id
+                        val tempFile = java.io.File.createTempFile("temp_sync_download", ".json")
+                        try {
+                            driveService.files().get(fileId).executeMediaAndDownloadTo(tempFile.outputStream())
+                            val content = tempFile.readText(Charsets.UTF_8)
+                            if (content.isNotEmpty()) {
+                                val jsonObject = Json.parseToJsonElement(content).jsonObject
+                                
+                                val activitiesArray = jsonObject["activities"]?.jsonArray ?: emptyList()
+                                val parsedActs = mutableListOf<Activity>()
+                                for (element in activitiesArray) {
+                                    try {
+                                        parsedActs.add(parseActivityFromJsonObject(element.jsonObject))
+                                    } catch(e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                                remoteActivities = parsedActs
+
+                                val completedArray = jsonObject["completedActivities"]?.jsonArray ?: emptyList()
+                                val parsedCompleted = mutableListOf<Activity>()
+                                for (element in completedArray) {
+                                    try {
+                                        parsedCompleted.add(parseActivityFromJsonObject(element.jsonObject).copy(isCompleted = true))
+                                    } catch(e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                                remoteCompleted = parsedCompleted
+
+                                val deletedArray = jsonObject["deletedActivities"]?.jsonArray ?: emptyList()
+                                val parsedDeleted = mutableSetOf<String>()
+                                for (element in deletedArray) {
+                                    try {
+                                        val optObj = element as? kotlinx.serialization.json.JsonObject
+                                        if (optObj != null) {
+                                            val origObj = optObj["originalActivity"]?.jsonObject
+                                            val origId = origObj?.get("id")?.jsonPrimitive?.content ?: optObj["id"]?.jsonPrimitive?.content
+                                            if (!origId.isNullOrEmpty()) {
+                                                parsedDeleted.add(origId)
+                                            }
+                                        } else {
+                                            val strId = element.jsonPrimitive.content
+                                            if (strId.isNotEmpty()) {
+                                                parsedDeleted.add(strId)
+                                            }
+                                        }
+                                    } catch(e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                                remoteDeletedIds = parsedDeleted
+                            }
+                        } finally {
+                            if (tempFile.exists()) tempFile.delete()
+                        }
+                    }
+
+                    // 2. Mesclar com dados locais
+                    val localActivities = _uiState.value.activities
+                    val localDeletedIds = _uiState.value.deletedActivityIds.toSet()
+                    
+                    val finalDeletedIds = localDeletedIds + remoteDeletedIds
+
+                    // Separar locais personalizadas e importadas
+                    val localCustomActive = localActivities.filter { !it.isCompleted && it.location?.startsWith("JSON_IMPORTED_") != true }
+                    val localJsonActive = localActivities.filter { !it.isCompleted && it.location?.startsWith("JSON_IMPORTED_") == true }
+
+                    val localCustomCompleted = localActivities.filter { it.isCompleted && it.location?.startsWith("JSON_IMPORTED_") != true }
+                    val localJsonCompleted = localActivities.filter { it.isCompleted && it.location?.startsWith("JSON_IMPORTED_") == true }
+
+                    // Filtrar remotas para garantir que não tenham lixo importado
+                    val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+                    val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+                    
+                    val mergedCustomActive = (localCustomActive + remoteCustomActive)
+                        .distinctBy { it.id }
+                        .filter { it.id !in finalDeletedIds }
+
+                    val mergedCustomCompleted = (localCustomCompleted + remoteCustomCompleted)
+                        .distinctBy { it.id }
+                        .filter { it.id !in finalDeletedIds }
+                    
+                    val finalActive = mergedCustomActive + localJsonActive
+                    val finalCompleted = mergedCustomCompleted + localJsonCompleted
+                    
+                    val mergedActivities = finalActive + finalCompleted
+
+                    // 3. Salvar no banco local (State e Datastore)
+                    _uiState.update { 
+                        it.copy(
+                            activities = mergedActivities,
+                            deletedActivityIds = finalDeletedIds.toList(),
+                            isSyncing = false,
+                            syncMessage = "Sincronização com a nuvem concluída!"
+                        ) 
+                    }
+                    saveData()
+                    checkGoogleAccount()
+
+                    // 4. Upload do arquivo atualizado
+                    val activitiesJsonList = mergedCustomActive
+                    val completedJsonList = mergedCustomCompleted
+
+                    val tempUploadFile = java.io.File.createTempFile("TBCalendar_Sync_Data", ".json")
+                    try {
+                        val syncJson = kotlinx.serialization.json.buildJsonObject {
+                            put("backupVersion", kotlinx.serialization.json.JsonPrimitive("1.1"))
+                            put("createdAt", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDateTime.now().toString()))
+                            put("appVersion", kotlinx.serialization.json.JsonPrimitive("TheBigCalendar"))
+                            
+                            put("activities", kotlinx.serialization.json.buildJsonArray {
+                                activitiesJsonList.forEach { act ->
+                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
+                                }
+                            })
+                            
+                            put("completedActivities", kotlinx.serialization.json.buildJsonArray {
+                                completedJsonList.forEach { act ->
+                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
+                                }
+                            })
+                            
+                            put("deletedActivities", kotlinx.serialization.json.buildJsonArray {
+                                finalDeletedIds.forEach { id ->
+                                    add(kotlinx.serialization.json.JsonPrimitive(id))
+                                }
+                            })
+                        }
+
+                        tempUploadFile.writeText(Json.encodeToString(syncJson), Charsets.UTF_8)
+
+                        val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+
+                        if (fileId != null) {
+                            val updateMetadata = com.google.api.services.drive.model.File().apply {
+                                name = "TBCalendar_Sync_Data.json"
+                            }
+                            driveService.files().update(fileId, updateMetadata, mediaContent).execute()
+                        } else {
+                            val createMetadata = com.google.api.services.drive.model.File().apply {
+                                name = "TBCalendar_Sync_Data.json"
+                                parents = listOf("appDataFolder")
+                            }
+                            driveService.files().create(createMetadata, mediaContent).execute()
+                        }
+                    } finally {
+                        if (tempUploadFile.exists()) tempUploadFile.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update { 
+                    it.copy(
+                        isSyncing = false,
+                        syncMessage = "Erro na sincronização: ${e.message}"
+                    ) 
+                }
+            }
+        }
     }
 }

@@ -871,6 +871,252 @@ class BackupService(
             skippedDate = alarmJson.optString("skippedDate", "").takeIf { it.isNotEmpty() && it != "null" }
         )
     }
+
+    private fun serializeActivityToJson(activity: Activity): JSONObject {
+        val activityJson = JSONObject()
+        activityJson.put("id", activity.id)
+        activityJson.put("title", activity.title)
+        activityJson.put("description", activity.description ?: "")
+        activityJson.put("date", activity.date)
+        activityJson.put("startTime", activity.startTime?.toString() ?: "")
+        activityJson.put("endTime", activity.endTime?.toString() ?: "")
+        activityJson.put("isAllDay", activity.isAllDay)
+        activityJson.put("location", activity.location ?: "")
+        activityJson.put("categoryColor", activity.categoryColor)
+        activityJson.put("activityType", activity.activityType.name)
+        activityJson.put("recurrenceRule", activity.recurrenceRule ?: "")
+        activityJson.put("isCompleted", activity.isCompleted)
+        activityJson.put("visibility", activity.visibility.name)
+        activityJson.put("showInCalendar", activity.showInCalendar)
+        activityJson.put("isFromGoogle", activity.isFromGoogle)
+        
+        val excludedDatesArray = JSONArray()
+        activity.excludedDates.forEach { excludedDatesArray.put(it) }
+        activityJson.put("excludedDates", excludedDatesArray)
+        
+        val excludedInstancesArray = JSONArray()
+        activity.excludedInstances.forEach { excludedInstancesArray.put(it) }
+        activityJson.put("excludedInstances", excludedInstancesArray)
+        
+        activityJson.put("wikipediaLink", activity.wikipediaLink ?: "")
+        
+        val notificationJson = JSONObject()
+        notificationJson.put("isEnabled", activity.notificationSettings.isEnabled)
+        notificationJson.put("notificationType", activity.notificationSettings.notificationType.name)
+        notificationJson.put("customMinutesBefore", activity.notificationSettings.customMinutesBefore)
+        notificationJson.put("notificationTime", activity.notificationSettings.notificationTime?.toString() ?: "")
+        activityJson.put("notificationSettings", notificationJson)
+        
+        return activityJson
+    }
+
+    suspend fun syncActivitiesWithCloud(account: GoogleSignInAccount): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val driveService = getGoogleDriveService(account)
+            val drive = driveService.drive
+            
+            // 1. Procurar arquivo TBCalendar_Sync_Data.json
+            val resultList = drive.files().list()
+                .setSpaces("appDataFolder")
+                .setQ("name = 'TBCalendar_Sync_Data.json'")
+                .setFields("files(id, name)")
+                .execute()
+            val files = resultList.files ?: emptyList()
+            
+            var remoteActivities = emptyList<Activity>()
+            var remoteCompleted = emptyList<Activity>()
+            var remoteDeletedIds = emptySet<String>()
+            var fileId: String? = null
+            
+            if (files.isNotEmpty()) {
+                val foundFile = files[0]
+                fileId = foundFile.id
+                val tempFile = File.createTempFile("temp_sync_download", ".json", context.cacheDir)
+                try {
+                    drive.files().get(fileId).executeMediaAndDownloadTo(tempFile.outputStream())
+                    val content = tempFile.readText(Charsets.UTF_8)
+                    if (content.isNotEmpty()) {
+                        val json = JSONObject(content)
+                        
+                        // Parsear atividades remotas
+                        val parsedActs = mutableListOf<Activity>()
+                        val actsArray = json.optJSONArray("activities")
+                        if (actsArray != null) {
+                            for (i in 0 until actsArray.length()) {
+                                try {
+                                    parsedActs.add(parseActivityFromJson(actsArray.getJSONObject(i)))
+                                } catch (e: Exception) {
+                                    // Ignorar erros individuais
+                                }
+                            }
+                        }
+                        remoteActivities = parsedActs
+                        
+                        // Parsear atividades concluídas remotas
+                        val parsedCompleted = mutableListOf<Activity>()
+                        val completedArray = json.optJSONArray("completedActivities")
+                        if (completedArray != null) {
+                            for (i in 0 until completedArray.length()) {
+                                try {
+                                    parsedCompleted.add(parseActivityFromJson(completedArray.getJSONObject(i)))
+                                } catch (e: Exception) {
+                                    // Ignorar
+                                }
+                            }
+                        }
+                        remoteCompleted = parsedCompleted
+                        
+                        // Parsear itens excluídos remotos
+                        val parsedDeletedIds = mutableSetOf<String>()
+                        val deletedArray = json.optJSONArray("deletedActivities")
+                        if (deletedArray != null) {
+                            for (i in 0 until deletedArray.length()) {
+                                try {
+                                    val optObj = deletedArray.optJSONObject(i)
+                                    if (optObj != null) {
+                                        val origObj = optObj.optJSONObject("originalActivity")
+                                        val origId = origObj?.optString("id") ?: optObj.optString("id")
+                                        if (!origId.isNullOrEmpty()) {
+                                            parsedDeletedIds.add(origId)
+                                        }
+                                    } else {
+                                        val strId = deletedArray.getString(i)
+                                        if (!strId.isNullOrEmpty()) {
+                                            parsedDeletedIds.add(strId)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    // Ignorar
+                                }
+                            }
+                        }
+                        remoteDeletedIds = parsedDeletedIds
+                    }
+                } finally {
+                    if (tempFile.exists()) tempFile.delete()
+                }
+            }
+            
+            // 2. Mesclar com dados locais
+            val localActivities = activityRepository.activities.first()
+            val localCompleted = completedActivityRepository.completedActivities.first()
+            val localDeleted = deletedActivityRepository.deletedActivities.first()
+            
+            val localDeletedIds = localDeleted.map { it.originalActivity.id }.toSet()
+            val finalDeletedIds = localDeletedIds + remoteDeletedIds
+
+            // Separar locais personalizadas e importadas
+            val localCustomActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val localJsonActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") == true }
+
+            val localCustomCompleted = localCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val localJsonCompleted = localCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") == true }
+
+            // Filtrar remotas para garantir que não tenham lixo importado
+            val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            
+            val mergedCustomActive = (localCustomActive + remoteCustomActive)
+                .distinctBy { it.id }
+                .filter { it.id !in finalDeletedIds }
+
+            val mergedCustomCompleted = (localCustomCompleted + remoteCustomCompleted)
+                .distinctBy { it.id }
+                .filter { it.id !in finalDeletedIds }
+            
+            val finalActive = mergedCustomActive + localJsonActive
+            val finalCompleted = mergedCustomCompleted + localJsonCompleted
+            
+            // 3. Salvar no banco local
+            activityRepository.clearAllActivities()
+            activityRepository.saveAllActivities(finalActive)
+            
+            completedActivityRepository.clearAllCompletedActivities()
+            completedActivityRepository.saveAllCompletedActivities(finalCompleted)
+            
+            // Atualizar banco de excluídos
+            deletedActivityRepository.clearAllDeletedActivities()
+            val updatedDeletedActivities = mutableListOf<DeletedActivity>()
+            finalDeletedIds.forEach { deletedId ->
+                val localFound = localDeleted.find { it.originalActivity.id == deletedId }
+                if (localFound != null) {
+                    updatedDeletedActivities.add(localFound)
+                } else {
+                    val origAct = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
+                        .find { it.id == deletedId }
+                        ?: Activity(
+                            id = deletedId,
+                            title = "Excluído",
+                            description = null,
+                            date = java.time.LocalDate.now().toString(),
+                            startTime = null,
+                            endTime = null,
+                            isAllDay = true,
+                            location = null,
+                            categoryColor = "1",
+                            activityType = com.mss.thebigcalendar.data.model.ActivityType.EVENT,
+                            recurrenceRule = null,
+                            notificationSettings = com.mss.thebigcalendar.data.model.NotificationSettings()
+                        )
+                    updatedDeletedActivities.add(
+                        DeletedActivity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            originalActivity = origAct,
+                            deletedAt = LocalDateTime.now(),
+                            deletedBy = "sync"
+                        )
+                    )
+                }
+            }
+            deletedActivityRepository.saveAllDeletedActivities(updatedDeletedActivities)
+            
+            // 4. Upload do arquivo atualizado
+            val syncJson = JSONObject().apply {
+                put("backupVersion", "1.1")
+                put("createdAt", LocalDateTime.now().toString())
+                put("appVersion", "TheBigCalendar")
+                
+                val activitiesJsonArray = JSONArray()
+                mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
+                put("activities", activitiesJsonArray)
+                
+                val completedJsonArray = JSONArray()
+                mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
+                put("completedActivities", completedJsonArray)
+                
+                val deletedJsonArray = JSONArray()
+                finalDeletedIds.forEach { deletedJsonArray.put(it) }
+                put("deletedActivities", deletedJsonArray)
+            }
+            
+            val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)
+            try {
+                tempUploadFile.writeText(syncJson.toString(), Charsets.UTF_8)
+                
+                val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+                
+                if (fileId != null) {
+                    val updateMetadata = com.google.api.services.drive.model.File().apply {
+                        name = "TBCalendar_Sync_Data.json"
+                    }
+                    drive.files().update(fileId, updateMetadata, mediaContent).execute()
+                } else {
+                    val createMetadata = com.google.api.services.drive.model.File().apply {
+                        name = "TBCalendar_Sync_Data.json"
+                        parents = listOf("appDataFolder")
+                    }
+                    drive.files().create(createMetadata, mediaContent).execute()
+                }
+            } finally {
+                if (tempUploadFile.exists()) tempUploadFile.delete()
+            }
+            
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("BackupService", "Erro na sincronização automática em nuvem: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
 
 /**

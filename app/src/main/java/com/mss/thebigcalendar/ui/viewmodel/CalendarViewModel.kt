@@ -221,6 +221,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     
     // Cache System
     private var updateJob: Job? = null
+    private var cloudSyncJob: Job? = null
     private var cachedCalendarDays: List<CalendarDay>? = null
     private var lastUpdateParams: String? = null
     private var cachedBirthdays: Map<LocalDate, List<Activity>> = emptyMap()
@@ -1154,6 +1155,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             }
+            // Trigger automatic sync with the cloud
+            triggerCloudSync()
         } catch (e: Exception) {
             Log.e("CalendarViewModel", "❌ Erro ao notificar widgets", e)
         }
@@ -2751,24 +2754,63 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
     
     fun manualGoogleSync() {
-        val account = _uiState.value.googleSignInAccount
-        if (account != null) {
-            performProgressiveSync(account, forceFullSync = true)
-        }
+        syncActivitiesWithCloud()
     }
     
     fun syncGoogleCalendarSimple() {
-        val account = _uiState.value.googleSignInAccount
-        if (account != null) {
-            performProgressiveSync(account, forceFullSync = false)
-        }
+        syncActivitiesWithCloud()
     }
     
     fun onManualSync() {
-        val account = _uiState.value.googleSignInAccount
-        if (account != null) {
-            // Sincronização manual sempre força uma busca completa para resolver problemas de inconsistência
-            performProgressiveSync(account, forceFullSync = true)
+        syncActivitiesWithCloud()
+    }
+
+    fun syncActivitiesWithCloud() {
+        val account = _uiState.value.googleSignInAccount ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null) }
+            try {
+                backupService.syncActivitiesWithCloud(account)
+                    .onSuccess {
+                        _uiState.update { it.copy(
+                            isSyncing = false,
+                            lastGoogleSyncTime = System.currentTimeMillis()
+                        ) }
+                        loadData()
+                        viewModelScope.launch {
+                            delay(500)
+                            notifyWidgetsDataChanged()
+                        }
+                    }
+                    .onFailure { exception ->
+                        Log.e("CalendarViewModel", "❌ Erro na sincronização com o Drive", exception)
+                        _uiState.update { it.copy(
+                            isSyncing = false,
+                            syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                        ) }
+                    }
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização com o Drive", e)
+                _uiState.update { it.copy(
+                    isSyncing = false,
+                    syncErrorMessage = "Erro inesperado: ${e.message}"
+                ) }
+            }
+        }
+    }
+
+    fun triggerCloudSync() {
+        cloudSyncJob?.cancel()
+        cloudSyncJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(2000) // Debounce de 2 segundos para evitar múltiplos uploads consecutivos
+            val account = _uiState.value.googleSignInAccount
+            if (account != null) {
+                try {
+                    backupService.syncActivitiesWithCloud(account)
+                } catch (e: Exception) {
+                    Log.e("CalendarViewModel", "Erro na sincronização automática em nuvem: ${e.message}", e)
+                }
+            }
         }
     }
 

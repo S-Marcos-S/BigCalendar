@@ -14,7 +14,7 @@ class GoogleDriveService(
     private val account: GoogleSignInAccount
 ) {
 
-    private val drive: Drive by lazy {
+    val drive: Drive by lazy {
         val credential = GoogleAccountCredential.usingOAuth2(
             context,
             listOf(DriveScopes.DRIVE_APPDATA)

@@ -73,7 +73,7 @@
 
         <activity-alias
             android:name=".MainActivityAliasWhite"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_white"
             android:roundIcon="@mipmap/ic_launcher_white_round"
@@ -87,7 +87,7 @@
 
         <activity-alias
             android:name=".MainActivityAliasBlack"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_black"
             android:roundIcon="@mipmap/ic_launcher_black_round"

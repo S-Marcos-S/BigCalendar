@@ -81,7 +81,6 @@ fun CalendarVisualizationSettingsScreen(
     var hideOtherMonths by remember { mutableStateOf(uiState.hideOtherMonthDays) }
     var showAnimationDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var showAppIconDialog by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     var welcomeNameInput by remember { mutableStateOf(welcomeName) }
@@ -462,45 +461,6 @@ fun CalendarVisualizationSettingsScreen(
                 }
             }
 
-            // Configuração do ícone do aplicativo
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Android,
-                    contentDescription = stringResource(id = R.string.settings_app_icon_title),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(id = R.string.settings_app_icon_title),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = { showAppIconDialog = true },
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    val modeLabel = when (uiState.appIconMode) {
-                        AppIconMode.DYNAMIC -> stringResource(id = R.string.settings_app_icon_mode_dynamic)
-                        AppIconMode.WHITE -> stringResource(id = R.string.settings_app_icon_mode_white)
-                        AppIconMode.BLACK -> stringResource(id = R.string.settings_app_icon_mode_black)
-                    }
-                    val iconText = when (uiState.appIconMode) {
-                        AppIconMode.DYNAMIC -> "🔄"
-                        AppIconMode.WHITE -> "⚪"
-                        AppIconMode.BLACK -> "⚫"
-                    }
-                    Text(
-                        text = "$iconText $modeLabel",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = stringResource(id = R.string.changes_saved_automatically),
@@ -531,17 +491,6 @@ fun CalendarVisualizationSettingsScreen(
                 showLanguageDialog = false
             },
             onDismiss = { showLanguageDialog = false }
-        )
-    }
-
-    // Dialog de seleção de ícone
-    if (showAppIconDialog) {
-        AppIconSelectionDialog(
-            currentMode = uiState.appIconMode,
-            onModeSelected = { mode ->
-                viewModel.onAppIconModeChange(mode)
-            },
-            onDismiss = { showAppIconDialog = false }
         )
     }
 }

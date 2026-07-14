@@ -21,30 +21,6 @@ class GoogleCalendarSyncWorker(
     }
     
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        try {
-            
-            // Verificar se há conta Google conectada
-            val account = GoogleSignIn.getLastSignedInAccount(applicationContext)
-            if (account == null) {
-                return@withContext Result.success()
-            }
-            
-            // Realizar sincronização progressiva
-            val googleCalendarService = GoogleCalendarService(applicationContext)
-            val progressiveSyncService = ProgressiveSyncService(applicationContext, googleCalendarService)
-            
-            val result = progressiveSyncService.syncProgressively(account) { progress ->
-                // Progresso da sincronização
-            }
-            
-            if (result.isSuccess) {
-                Result.success()
-            } else {
-                Result.retry()
-            }
-            
-        } catch (e: Exception) {
-            Result.failure()
-        }
+        Result.success()
     }
 }

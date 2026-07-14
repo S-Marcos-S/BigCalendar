@@ -520,30 +520,50 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                // Botão de Sincronização Google Calendar
+                // Botão de Sincronização Nuvem (Google Drive)
                 NavigationDrawerItem(
                     label = {
-                        if (uiState.isSyncing) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Sincronizando...")
+                        Column {
+                            if (uiState.isSyncing) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Sincronizando...")
+                                }
+                            } else {
+                                Text("Sincronizar Nuvem")
                             }
-                        } else {
-                            Text("Sincronizar Google")
+                            val email = uiState.googleAccountEmail
+                            if (email != null) {
+                                Text(
+                                    text = email,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     },
                     icon = { Icon(Icons.Default.Sync, contentDescription = null) },
                     selected = false,
-                    onClick = { if (!uiState.isSyncing) viewModel.syncGoogleCalendar() },
+                    onClick = { if (!uiState.isSyncing) viewModel.syncActivitiesWithCloud() },
                     modifier = Modifier
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                         .alpha(if (uiState.isSyncing) 0.38f else 1f)
                 )
+                
+                if (uiState.googleAccountEmail != null) {
+                    NavigationDrawerItem(
+                        label = { Text("Trocar Conta Google") },
+                        icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+                        selected = false,
+                        onClick = { if (!uiState.isSyncing) viewModel.disconnectGoogleAccount() },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
                 
                 // Botão de Restaurar Backup Local
                 NavigationDrawerItem(
