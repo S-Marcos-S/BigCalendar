@@ -58,9 +58,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 fun parseHexColor(colorStr: String): Color {
     return when (colorStr) {
         "1" -> Color.White
-        "2" -> Color.Blue
-        "3" -> Color.Yellow
-        "4" -> Color.Red
+        "2" -> Color(0xFF3B82F6) // Azul Material
+        "3" -> Color(0xFFFBBF24) // Amarelo Material
+        "4" -> Color(0xFFEF4444) // Vermelho Material
         else -> {
             try {
                 val decVal = colorStr.toIntOrNull()
