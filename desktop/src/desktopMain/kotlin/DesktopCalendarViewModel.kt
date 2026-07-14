@@ -10,6 +10,7 @@ import com.mss.thebigcalendar.data.model.HolidayType
 import com.mss.thebigcalendar.data.model.Theme
 import com.mss.thebigcalendar.data.model.VisibilityLevel
 import com.mss.thebigcalendar.data.model.NotificationSettings
+import com.mss.thebigcalendar.data.model.ViewMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -118,7 +119,8 @@ data class DesktopUiState(
     val sidebarFilterVisibility: DesktopSidebarFilterVisibility = DesktopSidebarFilterVisibility(),
     val showCompletedActivities: Boolean = false,
     val showMoonPhases: Boolean = false,
-    val jsonCalendars: List<DesktopJsonCalendar> = emptyList()
+    val jsonCalendars: List<DesktopJsonCalendar> = emptyList(),
+    val viewMode: ViewMode = ViewMode.MONTHLY
 )
 
 class DesktopCalendarViewModel(private val scope: CoroutineScope) {
@@ -392,6 +394,26 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
     fun setDisplayedMonth(yearMonth: YearMonth) {
         _uiState.update { it.copy(displayedYearMonth = yearMonth) }
+    }
+
+    fun setViewMode(mode: ViewMode) {
+        _uiState.update { it.copy(viewMode = mode) }
+    }
+
+    fun updateDisplayedYear(offset: Int) {
+        _uiState.update {
+            val newMonth = it.displayedYearMonth.plusYears(offset.toLong())
+            it.copy(displayedYearMonth = newMonth)
+        }
+    }
+
+    fun onYearlyMonthClicked(yearMonth: YearMonth) {
+        _uiState.update {
+            it.copy(
+                displayedYearMonth = yearMonth,
+                viewMode = ViewMode.MONTHLY
+            )
+        }
     }
 
     fun addOrUpdateActivity(

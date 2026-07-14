@@ -33,6 +33,7 @@ import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.model.Holiday
 import com.mss.thebigcalendar.data.model.HolidayType
 import com.mss.thebigcalendar.data.model.Theme
+import com.mss.thebigcalendar.data.model.ViewMode
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
@@ -98,6 +99,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
     val displayedMonth = uiState.displayedYearMonth
     val activities = uiState.activities
     val filters = uiState.filterOptions
+    val isYearly = uiState.viewMode == ViewMode.YEARLY
 
     val categoryColors = listOf("1", "2", "3", "4")
 
@@ -336,8 +338,8 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 NavigationDrawerItem(
                     label = { Text("Mensal") },
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    selected = true,
-                    onClick = { /* Já selecionado */ },
+                    selected = uiState.viewMode == ViewMode.MONTHLY,
+                    onClick = { viewModel.setViewMode(ViewMode.MONTHLY) },
                     colors = NavigationDrawerItemDefaults.colors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
                         selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -348,8 +350,13 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 NavigationDrawerItem(
                     label = { Text("Anual") },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                    selected = false,
-                    onClick = { /* Em breve no Desktop */ },
+                    selected = uiState.viewMode == ViewMode.YEARLY,
+                    onClick = { viewModel.setViewMode(ViewMode.YEARLY) },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
+                    ),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
                 NavigationDrawerItem(
@@ -725,7 +732,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
             )
         }
 
-        // SEÇÃO CENTRAL: Grade do Calendário Mensal
+        // SEÇÃO CENTRAL: Grade do Calendário Mensal/Anual
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -734,35 +741,53 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 .onPointerEvent(PointerEventType.Scroll) { pointerEvent ->
                     val deltaY = pointerEvent.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                     if (deltaY > 0f) {
-                        viewModel.updateDisplayedMonth(1)
+                        if (isYearly) viewModel.updateDisplayedYear(1) else viewModel.updateDisplayedMonth(1)
                     } else if (deltaY < 0f) {
-                        viewModel.updateDisplayedMonth(-1)
+                        if (isYearly) viewModel.updateDisplayedYear(-1) else viewModel.updateDisplayedMonth(-1)
                     }
                 }
         ) {
-            // Cabeçalho do Calendário (Mês e Ano + Navegação)
+            // Cabeçalho do Calendário (Mês/Ano + Navegação)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        displayedMonth.month.getDisplayName(TextStyle.FULL, Locale("pt", "BR")).replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        displayedMonth.year.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (isYearly) {
+                        Text(
+                            text = displayedMonth.year.toString(),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Calendário Anual",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = displayedMonth.month.getDisplayName(TextStyle.FULL, Locale("pt", "BR")).replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = displayedMonth.year.toString(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { viewModel.updateDisplayedMonth(-1) }) {
-                        Icon(Icons.Default.ChevronLeft, contentDescription = "Mês Anterior", modifier = Modifier.size(32.dp))
+                    IconButton(onClick = { if (isYearly) viewModel.updateDisplayedYear(-1) else viewModel.updateDisplayedMonth(-1) }) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = if (isYearly) "Ano Anterior" else "Mês Anterior",
+                            modifier = Modifier.size(32.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -775,157 +800,168 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                         Text("Hoje")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(onClick = { viewModel.updateDisplayedMonth(1) }) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Próximo Mês", modifier = Modifier.size(32.dp))
+                    IconButton(onClick = { if (isYearly) viewModel.updateDisplayedYear(1) else viewModel.updateDisplayedMonth(1) }) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = if (isYearly) "Próximo Ano" else "Próximo Mês",
+                            modifier = Modifier.size(32.dp)
+                        )
                     }
                 }
             }
 
-            // Dias da Semana
-            val daysOfWeek = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                daysOfWeek.forEach { day ->
-                    Text(
-                        text = day,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            if (isYearly) {
+                YearlyCalendarView(
+                    year = displayedMonth.year,
+                    onMonthClicked = { viewModel.onYearlyMonthClicked(it) }
+                )
+            } else {
+                // Dias da Semana
+                val daysOfWeek = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    daysOfWeek.forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-            }
 
-            // Grade do Calendário
-            val firstOfMonth = displayedMonth.atDay(1)
-            val firstDayOfWeek = firstOfMonth.dayOfWeek.value // 1 (Mon) - 7 (Sun)
-            val startOffset = if (firstDayOfWeek == 7) 0 else firstDayOfWeek
-            val startDate = firstOfMonth.minusDays(startOffset.toLong())
-            val calendarDates = List(42) { index -> startDate.plusDays(index.toLong()) }
+                // Grade do Calendário
+                val firstOfMonth = displayedMonth.atDay(1)
+                val firstDayOfWeek = firstOfMonth.dayOfWeek.value // 1 (Mon) - 7 (Sun)
+                val startOffset = if (firstDayOfWeek == 7) 0 else firstDayOfWeek
+                val startDate = firstOfMonth.minusDays(startOffset.toLong())
+                val calendarDates = List(42) { index -> startDate.plusDays(index.toLong()) }
 
-            Column(modifier = Modifier.weight(1f)) {
-                for (weekIndex in 0 until 6) {
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        for (dayIndex in 0 until 7) {
-                            val date = calendarDates[weekIndex * 7 + dayIndex]
-                            val isCurrentMonth = date.monthValue == displayedMonth.monthValue
-                            val isSelected = date == selectedDate
-                            val isToday = date == LocalDate.now()
+                Column(modifier = Modifier.weight(1f)) {
+                    for (weekIndex in 0 until 6) {
+                        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            for (dayIndex in 0 until 7) {
+                                val date = calendarDates[weekIndex * 7 + dayIndex]
+                                val isCurrentMonth = date.monthValue == displayedMonth.monthValue
+                                val isSelected = date == selectedDate
+                                val isToday = date == LocalDate.now()
 
-                            val dayActivities = filteredActivities.filter { it.date == date.toString() }
+                                val dayActivities = filteredActivities.filter { it.date == date.toString() }
 
-                            // Calcular feriados com string interpolation para MM-dd
-                            val dayHolidays = remember(date, filters) {
-                                val list = mutableListOf<Holiday>()
-                                val dMonthStr = if (date.monthValue < 10) "0${date.monthValue}" else "${date.monthValue}"
-                                val dDayStr = if (date.dayOfMonth < 10) "0${date.dayOfMonth}" else "${date.dayOfMonth}"
-                                val dMMDD = "$dMonthStr-$dDayStr"
+                                // Calcular feriados com string interpolation para MM-dd
+                                val dayHolidays = remember(date, filters) {
+                                    val list = mutableListOf<Holiday>()
+                                    val dMonthStr = if (date.monthValue < 10) "0${date.monthValue}" else "${date.monthValue}"
+                                    val dDayStr = if (date.dayOfMonth < 10) "0${date.dayOfMonth}" else "${date.dayOfMonth}"
+                                    val dMMDD = "$dMonthStr-$dDayStr"
 
-                                if (filters.showHolidays) {
-                                    list.addAll(viewModel.nationalHolidays.filter { it.date == dMMDD })
-                                    list.addAll(viewModel.commemorativeDates.filter { it.date == dMMDD })
-                                }
-                                if (filters.showSaintDays) {
-                                    list.addAll(viewModel.saintDays.filter { it.date == dMMDD })
-                                }
-                                if (filters.showProfessionalDays) {
-                                    list.addAll(viewModel.professionalDays.filter { it.date == dMMDD })
-                                }
-                                if (filters.showMilitaryHolidays) {
-                                    list.addAll(viewModel.militaryHolidays.filter { it.date == dMMDD })
-                                }
-                                list
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .padding(2.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        when {
-                                            isSelected -> MaterialTheme.colorScheme.primaryContainer
-                                            isToday -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-                                            else -> Color.Transparent
-                                        }
-                                    )
-                                    .border(
-                                        if (isSelected || isToday) 2.dp else 1.5.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else if (isToday) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
-                                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { viewModel.selectDate(date) }
-                                    .padding(6.dp)
-                            ) {
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = date.dayOfMonth.toString(),
-                                            fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = when {
-                                                !isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
-                                                isToday -> MaterialTheme.colorScheme.tertiary
-                                                dayHolidays.any { it.type == HolidayType.NATIONAL } -> Color(0xFFE53935)
-                                                else -> MaterialTheme.colorScheme.onSurface
-                                            },
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        
-                                        if (dayHolidays.isNotEmpty()) {
-                                            val color = if (dayHolidays.any { it.type == HolidayType.NATIONAL }) Color(0xFFE53935) else Color(0xFFB39DDB)
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .clip(CircleShape)
-                                                    .background(color)
-                                            )
-                                        }
+                                    if (filters.showHolidays) {
+                                        list.addAll(viewModel.nationalHolidays.filter { it.date == dMMDD })
+                                        list.addAll(viewModel.commemorativeDates.filter { it.date == dMMDD })
                                     }
-                                    
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        dayActivities.take(3).forEach { act ->
-                                            val pillBg = parseHexColor(act.categoryColor)
-                                            val textColor = if (pillBg == Color.White || pillBg == Color.Yellow) Color.Black else Color.White
-                                            val isWhiteBg = pillBg == Color.White
+                                    if (filters.showSaintDays) {
+                                        list.addAll(viewModel.saintDays.filter { it.date == dMMDD })
+                                    }
+                                    if (filters.showProfessionalDays) {
+                                        list.addAll(viewModel.professionalDays.filter { it.date == dMMDD })
+                                    }
+                                    if (filters.showMilitaryHolidays) {
+                                        list.addAll(viewModel.militaryHolidays.filter { it.date == dMMDD })
+                                    }
+                                    list
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .padding(2.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            when {
+                                                isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                                isToday -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
+                                                else -> Color.Transparent
+                                            }
+                                        )
+                                        .border(
+                                            if (isSelected || isToday) 2.dp else 1.5.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else if (isToday) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { viewModel.selectDate(date) }
+                                        .padding(6.dp)
+                                ) {
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Text(
-                                                text = act.title,
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                                color = textColor,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                textDecoration = if (act.isCompleted) TextDecoration.LineThrough else null,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(pillBg.copy(alpha = 0.85f))
-                                                    .then(
-                                                        if (isWhiteBg) {
-                                                            Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                                                        } else Modifier
-                                                    )
-                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                text = date.dayOfMonth.toString(),
+                                                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = when {
+                                                    !isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    isToday -> MaterialTheme.colorScheme.tertiary
+                                                    dayHolidays.any { it.type == HolidayType.NATIONAL } -> Color(0xFFE53935)
+                                                    else -> MaterialTheme.colorScheme.onSurface
+                                                },
+                                                style = MaterialTheme.typography.bodyLarge
                                             )
+                                            
+                                            if (dayHolidays.isNotEmpty()) {
+                                                val color = if (dayHolidays.any { it.type == HolidayType.NATIONAL }) Color(0xFFE53935) else Color(0xFFB39DDB)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(color)
+                                                )
+                                            }
                                         }
-                                        if (dayActivities.size > 3) {
-                                            Text(
-                                                text = "+${dayActivities.size - 3}",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 4.dp)
-                                            )
+                                        
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            dayActivities.take(3).forEach { act ->
+                                                val pillBg = parseHexColor(act.categoryColor)
+                                                val textColor = if (pillBg == Color.White || pillBg == Color.Yellow) Color.Black else Color.White
+                                                val isWhiteBg = pillBg == Color.White
+                                                Text(
+                                                    text = act.title,
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                                    color = textColor,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    textDecoration = if (act.isCompleted) TextDecoration.LineThrough else null,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(pillBg.copy(alpha = 0.85f))
+                                                        .then(
+                                                            if (isWhiteBg) {
+                                                                Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                                                            } else Modifier
+                                                        )
+                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                            if (dayActivities.size > 3) {
+                                                Text(
+                                                    text = "+${dayActivities.size - 3}",
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
