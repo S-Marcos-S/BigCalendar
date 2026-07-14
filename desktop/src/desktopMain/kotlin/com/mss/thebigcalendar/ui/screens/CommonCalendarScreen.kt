@@ -63,17 +63,40 @@ fun parseHexColor(colorStr: String): Color {
         "4" -> Color.Red
         else -> {
             try {
-                val hex = colorStr.removePrefix("#")
-                val argb = when (hex.length) {
-                    6 -> 0xFF000000.toInt() or hex.toInt(16)
-                    8 -> hex.toLong(16).toInt()
-                    else -> 0xFFEF5350.toInt()
+                val decVal = colorStr.toIntOrNull()
+                if (decVal != null) {
+                    Color(decVal)
+                } else {
+                    val hex = colorStr.removePrefix("#")
+                    when (hex.length) {
+                        6 -> Color((0xFF000000 or hex.toLong(16)).toInt())
+                        8 -> Color(hex.toLong(16).toInt())
+                        else -> Color(0xFFEF5350.toInt())
+                    }
                 }
-                Color(argb)
             } catch (e: Exception) {
                 Color.White
             }
         }
+    }
+}
+
+fun getHolidayColor(holiday: Holiday, viewModel: DesktopCalendarViewModel): Color {
+    return when {
+        holiday.type == HolidayType.NATIONAL -> Color(0xFFE53935) // Vermelho Feriado
+        holiday.type == HolidayType.COMMEMORATIVE -> Color(0xFFFF9800) // Laranja Comemorativo
+        holiday.type == HolidayType.SAINT -> Color(0xFFFFA000) // Amarelo/Laranja Santo
+        viewModel.professionalDays.any { it.name == holiday.name && it.date == holiday.date } -> Color(0xFF1976D2) // Azul Profissão
+        viewModel.militaryHolidays.any { it.name == holiday.name && it.date == holiday.date } -> Color(0xFF2E7D32) // Verde Militar
+        else -> Color(0xFFFFA000)
+    }
+}
+
+fun getActivityColor(activity: Activity): Color {
+    return when (activity.activityType) {
+        ActivityType.BIRTHDAY -> Color(0xFFE91E63) // Rosa
+        ActivityType.NOTE -> Color(0xFF9C27B0) // Roxo
+        else -> parseHexColor(activity.categoryColor)
     }
 }
 
@@ -408,7 +431,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Eventos",
                                 checked = uiState.filterOptions.showEvents,
-                                colorHex = "#EF5350",
+                                colorHex = "#2196F3",
                                 icon = Icons.Default.Event,
                                 onCheckedChange = { viewModel.onFilterChange("showEvents", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showEvents") }
@@ -418,7 +441,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Tarefas",
                                 checked = uiState.filterOptions.showTasks,
-                                colorHex = "#66BB6A",
+                                colorHex = "#4CAF50",
                                 icon = Icons.Default.TaskAlt,
                                 onCheckedChange = { viewModel.onFilterChange("showTasks", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showTasks") }
@@ -428,7 +451,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Notas",
                                 checked = uiState.filterOptions.showNotes,
-                                colorHex = "#42A5F5",
+                                colorHex = "#9C27B0",
                                 icon = Icons.Default.Description,
                                 onCheckedChange = { viewModel.onFilterChange("showNotes", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showNotes") }
@@ -438,7 +461,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Aniversários",
                                 checked = uiState.filterOptions.showBirthdays,
-                                colorHex = "#FFA726",
+                                colorHex = "#E91E63",
                                 icon = Icons.Default.Cake,
                                 onCheckedChange = { viewModel.onFilterChange("showBirthdays", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showBirthdays") }
@@ -448,7 +471,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Feriados",
                                 checked = uiState.filterOptions.showHolidays,
-                                colorHex = "#FFCDD2",
+                                colorHex = "#E53935",
                                 icon = Icons.Default.Star,
                                 onCheckedChange = { viewModel.onFilterChange("showHolidays", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showHolidays") }
@@ -458,7 +481,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Santos do Dia",
                                 checked = uiState.filterOptions.showSaintDays,
-                                colorHex = "#D1C4E9",
+                                colorHex = "#FFA000",
                                 icon = Icons.Default.Church,
                                 onCheckedChange = { viewModel.onFilterChange("showSaintDays", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showSaintDays") }
@@ -468,7 +491,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Profissões",
                                 checked = uiState.filterOptions.showProfessionalDays,
-                                colorHex = "#C8E6C9",
+                                colorHex = "#1976D2",
                                 icon = Icons.Default.Work,
                                 onCheckedChange = { viewModel.onFilterChange("showProfessionalDays", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showProfessionalDays") }
@@ -478,7 +501,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                             FilterRow(
                                 label = "Feriados Militares",
                                 checked = uiState.filterOptions.showMilitaryHolidays,
-                                colorHex = "#FFE082",
+                                colorHex = "#2E7D32",
                                 icon = Icons.Default.Shield,
                                 onCheckedChange = { viewModel.onFilterChange("showMilitaryHolidays", it) },
                                 onLongPress = { viewModel.toggleSidebarFilterVisibility("showMilitaryHolidays") }
@@ -921,6 +944,23 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                         .padding(6.dp)
                                 ) {
                                     Column(modifier = Modifier.fillMaxSize()) {
+                                val dotColors = remember(dayActivities, dayHolidays) {
+                                    val colors = mutableListOf<Color>()
+                                    dayHolidays.forEach { holiday ->
+                                        val color = getHolidayColor(holiday, viewModel)
+                                        if (!colors.contains(color)) {
+                                            colors.add(color)
+                                        }
+                                    }
+                                    dayActivities.forEach { act ->
+                                        val color = getActivityColor(act)
+                                        if (!colors.contains(color)) {
+                                            colors.add(color)
+                                        }
+                                    }
+                                    colors
+                                }
+
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -939,14 +979,20 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                             
-                                            if (dayHolidays.isNotEmpty()) {
-                                                val color = if (dayHolidays.any { it.type == HolidayType.NATIONAL }) Color(0xFFE53935) else Color(0xFFB39DDB)
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(color)
-                                                )
+                                            if (dotColors.isNotEmpty()) {
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    dotColors.take(4).forEach { color ->
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(6.dp)
+                                                                .clip(CircleShape)
+                                                                .background(color)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                         
@@ -957,7 +1003,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             dayActivities.take(3).forEach { act ->
-                                                val pillBg = parseHexColor(act.categoryColor)
+                                                val pillBg = getActivityColor(act)
                                                 val textColor = if (pillBg == Color.White || pillBg == Color.Yellow) Color.Black else Color.White
                                                 val isWhiteBg = pillBg == Color.White
                                                 Text(
@@ -1033,21 +1079,35 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         holidaysForSelectedDate.forEach { holiday ->
-                            Text(
-                                text = "• ${holiday.name}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (holiday.type == HolidayType.NATIONAL) Color(0xFFE53935) else MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            // Evitar erro de Smart Cast carregando summary em variável local
-                            val summary = holiday.summary
-                            if (!summary.isNullOrBlank()) {
-                                Text(
-                                    text = summary,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
+                            val holidayColor = getHolidayColor(holiday, viewModel)
+                            Row(
+                                verticalAlignment = Alignment.Top,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(holidayColor)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = holiday.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    val summary = holiday.summary
+                                    if (!summary.isNullOrBlank()) {
+                                        Text(
+                                            text = summary,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1595,7 +1655,7 @@ fun ActivityItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val categoryColor = parseHexColor(activity.categoryColor)
+    val categoryColor = getActivityColor(activity)
     var isExpanded by remember { mutableStateOf(false) }
 
     Card(
