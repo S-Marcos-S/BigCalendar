@@ -94,6 +94,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
 
     var editingWelcomeName by remember { mutableStateOf(false) }
     var tempWelcomeName by remember { mutableStateOf(uiState.welcomeName) }
+    var showFiltersSection by remember { mutableStateOf(true) }
 
     val selectedDate = uiState.selectedDate
     val displayedMonth = uiState.displayedYearMonth
@@ -376,120 +377,137 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
                 
-                // 5. Seção de Filtros (Mostrar no Calendário)
-                Text(
-                    text = "Mostrar no Calendário",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // 5. Seção de Filtros (Mostrar no Calendário) com botão de expansão
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showFiltersSection = !showFiltersSection }
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
                 ) {
-                    if (uiState.sidebarFilterVisibility.showEvents) {
-                        FilterRow(
-                            label = "Eventos",
-                            checked = uiState.filterOptions.showEvents,
-                            colorHex = "#EF5350",
-                            icon = Icons.Default.Event,
-                            onCheckedChange = { viewModel.onFilterChange("showEvents", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showEvents") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showTasks) {
-                        FilterRow(
-                            label = "Tarefas",
-                            checked = uiState.filterOptions.showTasks,
-                            colorHex = "#66BB6A",
-                            icon = Icons.Default.TaskAlt,
-                            onCheckedChange = { viewModel.onFilterChange("showTasks", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showTasks") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showNotes) {
-                        FilterRow(
-                            label = "Notas",
-                            checked = uiState.filterOptions.showNotes,
-                            colorHex = "#42A5F5",
-                            icon = Icons.Default.Description,
-                            onCheckedChange = { viewModel.onFilterChange("showNotes", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showNotes") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showBirthdays) {
-                        FilterRow(
-                            label = "Aniversários",
-                            checked = uiState.filterOptions.showBirthdays,
-                            colorHex = "#FFA726",
-                            icon = Icons.Default.Cake,
-                            onCheckedChange = { viewModel.onFilterChange("showBirthdays", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showBirthdays") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showHolidays) {
-                        FilterRow(
-                            label = "Feriados",
-                            checked = uiState.filterOptions.showHolidays,
-                            colorHex = "#FFCDD2",
-                            icon = Icons.Default.Star,
-                            onCheckedChange = { viewModel.onFilterChange("showHolidays", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showHolidays") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showSaintDays) {
-                        FilterRow(
-                            label = "Santos do Dia",
-                            checked = uiState.filterOptions.showSaintDays,
-                            colorHex = "#D1C4E9",
-                            icon = Icons.Default.Church,
-                            onCheckedChange = { viewModel.onFilterChange("showSaintDays", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showSaintDays") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showProfessionalDays) {
-                        FilterRow(
-                            label = "Profissões",
-                            checked = uiState.filterOptions.showProfessionalDays,
-                            colorHex = "#C8E6C9",
-                            icon = Icons.Default.Work,
-                            onCheckedChange = { viewModel.onFilterChange("showProfessionalDays", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showProfessionalDays") }
-                        )
-                    }
-                    if (uiState.sidebarFilterVisibility.showMilitaryHolidays) {
-                        FilterRow(
-                            label = "Feriados Militares",
-                            checked = uiState.filterOptions.showMilitaryHolidays,
-                            colorHex = "#FFE082",
-                            icon = Icons.Default.Shield,
-                            onCheckedChange = { viewModel.onFilterChange("showMilitaryHolidays", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showMilitaryHolidays") }
-                        )
-                    }
-                    
-                    // Opção para mostrar tarefas finalizadas
-                    if (uiState.sidebarFilterVisibility.showCompletedTasks) {
-                        FilterRow(
-                            label = "Tarefas finalizadas",
-                            checked = uiState.showCompletedActivities,
-                            colorHex = "#4CAF50",
-                            icon = Icons.Default.CheckCircle,
-                            onCheckedChange = { viewModel.onFilterChange("showCompletedActivities", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showCompletedActivities") }
-                        )
-                    }
-                    
-                    // Opção para mostrar fases da lua
-                    if (uiState.sidebarFilterVisibility.showMoonPhases) {
-                        FilterRow(
-                            label = "Fases da lua",
-                            checked = uiState.showMoonPhases,
-                            colorHex = "#FFF59D",
-                            icon = Icons.Default.Brightness4,
-                            onCheckedChange = { viewModel.onFilterChange("showMoonPhases", it) },
-                            onLongPress = { viewModel.toggleSidebarFilterVisibility("showMoonPhases") }
-                        )
+                    Text(
+                        text = "Mostrar no Calendário",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = if (showFiltersSection) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (showFiltersSection) "Recolher" else "Expandir",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                
+                AnimatedVisibility(visible = showFiltersSection) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (uiState.sidebarFilterVisibility.showEvents) {
+                            FilterRow(
+                                label = "Eventos",
+                                checked = uiState.filterOptions.showEvents,
+                                colorHex = "#EF5350",
+                                icon = Icons.Default.Event,
+                                onCheckedChange = { viewModel.onFilterChange("showEvents", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showEvents") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showTasks) {
+                            FilterRow(
+                                label = "Tarefas",
+                                checked = uiState.filterOptions.showTasks,
+                                colorHex = "#66BB6A",
+                                icon = Icons.Default.TaskAlt,
+                                onCheckedChange = { viewModel.onFilterChange("showTasks", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showTasks") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showNotes) {
+                            FilterRow(
+                                label = "Notas",
+                                checked = uiState.filterOptions.showNotes,
+                                colorHex = "#42A5F5",
+                                icon = Icons.Default.Description,
+                                onCheckedChange = { viewModel.onFilterChange("showNotes", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showNotes") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showBirthdays) {
+                            FilterRow(
+                                label = "Aniversários",
+                                checked = uiState.filterOptions.showBirthdays,
+                                colorHex = "#FFA726",
+                                icon = Icons.Default.Cake,
+                                onCheckedChange = { viewModel.onFilterChange("showBirthdays", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showBirthdays") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showHolidays) {
+                            FilterRow(
+                                label = "Feriados",
+                                checked = uiState.filterOptions.showHolidays,
+                                colorHex = "#FFCDD2",
+                                icon = Icons.Default.Star,
+                                onCheckedChange = { viewModel.onFilterChange("showHolidays", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showHolidays") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showSaintDays) {
+                            FilterRow(
+                                label = "Santos do Dia",
+                                checked = uiState.filterOptions.showSaintDays,
+                                colorHex = "#D1C4E9",
+                                icon = Icons.Default.Church,
+                                onCheckedChange = { viewModel.onFilterChange("showSaintDays", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showSaintDays") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showProfessionalDays) {
+                            FilterRow(
+                                label = "Profissões",
+                                checked = uiState.filterOptions.showProfessionalDays,
+                                colorHex = "#C8E6C9",
+                                icon = Icons.Default.Work,
+                                onCheckedChange = { viewModel.onFilterChange("showProfessionalDays", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showProfessionalDays") }
+                            )
+                        }
+                        if (uiState.sidebarFilterVisibility.showMilitaryHolidays) {
+                            FilterRow(
+                                label = "Feriados Militares",
+                                checked = uiState.filterOptions.showMilitaryHolidays,
+                                colorHex = "#FFE082",
+                                icon = Icons.Default.Shield,
+                                onCheckedChange = { viewModel.onFilterChange("showMilitaryHolidays", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showMilitaryHolidays") }
+                            )
+                        }
+                        
+                        // Opção para mostrar tarefas finalizadas
+                        if (uiState.sidebarFilterVisibility.showCompletedTasks) {
+                            FilterRow(
+                                label = "Tarefas finalizadas",
+                                checked = uiState.showCompletedActivities,
+                                colorHex = "#4CAF50",
+                                icon = Icons.Default.CheckCircle,
+                                onCheckedChange = { viewModel.onFilterChange("showCompletedActivities", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showCompletedActivities") }
+                            )
+                        }
+                        
+                        // Opção para mostrar fases da lua
+                        if (uiState.sidebarFilterVisibility.showMoonPhases) {
+                            FilterRow(
+                                label = "Fases da lua",
+                                checked = uiState.showMoonPhases,
+                                colorHex = "#FFF59D",
+                                icon = Icons.Default.Brightness4,
+                                onCheckedChange = { viewModel.onFilterChange("showMoonPhases", it) },
+                                onLongPress = { viewModel.toggleSidebarFilterVisibility("showMoonPhases") }
+                            )
+                        }
                     }
                 }
                 
