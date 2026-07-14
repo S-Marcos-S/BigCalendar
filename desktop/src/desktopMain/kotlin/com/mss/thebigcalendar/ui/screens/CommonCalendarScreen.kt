@@ -886,11 +886,18 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                             }
                                         )
                                         .border(
-                                            if (isSelected || isToday) 2.dp else 1.5.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else if (isToday) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
-                                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                            RoundedCornerShape(8.dp)
+                                            width = when {
+                                                isSelected || isToday -> 2.dp
+                                                isCurrentMonth -> 1.5.dp
+                                                else -> 1.dp
+                                            },
+                                            color = when {
+                                                isSelected -> MaterialTheme.colorScheme.primary
+                                                isToday -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                                                isCurrentMonth -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+                                                else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
+                                            },
+                                            shape = RoundedCornerShape(8.dp)
                                         )
                                         .clickable { viewModel.selectDate(date) }
                                         .padding(6.dp)
@@ -905,7 +912,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                                 text = date.dayOfMonth.toString(),
                                                 fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 color = when {
-                                                    !isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                                    !isCurrentMonth -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                                                     isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                                                     isToday -> MaterialTheme.colorScheme.tertiary
                                                     dayHolidays.any { it.type == HolidayType.NATIONAL } -> Color(0xFFE53935)
