@@ -1397,6 +1397,22 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
             }
         }
     }
+
+    SettingsDialog(
+        show = uiState.showSettings,
+        onDismissRequest = { viewModel.setShowSettings(false) },
+        currentTheme = uiState.theme,
+        onThemeChange = { viewModel.setTheme(it) },
+        pureBlackTheme = uiState.pureBlackTheme,
+        onPureBlackThemeChange = { viewModel.setPureBlackTheme(it) },
+        welcomeName = uiState.welcomeName,
+        onWelcomeNameChange = { viewModel.setWelcomeName(it) },
+        googleEmail = uiState.googleAccountEmail,
+        onGoogleConnect = { viewModel.syncActivitiesWithCloud() },
+        onGoogleDisconnect = { viewModel.disconnectGoogleAccount() },
+        isSyncing = uiState.isSyncing,
+        onManualSync = { viewModel.syncActivitiesWithCloud() }
+    )
 }
 
 @Composable
