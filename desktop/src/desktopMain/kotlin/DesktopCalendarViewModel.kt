@@ -1611,6 +1611,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         }
                     }
                     
+                    val hasOtherDevices = mergedDevices.isNotEmpty()
+
                     val currentDeviceJson = kotlinx.serialization.json.buildJsonObject {
                         put("platform", kotlinx.serialization.json.JsonPrimitive(currentPlatform))
                         put("deviceName", kotlinx.serialization.json.JsonPrimitive(currentDeviceName))
@@ -1618,58 +1620,62 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     }
                     mergedDevices.add(currentDeviceJson)
 
-                    // 4. Upload do arquivo atualizado
-                    val activitiesJsonList = mergedCustomActive
-                    val completedJsonList = mergedCustomCompleted
+                    if (hasOtherDevices) {
+                        // 4. Upload do arquivo atualizado
+                        val activitiesJsonList = mergedCustomActive
+                        val completedJsonList = mergedCustomCompleted
 
-                    val tempUploadFile = java.io.File.createTempFile("TBCalendar_Sync_Data", ".json")
-                    try {
-                        val syncJson = kotlinx.serialization.json.buildJsonObject {
-                            put("backupVersion", kotlinx.serialization.json.JsonPrimitive("1.1"))
-                            put("createdAt", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDateTime.now().toString()))
-                            put("appVersion", kotlinx.serialization.json.JsonPrimitive("TheBigCalendar"))
-                            
-                            put("activities", kotlinx.serialization.json.buildJsonArray {
-                                activitiesJsonList.forEach { act ->
-                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
-                                }
-                            })
-                            
-                            put("completedActivities", kotlinx.serialization.json.buildJsonArray {
-                                completedJsonList.forEach { act ->
-                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
-                                }
-                            })
-                            
-                            put("deletedActivities", kotlinx.serialization.json.buildJsonArray {
-                                finalDeletedIds.forEach { id ->
-                                    add(kotlinx.serialization.json.JsonPrimitive(id))
-                                }
-                            })
+                        val tempUploadFile = java.io.File.createTempFile("TBCalendar_Sync_Data", ".json")
+                        try {
+                            val syncJson = kotlinx.serialization.json.buildJsonObject {
+                                put("backupVersion", kotlinx.serialization.json.JsonPrimitive("1.1"))
+                                put("createdAt", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDateTime.now().toString()))
+                                put("appVersion", kotlinx.serialization.json.JsonPrimitive("TheBigCalendar"))
+                                
+                                put("activities", kotlinx.serialization.json.buildJsonArray {
+                                    activitiesJsonList.forEach { act ->
+                                        add(Json.parseToJsonElement(Json.encodeToString(act)))
+                                    }
+                                })
+                                
+                                put("completedActivities", kotlinx.serialization.json.buildJsonArray {
+                                    completedJsonList.forEach { act ->
+                                        add(Json.parseToJsonElement(Json.encodeToString(act)))
+                                    }
+                                })
+                                
+                                put("deletedActivities", kotlinx.serialization.json.buildJsonArray {
+                                    finalDeletedIds.forEach { id ->
+                                        add(kotlinx.serialization.json.JsonPrimitive(id))
+                                    }
+                                })
 
-                            put("devices", kotlinx.serialization.json.buildJsonArray {
-                                mergedDevices.forEach { add(it) }
-                            })
-                        }
-
-                        tempUploadFile.writeText(Json.encodeToString(syncJson), Charsets.UTF_8)
-
-                        val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
-
-                        if (fileId != null) {
-                            val updateMetadata = com.google.api.services.drive.model.File().apply {
-                                name = "TBCalendar_Sync_Data.json"
+                                put("devices", kotlinx.serialization.json.buildJsonArray {
+                                    mergedDevices.forEach { add(it) }
+                                })
                             }
-                            driveService.files().update(fileId, updateMetadata, mediaContent).execute()
-                        } else {
-                            val createMetadata = com.google.api.services.drive.model.File().apply {
-                                name = "TBCalendar_Sync_Data.json"
-                                parents = listOf("appDataFolder")
+
+                            tempUploadFile.writeText(Json.encodeToString(syncJson), Charsets.UTF_8)
+
+                            val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+
+                            if (fileId != null) {
+                                val updateMetadata = com.google.api.services.drive.model.File().apply {
+                                    name = "TBCalendar_Sync_Data.json"
+                                }
+                                driveService.files().update(fileId, updateMetadata, mediaContent).execute()
+                            } else {
+                                val createMetadata = com.google.api.services.drive.model.File().apply {
+                                    name = "TBCalendar_Sync_Data.json"
+                                    parents = listOf("appDataFolder")
+                                }
+                                driveService.files().create(createMetadata, mediaContent).execute()
                             }
-                            driveService.files().create(createMetadata, mediaContent).execute()
+                        } finally {
+                            if (tempUploadFile.exists()) tempUploadFile.delete()
                         }
-                    } finally {
-                        if (tempUploadFile.exists()) tempUploadFile.delete()
+                    } else {
+                        println("Sincronização: Nenhum outro dispositivo ativo detectado nos últimos 30 dias. Ignorando upload do arquivo para o Google Drive.")
                     }
                 }
             } catch (e: Exception) {
