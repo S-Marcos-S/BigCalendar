@@ -1095,6 +1095,8 @@ class BackupService(
                 mergedDevices.add(devObj)
             }
 
+            val hasOtherDevices = mergedDevices.isNotEmpty()
+
             val currentDeviceJson = JSONObject().apply {
                 put("platform", currentPlatform)
                 put("deviceName", currentDeviceName)
@@ -1106,47 +1108,51 @@ class BackupService(
             mergedDevices.forEach { updatedDevicesArray.put(it) }
             settingsRepository.saveSyncedDevicesJson(updatedDevicesArray.toString())
 
-            // 4. Upload do arquivo atualizado
-            val syncJson = JSONObject().apply {
-                put("backupVersion", "1.1")
-                put("createdAt", LocalDateTime.now().toString())
-                put("appVersion", "TheBigCalendar")
-                
-                val activitiesJsonArray = JSONArray()
-                mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
-                put("activities", activitiesJsonArray)
-                
-                val completedJsonArray = JSONArray()
-                mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
-                put("completedActivities", completedJsonArray)
-                
-                val deletedJsonArray = JSONArray()
-                finalDeletedIds.forEach { deletedJsonArray.put(it) }
-                put("deletedActivities", deletedJsonArray)
-                
-                put("devices", updatedDevicesArray)
-            }
-            
-            val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)
-            try {
-                tempUploadFile.writeText(syncJson.toString(), Charsets.UTF_8)
-                
-                val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
-                
-                if (fileId != null) {
-                    val updateMetadata = com.google.api.services.drive.model.File().apply {
-                        name = "TBCalendar_Sync_Data.json"
-                    }
-                    drive.files().update(fileId, updateMetadata, mediaContent).execute()
-                } else {
-                    val createMetadata = com.google.api.services.drive.model.File().apply {
-                        name = "TBCalendar_Sync_Data.json"
-                        parents = listOf("appDataFolder")
-                    }
-                    drive.files().create(createMetadata, mediaContent).execute()
+            if (hasOtherDevices) {
+                // 4. Upload do arquivo atualizado
+                val syncJson = JSONObject().apply {
+                    put("backupVersion", "1.1")
+                    put("createdAt", LocalDateTime.now().toString())
+                    put("appVersion", "TheBigCalendar")
+                    
+                    val activitiesJsonArray = JSONArray()
+                    mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
+                    put("activities", activitiesJsonArray)
+                    
+                    val completedJsonArray = JSONArray()
+                    mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
+                    put("completedActivities", completedJsonArray)
+                    
+                    val deletedJsonArray = JSONArray()
+                    finalDeletedIds.forEach { deletedJsonArray.put(it) }
+                    put("deletedActivities", deletedJsonArray)
+                    
+                    put("devices", updatedDevicesArray)
                 }
-            } finally {
-                if (tempUploadFile.exists()) tempUploadFile.delete()
+                
+                val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)
+                try {
+                    tempUploadFile.writeText(syncJson.toString(), Charsets.UTF_8)
+                    
+                    val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+                    
+                    if (fileId != null) {
+                        val updateMetadata = com.google.api.services.drive.model.File().apply {
+                            name = "TBCalendar_Sync_Data.json"
+                        }
+                        drive.files().update(fileId, updateMetadata, mediaContent).execute()
+                    } else {
+                        val createMetadata = com.google.api.services.drive.model.File().apply {
+                            name = "TBCalendar_Sync_Data.json"
+                            parents = listOf("appDataFolder")
+                        }
+                        drive.files().create(createMetadata, mediaContent).execute()
+                    }
+                } finally {
+                    if (tempUploadFile.exists()) tempUploadFile.delete()
+                }
+            } else {
+                android.util.Log.d("BackupService", "Nenhum outro dispositivo ativo detectado nos últimos 30 dias. Ignorando atualização/upload do arquivo de sincronização no Google Drive.")
             }
             
             Result.success(Unit)
