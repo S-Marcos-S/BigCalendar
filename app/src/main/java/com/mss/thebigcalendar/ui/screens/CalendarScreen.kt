@@ -676,7 +676,10 @@ fun MainCalendarView(
                             onNoteLongClick = { viewModel.onTaskLongPressed(it) },
                             onDeleteClick = { viewModel.requestDeleteActivity(it) },
                             onCompleteClick = { viewModel.markActivityAsCompleted(it) },
-                            onAddNoteClick = { viewModel.openCreateActivityModal(activityType = ActivityType.NOTE) }
+                            onAddNoteClick = { viewModel.openCreateActivityModal(activityType = ActivityType.NOTE) },
+                            onUpdateNoteDescription = { activity, newDesc ->
+                                viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                            }
                         )
                     }
                     
