@@ -424,6 +424,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
                                 onOpenSyncSettings = { viewModel.openSyncSettings() },
+                                onOpenBackupSettings = { viewModel.onBackupIconClick() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
@@ -450,6 +451,10 @@ class MainActivity : ComponentActivity() {
                                 syncProgress = uiState.syncProgress,
                                 isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
                                 onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) },
+                                isEncryptionEnabled = uiState.isEncryptionEnabled,
+                                onEncryptionToggle = { enabled, password -> 
+                                    viewModel.setEncryptionSettings(enabled, password)
+                                },
                                 onBackClick = { viewModel.closeSyncSettings() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
                                 syncedDevices = uiState.syncedDevices

@@ -95,6 +95,7 @@ class CompletedActivityRepository(private val context: Context) {
             .addAllExcludedDates(this.excludedDates)
             .addAllExcludedInstances(this.excludedInstances)
             .setWikipediaLink(this.wikipediaLink ?: "")
+            .setLastModified(this.lastModified)
             .build()
     }
 
@@ -122,7 +123,8 @@ class CompletedActivityRepository(private val context: Context) {
             showInCalendar = this.showInCalendar,
             excludedDates = this.excludedDatesList.toList(),
             excludedInstances = this.excludedInstancesList.toList(),
-            wikipediaLink = this.wikipediaLink.takeIf { it.isNotEmpty() }
+            wikipediaLink = this.wikipediaLink.takeIf { it.isNotEmpty() },
+            lastModified = this.lastModified
         )
     }
 

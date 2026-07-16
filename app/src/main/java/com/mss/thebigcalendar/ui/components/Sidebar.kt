@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -71,7 +70,6 @@ fun Sidebar(
     onViewModeChange: (ViewMode) -> Unit,
     onFilterChange: (key: String, value: Boolean) -> Unit,
     onNavigateToSettings: (String) -> Unit,
-    onBackup: () -> Unit,
     onNotesClick: () -> Unit,
     onAlarmsClick: () -> Unit,
     onPrintCalendar: () -> Unit,
@@ -297,22 +295,6 @@ fun Sidebar(
                 icon = { Icon(Icons.Filled.Print, contentDescription = null) },
                 selected = false,
                 onClick = { onPrintCalendar() }
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // Seção de Backup
-            Text(
-                text = stringResource(id = R.string.backup),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            NavigationDrawerItem(
-                label = { Text(stringResource(id = R.string.do_backup)) },
-                icon = { Icon(Icons.Outlined.Backup, contentDescription = null) },
-                selected = false,
-                onClick = { onBackup() }
             )
             }
             

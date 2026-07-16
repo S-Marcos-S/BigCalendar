@@ -131,6 +131,7 @@
     <string name="event_type_colors">Cores por Tipo de Agendamento</string>
     <string name="general">Geral</string>
     <string name="backup">Backup</string>
+    <string name="backup_settings_desc">Gerenciar backups locais e na nuvem</string>
     <string name="do_backup">Backup</string>
     <string name="backup_options">Opções de Backup</string>
     <string name="local_backup">Backup Local</string>
@@ -851,4 +852,25 @@
     <string name="predefined_calendars_desc">Importe calendários temáticos predefinidos de forma rápida</string>
     <string name="professional_days">Dias das Profissões</string>
     <string name="onboarding_crash_desc">Para nos ajudar a identificar e corrigir problemas rapidamente, deseja ativar o envio automático de relatórios de erros?</string>
+
+    <!-- Encryption settings and dialogs -->
+    <string name="encryption_setting_title">Criptografia de Dados</string>
+    <string name="encryption_setting_description">Criptografa backups locais e na nuvem. ATENÇÃO: se você esquecer a senha, seus dados serão perdidos permanentemente.</string>
+    <string name="encryption_dialog_title">Ativar Criptografia</string>
+    <string name="encryption_dialog_warning">Atenção: A criptografia é realizada no seu dispositivo. Caso precise restaurar o backup em outro aparelho ou reinstalar o aplicativo, será necessário lembrar desta senha. Se você esquecer, não há como recuperar seus dados!</string>
+    <string name="encryption_password_placeholder">Digite a senha</string>
+    <string name="encryption_confirm_password_placeholder">Confirme a senha</string>
+    <string name="encryption_passwords_mismatch">As senhas não coincidem!</string>
+    <string name="encryption_password_empty">A senha não pode ser vazia!</string>
+    <string name="encryption_disable_title">Desativar Criptografia?</string>
+    <string name="encryption_disable_message">Tem certeza de que deseja desativar a criptografia? Seus backups futuros não serão protegidos.</string>
+    <string name="decryption_dialog_title">Descriptografar Dados</string>
+    <string name="decryption_dialog_message">Este arquivo está criptografado. Digite a senha correspondente para descriptografar:</string>
+    <string name="decryption_failed">Senha incorreta ou erro de descriptografia.</string>
+    <string name="encrypted_badge">Protegido</string>
+    <string name="backup_limits_title">Limite de Backups</string>
+    <string name="max_local_backups_label">Limitar backups locais</string>
+    <string name="max_cloud_backups_label">Limitar backups na nuvem</string>
+    <string name="unlimited">Ilimitado</string>
+    <string name="backup_limit_option">%1$d backups</string>
 </resources>

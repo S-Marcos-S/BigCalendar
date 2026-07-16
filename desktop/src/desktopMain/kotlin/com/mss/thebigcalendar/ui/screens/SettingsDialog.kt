@@ -35,7 +35,9 @@ fun SettingsDialog(
     onGoogleConnect: () -> Unit,
     onGoogleDisconnect: () -> Unit,
     isSyncing: Boolean,
-    onManualSync: () -> Unit
+    onManualSync: () -> Unit,
+    isEncryptionEnabled: Boolean,
+    onEncryptionToggle: (Boolean, String) -> Unit
 ) {
     if (!show) return
 
@@ -143,7 +145,9 @@ fun SettingsDialog(
                                 onGoogleConnect = onGoogleConnect,
                                 onGoogleDisconnect = onGoogleDisconnect,
                                 isSyncing = isSyncing,
-                                onManualSync = onManualSync
+                                onManualSync = onManualSync,
+                                isEncryptionEnabled = isEncryptionEnabled,
+                                onEncryptionToggle = onEncryptionToggle
                             )
                         }
                     }
@@ -292,8 +296,17 @@ private fun TabSincronizacaoContent(
     onGoogleConnect: () -> Unit,
     onGoogleDisconnect: () -> Unit,
     isSyncing: Boolean,
-    onManualSync: () -> Unit
+    onManualSync: () -> Unit,
+    isEncryptionEnabled: Boolean,
+    onEncryptionToggle: (Boolean, String) -> Unit
 ) {
+    var showPasswordSetupDialog by remember { mutableStateOf(false) }
+    var showDisableConfirmationDialog by remember { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var confirmPasswordInput by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Conta Google Drive", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
@@ -312,6 +325,50 @@ private fun TabSincronizacaoContent(
                 ) {
                     Text("Desconectar")
                 }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Criptografia de Dados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = { showInfoDialog = true },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Mais informações sobre criptografia de dados",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Text(
+                text = "Protege seus backups e dados de sincronização com criptografia de ponta a ponta.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Criptografar Dados na Nuvem", style = MaterialTheme.typography.bodyLarge)
+                }
+                Switch(
+                    checked = isEncryptionEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            showPasswordSetupDialog = true
+                        } else {
+                            showDisableConfirmationDialog = true
+                        }
+                    }
+                )
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -344,4 +401,135 @@ private fun TabSincronizacaoContent(
             }
         }
     }
+
+    if (showPasswordSetupDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPasswordSetupDialog = false
+                passwordInput = ""
+                confirmPasswordInput = ""
+                passwordError = null
+            },
+            title = { Text("Configurar Criptografia") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "ATENÇÃO: A criptografia é zero-knowledge. Seus dados serão criptografados localmente antes do envio. Para restaurar os backups ou sincronizar outros dispositivos, você DEVE lembrar desta senha. Não há como recuperar os dados se você esquecer a senha.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { 
+                            passwordInput = it
+                            passwordError = null
+                        },
+                        label = { Text("Senha de Criptografia") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = confirmPasswordInput,
+                        onValueChange = { 
+                            confirmPasswordInput = it
+                            passwordError = null
+                        },
+                        label = { Text("Confirmar Senha") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (passwordError != null) {
+                        Text(
+                            text = passwordError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (passwordInput.length < 4) {
+                            passwordError = "A senha deve ter pelo menos 4 caracteres."
+                        } else if (passwordInput != confirmPasswordInput) {
+                            passwordError = "As senhas não coincidem."
+                        } else {
+                            onEncryptionToggle(true, passwordInput)
+                            showPasswordSetupDialog = false
+                            passwordInput = ""
+                            confirmPasswordInput = ""
+                            passwordError = null
+                        }
+                    }
+                ) {
+                    Text("Ativar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPasswordSetupDialog = false
+                        passwordInput = ""
+                        confirmPasswordInput = ""
+                        passwordError = null
+                    }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    if (showDisableConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableConfirmationDialog = false },
+            title = { Text("Desativar Criptografia?") },
+            text = {
+                Text("Seus dados na nuvem serão enviados sem criptografia a partir de agora. Os backups criptografados existentes ainda exigirão a senha original para restauração.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onEncryptionToggle(false, "")
+                        showDisableConfirmationDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Desativar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisableConfirmationDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = { Text("Sobre a Criptografia de Dados") },
+            text = {
+                Text(
+                    text = "A criptografia de dados protege seus compromissos e tarefas contra acessos não autorizados.\n\n" +
+                            "• Privacidade Absoluta (Zero-Knowledge): Seus dados são criptografados diretamente no seu dispositivo antes de serem enviados para a nuvem. Isso significa que apenas você, com a sua senha, pode descriptografá-los.\n\n" +
+                            "• Algoritmo de Alta Segurança: Utilizamos o padrão AES com chaves de 256 bits geradas a partir de sua senha usando derivação robusta (PBKDF2). Nem mesmo o Google ou os desenvolvedores do app podem acessar suas informações.\n\n" +
+                            "• Proteção de Backups: Seus arquivos de backup locais salvos no armazenamento do aparelho também ficam totalmente protegidos contra leituras por outros aplicativos.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfoDialog = false }) {
+                    Text("Entendi")
+                }
+            }
+        )
+    }
 }
+

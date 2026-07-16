@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -176,7 +177,6 @@ fun CalendarScreen(
                     onViewModeChange = { viewModel.onViewModeChange(it) },
                     onFilterChange = { key, value -> viewModel.onFilterChange(key, value) },
                     onNavigateToSettings = { viewModel.onNavigateToSettings(it) },
-                    onBackup = { viewModel.onBackupIconClick() },
                     onNotesClick = { viewModel.onNotesClick() },
                     onAlarmsClick = { viewModel.onAlarmsClick() },
                     onPrintCalendar = { viewModel.onPrintCalendarClick() },
@@ -311,6 +311,15 @@ fun CalendarScreen(
                                 }
 
                                 if (uiState.viewMode == ViewMode.MONTHLY) {
+                                    if (uiState.duplicateGroups.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.showDuplicateDialog() }) {
+                                            Icon(
+                                                Icons.Default.Warning,
+                                                contentDescription = "Agendamentos repetidos detectados",
+                                                tint = androidx.compose.ui.graphics.Color.Red
+                                            )
+                                        }
+                                    }
                                     IconButton(onClick = { viewModel.onSearchIconClick() }) {
                                         Icon(
                                             Icons.Default.Search,
@@ -453,6 +462,82 @@ fun CalendarScreen(
                             onConfirmDelete = { viewModel.confirmDeleteJsonCalendar() }
                         )
                     }
+
+                    if (uiState.showDuplicateDialog) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { viewModel.dismissDuplicateDialog() },
+                            title = { Text("Agendamentos Duplicados") },
+                            text = {
+                                Column {
+                                    Text(
+                                        text = "Foram encontrados agendamentos com as mesmas informações. Você pode apagá-los de forma individual ou remover todas as cópias extras de uma vez, mantendo apenas um.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(bottom = 16.dp)
+                                    )
+                                    
+                                    Box(modifier = Modifier.weight(1f, fill = false).height(300.dp)) {
+                                        androidx.compose.foundation.lazy.LazyColumn {
+                                            uiState.duplicateGroups.forEachIndexed { groupIndex, group ->
+                                                item {
+                                                    Text(
+                                                        text = "Grupo ${groupIndex + 1} (${group.first().title})",
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                                    )
+                                                }
+                                                items(group.size) { index ->
+                                                    val activity = group[index]
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(vertical = 4.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = "${activity.date} ${activity.startTime?.toString() ?: ""}",
+                                                                style = MaterialTheme.typography.bodySmall
+                                                            )
+                                                            if (!activity.description.isNullOrBlank()) {
+                                                                Text(
+                                                                    text = activity.description,
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    maxLines = 1,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                        }
+                                                        IconButton(onClick = { viewModel.deleteActivityDirectly(activity.id) }) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Delete,
+                                                                contentDescription = "Apagar esta cópia",
+                                                                tint = MaterialTheme.colorScheme.error
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { viewModel.removeAllDuplicates() }
+                                ) {
+                                    Text("Manter apenas um")
+                                }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(
+                                    onClick = { viewModel.dismissDuplicateDialog() }
+                                ) {
+                                    Text("Fechar")
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -580,11 +665,16 @@ fun MainCalendarView(
                                                     val newScale = (calendarScale + delta).coerceIn(0.5f, 1.22f)
                                                     if (newScale != calendarScale) {
                                                         calendarScale = newScale
-                                                        viewModel.setCalendarScale(newScale)
                                                     }
                                                 },
-                                                onDragEnd = { isZooming = false },
-                                                onDragCancel = { isZooming = false }
+                                                onDragEnd = { 
+                                                    isZooming = false
+                                                    viewModel.setCalendarScale(calendarScale)
+                                                },
+                                                onDragCancel = { 
+                                                    isZooming = false
+                                                    viewModel.setCalendarScale(calendarScale)
+                                                }
                                             )
                                         },
                                     contentAlignment = Alignment.Center

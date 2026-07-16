@@ -120,6 +120,7 @@ class DeletedActivityRepository(private val context: Context) {
             .setRecurrenceRule(this.recurrenceRule ?: "")
             .setIsCompleted(this.isCompleted)
             .setShowInCalendar(this.showInCalendar)
+            .setLastModified(this.lastModified)
             .build()
     }
 
@@ -140,7 +141,8 @@ class DeletedActivityRepository(private val context: Context) {
             isCompleted = this.isCompleted,
             showInCalendar = this.showInCalendar,
             excludedDates = emptyList(), // Para atividades deletadas, não precisamos das datas excluídas
-            excludedInstances = emptyList() // Para atividades deletadas, não precisamos das instâncias excluídas
+            excludedInstances = emptyList(), // Para atividades deletadas, não precisamos das instâncias excluídas
+            lastModified = this.lastModified
         )
     }
 

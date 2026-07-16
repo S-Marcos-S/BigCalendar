@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +48,7 @@ fun GeneralSettingsScreen(
     onToggleSidebarFilterVisibility: (String) -> Unit = {},
     onOpenCalendarVisualization: () -> Unit = {},
     onOpenSyncSettings: () -> Unit = {},
+    onOpenBackupSettings: () -> Unit = {},
     unfixHeadersOnScroll: Boolean = false
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
@@ -139,12 +141,6 @@ fun GeneralSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -174,12 +170,35 @@ fun GeneralSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Backup settings entry
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+                    .clickable { onOpenBackupSettings() }
+            ) {
                 Icon(
-                    imageVector = Icons.Filled.ArrowForward,
+                    imageVector = Icons.Outlined.Backup,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
                 )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.backup),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(id = R.string.backup_settings_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -209,12 +228,6 @@ fun GeneralSettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             // Lista de filtros que podem ser adicionados ao menu

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.mss.thebigcalendar.data.model.CalendarFilterOptions
 import com.mss.thebigcalendar.data.model.Theme
@@ -62,6 +63,27 @@ class SettingsRepository(private val context: Context) {
         val HAS_SEEN_MAIN_ONBOARDING = booleanPreferencesKey("has_seen_main_onboarding")
         val BACKUP_DIRECTORY_URI = stringPreferencesKey("backup_directory_uri")
         val SYNCED_DEVICES_JSON = stringPreferencesKey("synced_devices_json")
+        val IS_ENCRYPTION_ENABLED = booleanPreferencesKey("is_encryption_enabled")
+        val ENCRYPTION_PASSWORD = stringPreferencesKey("encryption_password")
+        val MAX_LOCAL_BACKUPS = intPreferencesKey("max_local_backups")
+        val MAX_CLOUD_BACKUPS = intPreferencesKey("max_cloud_backups")
+    }
+
+    val isEncryptionEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.IS_ENCRYPTION_ENABLED] ?: false
+        }
+
+    val encryptionPassword: Flow<String> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.ENCRYPTION_PASSWORD] ?: ""
+        }
+
+    suspend fun saveEncryptionSettings(enabled: Boolean, password: String) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.IS_ENCRYPTION_ENABLED] = enabled
+            preferences[PreferencesKeys.ENCRYPTION_PASSWORD] = password
+        }
     }
 
     val syncedDevicesJson: Flow<String> = context.dataStore.data
@@ -83,6 +105,28 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveBackupDirectoryUri(uri: String) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.BACKUP_DIRECTORY_URI] = uri
+        }
+    }
+
+    val maxLocalBackups: Flow<Int> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.MAX_LOCAL_BACKUPS] ?: 10
+        }
+
+    val maxCloudBackups: Flow<Int> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.MAX_CLOUD_BACKUPS] ?: 10
+        }
+
+    suspend fun saveMaxLocalBackups(max: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MAX_LOCAL_BACKUPS] = max
+        }
+    }
+
+    suspend fun saveMaxCloudBackups(max: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.MAX_CLOUD_BACKUPS] = max
         }
     }
 

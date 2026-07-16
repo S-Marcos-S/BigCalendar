@@ -1,0 +1,3 @@
+[submodule "cinnamon-spices-applets"]
+	path = cinnamon-spices-applets
+	url = https://github.com/S-Marcos-S/cinnamon-spices-applets.git

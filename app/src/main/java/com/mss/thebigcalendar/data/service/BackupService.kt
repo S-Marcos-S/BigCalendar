@@ -63,7 +63,14 @@ class BackupService(
             val completedActivities = completedActivityRepository.completedActivities.first()
 
             val backupData = createBackupJson(activities, deletedActivities, completedActivities)
-            tempFile.writeText(backupData, Charsets.UTF_8)
+            val isEncrypted = settingsRepository.isEncryptionEnabled.first()
+            val password = settingsRepository.encryptionPassword.first()
+            val finalBackupData = if (isEncrypted && password.isNotEmpty()) {
+                com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(backupData, password)
+            } else {
+                backupData
+            }
+            tempFile.writeText(finalBackupData, Charsets.UTF_8)
 
             val appProperties = mapOf(
                 "totalActivities" to activities.size.toString(),
@@ -75,6 +82,11 @@ class BackupService(
             val uploadedFile = driveService.uploadBackupFile(tempFile, appProperties)
 
             if (uploadedFile != null) {
+                try {
+                    pruneCloudBackups(account)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 notificationService.showBackupCompleteNotification(uploadedFile.name)
                 Result.success(uploadedFile.id)
             } else {
@@ -94,21 +106,22 @@ class BackupService(
     suspend fun listCloudBackupFiles(account: GoogleSignInAccount): Result<List<DriveFile>> = withContext(Dispatchers.IO) {
         try {
             val driveService = getGoogleDriveService(account)
-            val files = driveService.getBackupFiles()
-            Result.success(files)
+            val files = driveService.getBackupFiles() ?: emptyList()
+            val backupFiles = files.filter { it.name?.startsWith(BACKUP_FILE_PREFIX) == true }
+            Result.success(backupFiles)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    suspend fun restoreFromCloudBackup(account: GoogleSignInAccount, fileId: String, fileName: String): Result<RestoreResult> = withContext(Dispatchers.IO) {
+    suspend fun restoreFromCloudBackup(account: GoogleSignInAccount, fileId: String, fileName: String, providedPassword: String? = null): Result<RestoreResult> = withContext(Dispatchers.IO) {
         notificationService.showRestoreInProgressNotification()
         try {
             val driveService = getGoogleDriveService(account)
             val tempFile = File.createTempFile("restore_", ".json", context.cacheDir)
             driveService.downloadBackupFile(fileId, tempFile)
 
-            val result = restoreFromBackup(Uri.fromFile(tempFile))
+            val result = restoreFromBackup(Uri.fromFile(tempFile), providedPassword)
 
             tempFile.delete()
 
@@ -163,6 +176,14 @@ class BackupService(
             // Criar estrutura JSON do backup
             val backupData = createBackupJson(activities, deletedActivities, completedActivities)
 
+            val isEncrypted = settingsRepository.isEncryptionEnabled.first()
+            val password = settingsRepository.encryptionPassword.first()
+            val finalBackupData = if (isEncrypted && password.isNotEmpty()) {
+                com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(backupData, password)
+            } else {
+                backupData
+            }
+
             // Gerar nome do arquivo com timestamp
             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
             val backupFileName = "$BACKUP_FILE_PREFIX$timestamp$BACKUP_FILE_EXTENSION"
@@ -178,8 +199,14 @@ class BackupService(
             // Escrever no arquivo de backup
             context.contentResolver.openOutputStream(backupFile.uri)?.use { outputStream ->
                 OutputStreamWriter(outputStream).use { writer ->
-                    writer.write(backupData)
+                    writer.write(finalBackupData)
                 }
+            }
+
+            try {
+                pruneLocalBackups(directoryUri)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
             notificationService.showBackupCompleteNotification(backupFile.name ?: backupFileName)
@@ -462,7 +489,22 @@ class BackupService(
                 inputStream.bufferedReader().use { it.readText() }
             } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo de backup."))
 
-            val json = JSONObject(content)
+            val isEncrypted = com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)
+            val json = if (isEncrypted) {
+                val password = settingsRepository.encryptionPassword.first()
+                if (password.isNotEmpty()) {
+                    try {
+                        val decrypted = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, password)
+                        JSONObject(decrypted)
+                    } catch (e: Exception) {
+                        JSONObject(content)
+                    }
+                } else {
+                    JSONObject(content)
+                }
+            } else {
+                JSONObject(content)
+            }
 
             val info = BackupInfo(
                 fileName = backupFile.name ?: "Unknown",
@@ -472,7 +514,8 @@ class BackupService(
                 totalActivities = json.optInt("totalActivities", 0),
                 totalDeletedActivities = json.optInt("totalDeletedActivities", 0),
                 totalCompletedActivities = json.optInt("totalCompletedActivities", 0),
-                backupVersion = json.optString("backupVersion", "1.0")
+                backupVersion = json.optString("backupVersion", "1.0"),
+                isEncrypted = isEncrypted
             )
 
             Result.success(info)
@@ -485,7 +528,7 @@ class BackupService(
     /**
      * Restaura dados de um arquivo de backup usando SAF.
      */
-    suspend fun restoreFromBackup(backupUri: Uri): Result<RestoreResult> = withContext(Dispatchers.IO) {
+    suspend fun restoreFromBackup(backupUri: Uri, providedPassword: String? = null): Result<RestoreResult> = withContext(Dispatchers.IO) {
         notificationService.showRestoreInProgressNotification()
         try {
             val content = context.contentResolver.openInputStream(backupUri)?.use { inputStream ->
@@ -496,7 +539,25 @@ class BackupService(
                 return@withContext Result.failure(Exception(errorMessage))
             }
 
-            val json = JSONObject(content)
+            val finalContent = if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
+                val passwordToUse = providedPassword ?: settingsRepository.encryptionPassword.first()
+                if (passwordToUse.isEmpty()) {
+                    val error = com.mss.thebigcalendar.crypto.DecryptionRequiredException("Este arquivo de backup está criptografado. Uma senha é necessária.")
+                    notificationService.showRestoreFailedNotification("Backup criptografado. Senha necessária.")
+                    return@withContext Result.failure(error)
+                }
+                try {
+                    com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
+                } catch (e: Exception) {
+                    val error = com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ou erro ao descriptografar.")
+                    notificationService.showRestoreFailedNotification("Senha do backup incorreta.")
+                    return@withContext Result.failure(error)
+                }
+            } else {
+                content
+            }
+
+            val json = JSONObject(finalContent)
 
             // Verificar versão do backup
             val backupVersion = json.optString("backupVersion", "1.0")
@@ -705,6 +766,41 @@ class BackupService(
             Result.failure(e)
         }
     }
+
+    suspend fun pruneLocalBackups(directoryUri: Uri) = withContext(Dispatchers.IO) {
+        val limit = settingsRepository.maxLocalBackups.first()
+        if (limit <= 0) return@withContext
+
+        val files = listBackupFiles(directoryUri)
+        val backupFiles = files.filter { it.isFile && it.name?.startsWith(BACKUP_FILE_PREFIX) == true }
+        if (backupFiles.size > limit) {
+            val sorted = backupFiles.sortedBy { it.lastModified() }
+            val toDelete = sorted.size - limit
+            for (i in 0 until toDelete) {
+                sorted[i].delete()
+            }
+        }
+    }
+
+    suspend fun pruneCloudBackups(account: GoogleSignInAccount) = withContext(Dispatchers.IO) {
+        val limit = settingsRepository.maxCloudBackups.first()
+        if (limit <= 0) return@withContext
+
+        val driveService = getGoogleDriveService(account)
+        val files = driveService.getBackupFiles() ?: emptyList()
+        val backupFiles = files.filter { it.name?.startsWith(BACKUP_FILE_PREFIX) == true }
+        if (backupFiles.size > limit) {
+            val sorted = backupFiles.sortedBy { it.createdTime?.value ?: 0L }
+            val toDelete = sorted.size - limit
+            for (i in 0 until toDelete) {
+                try {
+                    driveService.deleteBackupFile(sorted[i].id)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
     
     /**
      * Parseia uma atividade a partir do JSON
@@ -784,15 +880,15 @@ class BackupService(
         return com.mss.thebigcalendar.data.model.Activity(
             id = activityJson.getString("id"),
             title = activityJson.getString("title"),
-            description = activityJson.optString("description").takeIf { it.isNotEmpty() },
+            description = activityJson.optString("description").let { if (it == "null" || it.isEmpty()) "" else it },
             date = activityJson.getString("date"),
             startTime = startTime,
             endTime = endTime,
             isAllDay = activityJson.optBoolean("isAllDay", false),
-            location = activityJson.optString("location").takeIf { it.isNotEmpty() },
+            location = activityJson.optString("location").takeIf { it.isNotEmpty() && it != "null" },
             categoryColor = activityJson.optString("categoryColor", "#3B82F6"),
             activityType = activityType,
-            recurrenceRule = activityJson.optString("recurrenceRule").takeIf { it.isNotEmpty() },
+            recurrenceRule = activityJson.optString("recurrenceRule").takeIf { it.isNotEmpty() && it != "null" },
             notificationSettings = notificationSettings,
             isCompleted = activityJson.optBoolean("isCompleted", false),
             visibility = visibility,
@@ -800,7 +896,8 @@ class BackupService(
             isFromGoogle = activityJson.optBoolean("isFromGoogle", false),
             excludedDates = parseStringArray(activityJson.optJSONArray("excludedDates")),
             excludedInstances = parseStringArray(activityJson.optJSONArray("excludedInstances")),
-            wikipediaLink = activityJson.optString("wikipediaLink").takeIf { it.isNotEmpty() } // Preservar link da Wikipedia se existir
+            wikipediaLink = activityJson.optString("wikipediaLink").takeIf { it.isNotEmpty() && it != "null" }, // Preservar link da Wikipedia se existir
+            lastModified = activityJson.optLong("lastModified", 0L)
         )
     }
     
@@ -899,6 +996,7 @@ class BackupService(
         activityJson.put("excludedInstances", excludedInstancesArray)
         
         activityJson.put("wikipediaLink", activity.wikipediaLink ?: "")
+        activityJson.put("lastModified", activity.lastModified)
         
         val notificationJson = JSONObject()
         notificationJson.put("isEnabled", activity.notificationSettings.isEnabled)
@@ -935,8 +1033,19 @@ class BackupService(
                 val tempFile = File.createTempFile("temp_sync_download", ".json", context.cacheDir)
                 try {
                     drive.files().get(fileId).executeMediaAndDownloadTo(tempFile.outputStream())
-                    val content = tempFile.readText(Charsets.UTF_8)
+                    var content = tempFile.readText(Charsets.UTF_8)
                     if (content.isNotEmpty()) {
+                        if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
+                            val password = settingsRepository.encryptionPassword.first()
+                            if (password.isEmpty()) {
+                                throw com.mss.thebigcalendar.crypto.DecryptionRequiredException("Sincronização em nuvem está criptografada, mas nenhuma senha está configurada localmente.")
+                            }
+                            try {
+                                content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, password)
+                            } catch (e: Exception) {
+                                throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar dados de sincronização em nuvem.")
+                            }
+                        }
                         val json = JSONObject(content)
                         
                         val devArray = json.optJSONArray("devices")
@@ -1009,7 +1118,7 @@ class BackupService(
             val localDeleted = deletedActivityRepository.deletedActivities.first()
             
             val localDeletedIds = localDeleted.map { it.originalActivity.id }.toSet()
-            val finalDeletedIds = localDeletedIds + remoteDeletedIds
+            var finalDeletedIds = localDeletedIds + remoteDeletedIds
 
             // Separar locais personalizadas e importadas
             val localCustomActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
@@ -1022,13 +1131,94 @@ class BackupService(
             val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
             val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
             
-            val mergedCustomActive = (localCustomActive + remoteCustomActive)
-                .distinctBy { it.id }
-                .filter { it.id !in finalDeletedIds }
+            data class SyncSignature(
+                val title: String,
+                val date: String,
+                val startTime: String?,
+                val endTime: String?,
+                val isAllDay: Boolean,
+                val description: String,
+                val location: String,
+                val activityType: String,
+                val recurrenceRule: String
+            )
+            
+            fun Activity.toSyncSignature() = SyncSignature(
+                title = title.trim().lowercase(),
+                date = date,
+                startTime = startTime?.toString(),
+                endTime = endTime?.toString(),
+                isAllDay = isAllDay,
+                description = description?.trim()?.lowercase() ?: "",
+                location = location?.trim()?.lowercase() ?: "",
+                activityType = activityType.name,
+                recurrenceRule = recurrenceRule?.trim()?.lowercase() ?: ""
+            )
 
-            val mergedCustomCompleted = (localCustomCompleted + remoteCustomCompleted)
-                .distinctBy { it.id }
+            val allCustomActivities = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
                 .filter { it.id !in finalDeletedIds }
+                .distinctBy { it.id }
+
+            val mergedCustomCompleted = mutableListOf<Activity>()
+            val mergedCustomActive = mutableListOf<Activity>()
+
+            val completedSignatures = mutableSetOf<SyncSignature>()
+            val activeSignatures = mutableSetOf<SyncSignature>()
+            val discardedIds = mutableSetOf<String>()
+
+            allCustomActivities.forEach { act ->
+                val id = act.id
+                val localActiveAct = localCustomActive.find { it.id == id }
+                val remoteActiveAct = remoteCustomActive.find { it.id == id }
+                val localCompletedAct = localCustomCompleted.find { it.id == id }
+                val remoteCompletedAct = remoteCustomCompleted.find { it.id == id }
+
+                val activeVersion = if (localActiveAct != null && remoteActiveAct != null) {
+                    if (localActiveAct.lastModified >= remoteActiveAct.lastModified) localActiveAct else remoteActiveAct
+                } else {
+                    localActiveAct ?: remoteActiveAct
+                }
+
+                val completedVersion = if (localCompletedAct != null && remoteCompletedAct != null) {
+                    if (localCompletedAct.lastModified >= remoteCompletedAct.lastModified) localCompletedAct else remoteCompletedAct
+                } else {
+                    localCompletedAct ?: remoteCompletedAct
+                }
+
+                if (activeVersion != null && completedVersion != null) {
+                    if (activeVersion.lastModified > completedVersion.lastModified) {
+                        val sig = activeVersion.toSyncSignature()
+                        if (activeSignatures.add(sig)) {
+                            mergedCustomActive.add(activeVersion)
+                        } else {
+                            discardedIds.add(id)
+                        }
+                    } else {
+                        val sig = completedVersion.toSyncSignature()
+                        if (completedSignatures.add(sig)) {
+                            mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
+                        } else {
+                            discardedIds.add(id)
+                        }
+                    }
+                } else if (activeVersion != null) {
+                    val sig = activeVersion.toSyncSignature()
+                    if (activeSignatures.add(sig)) {
+                        mergedCustomActive.add(activeVersion)
+                    } else {
+                        discardedIds.add(id)
+                    }
+                } else if (completedVersion != null) {
+                    val sig = completedVersion.toSyncSignature()
+                    if (completedSignatures.add(sig)) {
+                        mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
+                    } else {
+                        discardedIds.add(id)
+                    }
+                }
+            }
+
+            finalDeletedIds = finalDeletedIds + discardedIds
             
             val finalActive = mergedCustomActive + localJsonActive
             val finalCompleted = mergedCustomCompleted + localJsonCompleted
@@ -1095,8 +1285,6 @@ class BackupService(
                 mergedDevices.add(devObj)
             }
 
-            val hasOtherDevices = mergedDevices.isNotEmpty()
-
             val currentDeviceJson = JSONObject().apply {
                 put("platform", currentPlatform)
                 put("deviceName", currentDeviceName)
@@ -1108,51 +1296,55 @@ class BackupService(
             mergedDevices.forEach { updatedDevicesArray.put(it) }
             settingsRepository.saveSyncedDevicesJson(updatedDevicesArray.toString())
 
-            if (hasOtherDevices) {
-                // 4. Upload do arquivo atualizado
-                val syncJson = JSONObject().apply {
-                    put("backupVersion", "1.1")
-                    put("createdAt", LocalDateTime.now().toString())
-                    put("appVersion", "TheBigCalendar")
-                    
-                    val activitiesJsonArray = JSONArray()
-                    mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
-                    put("activities", activitiesJsonArray)
-                    
-                    val completedJsonArray = JSONArray()
-                    mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
-                    put("completedActivities", completedJsonArray)
-                    
-                    val deletedJsonArray = JSONArray()
-                    finalDeletedIds.forEach { deletedJsonArray.put(it) }
-                    put("deletedActivities", deletedJsonArray)
-                    
-                    put("devices", updatedDevicesArray)
-                }
+            // 4. Upload do arquivo atualizado
+            val syncJson = JSONObject().apply {
+                put("backupVersion", "1.1")
+                put("createdAt", LocalDateTime.now().toString())
+                put("appVersion", "TheBigCalendar")
                 
-                val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)
-                try {
-                    tempUploadFile.writeText(syncJson.toString(), Charsets.UTF_8)
-                    
-                    val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
-                    
-                    if (fileId != null) {
-                        val updateMetadata = com.google.api.services.drive.model.File().apply {
-                            name = "TBCalendar_Sync_Data.json"
-                        }
-                        drive.files().update(fileId, updateMetadata, mediaContent).execute()
-                    } else {
-                        val createMetadata = com.google.api.services.drive.model.File().apply {
-                            name = "TBCalendar_Sync_Data.json"
-                            parents = listOf("appDataFolder")
-                        }
-                        drive.files().create(createMetadata, mediaContent).execute()
-                    }
-                } finally {
-                    if (tempUploadFile.exists()) tempUploadFile.delete()
-                }
+                val activitiesJsonArray = JSONArray()
+                mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
+                put("activities", activitiesJsonArray)
+                
+                val completedJsonArray = JSONArray()
+                mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
+                put("completedActivities", completedJsonArray)
+                
+                val deletedJsonArray = JSONArray()
+                finalDeletedIds.forEach { deletedJsonArray.put(it) }
+                put("deletedActivities", deletedJsonArray)
+                
+                put("devices", updatedDevicesArray)
+            }
+            
+            val isEncrypted = settingsRepository.isEncryptionEnabled.first()
+            val password = settingsRepository.encryptionPassword.first()
+            val syncContent = if (isEncrypted && password.isNotEmpty()) {
+                com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(syncJson.toString(), password)
             } else {
-                android.util.Log.d("BackupService", "Nenhum outro dispositivo ativo detectado nos últimos 30 dias. Ignorando atualização/upload do arquivo de sincronização no Google Drive.")
+                syncJson.toString()
+            }
+            
+            val tempUploadFile = File.createTempFile("TBCalendar_Sync_Data", ".json", context.cacheDir)
+            try {
+                tempUploadFile.writeText(syncContent, Charsets.UTF_8)
+                
+                val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+                
+                if (fileId != null) {
+                    val updateMetadata = com.google.api.services.drive.model.File().apply {
+                        name = "TBCalendar_Sync_Data.json"
+                    }
+                    drive.files().update(fileId, updateMetadata, mediaContent).execute()
+                } else {
+                    val createMetadata = com.google.api.services.drive.model.File().apply {
+                        name = "TBCalendar_Sync_Data.json"
+                        parents = listOf("appDataFolder")
+                    }
+                    drive.files().create(createMetadata, mediaContent).execute()
+                }
+            } finally {
+                if (tempUploadFile.exists()) tempUploadFile.delete()
             }
             
             Result.success(Unit)
@@ -1174,7 +1366,8 @@ data class BackupInfo(
     val totalActivities: Int,
     val totalDeletedActivities: Int,
     val totalCompletedActivities: Int,
-    val backupVersion: String
+    val backupVersion: String,
+    val isEncrypted: Boolean = false
 )
 
 /**

@@ -1,16 +1,26 @@
+# --- Android Studio / IntelliJ ---
+.idea/
 *.iml
 .gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-/.idea/deploymentTargetSelector.xml
+local.properties
+
+# --- Sistema Operacional ---
 .DS_Store
-/build
-/captures
+Thumbs.db
+
+# --- Arquivos de Build e Compilação (Multi-módulo) ---
+**/build/
+*.class
+*.jar
+*.aar
+*.bak
 .externalNativeBuild
 .cxx
+captures/
+
+# --- Produção e Releases Locais ---
 /app/release/
+
+# --- Arquivos Confidenciais e Testes Locais (Segurança) ---
+client_secrets.json
+calendar_events.txt

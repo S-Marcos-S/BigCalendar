@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -326,6 +328,18 @@ fun BackupScreen(
             item { Spacer(modifier = Modifier.height(16.dp)) }
 
             item {
+                BackupLimitSettings(
+                    maxLocal = uiState.maxLocalBackups,
+                    maxCloud = uiState.maxCloudBackups,
+                    onMaxLocalChange = { viewModel.saveMaxLocalBackups(it) },
+                    onMaxCloudChange = { viewModel.saveMaxCloudBackups(it) },
+                    isCloudBackupEnabled = uiState.googleSignInAccount != null
+                )
+            }
+
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+
+            item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -539,6 +553,72 @@ fun BackupScreen(
                     showCloudDeleteConfirmation = null
                 },
                 onDismiss = { showCloudDeleteConfirmation = null }
+            )
+        }
+
+        if (uiState.showDecryptionDialog) {
+            var decryptionPassword by remember { mutableStateOf("") }
+            var decryptionError by remember { mutableStateOf<String?>(null) }
+            
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissDecryptionDialog() },
+                title = { Text(stringResource(id = R.string.decryption_dialog_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(id = R.string.decryption_dialog_message))
+                        Spacer(modifier = Modifier.height(4.dp))
+                        androidx.compose.material3.OutlinedTextField(
+                            value = decryptionPassword,
+                            onValueChange = { 
+                                decryptionPassword = it
+                                decryptionError = null
+                            },
+                            label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (decryptionError != null) {
+                            Text(
+                                text = decryptionError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else if (uiState.decryptionErrorMessage != null) {
+                            Text(
+                                text = uiState.decryptionErrorMessage!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (decryptionPassword.isEmpty()) {
+                                decryptionError = "A senha não pode ser vazia!"
+                            } else {
+                                val backupUri = uiState.decryptionBackupUri
+                                val cloudFileId = uiState.decryptionCloudFileId
+                                val cloudFileName = uiState.decryptionCloudFileName
+                                
+                                if (backupUri != null) {
+                                    viewModel.restoreFromBackup(backupUri, decryptionPassword)
+                                } else if (cloudFileId != null && cloudFileName != null) {
+                                    viewModel.restoreFromCloudBackup(cloudFileId, cloudFileName, decryptionPassword)
+                                }
+                            }
+                        }
+                    ) {
+                        Text(stringResource(id = R.string.confirm))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissDecryptionDialog() }) {
+                        Text(stringResource(id = R.string.cancel))
+                    }
+                }
             )
         }
     }
@@ -893,7 +973,34 @@ fun BackupFileItem(backupInfo: BackupInfo, onDelete: () -> Unit, onRestore: () -
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = backupInfo.fileName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = backupInfo.fileName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (backupInfo.isEncrypted) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = stringResource(id = R.string.encrypted_badge),
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(id = R.string.encrypted_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.backup_info_details, backupInfo.totalActivities, backupInfo.totalDeletedActivities, formatFileSize(backupInfo.fileSize)),
@@ -976,5 +1083,147 @@ private fun formatDriveDate(epochMillis: Long, format: String): String {
         displayFormatter.format(date)
     } catch (e: Exception) {
         stringResource(R.string.invalid_date)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BackupLimitSettings(
+    maxLocal: Int,
+    maxCloud: Int,
+    onMaxLocalChange: (Int) -> Unit,
+    onMaxCloudChange: (Int) -> Unit,
+    isCloudBackupEnabled: Boolean
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    val limitOptions = listOf(5, 10, 20, 0) // 0 = Unlimited
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = stringResource(id = R.string.backup_limits_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { isExpanded = !isExpanded }) {
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                    contentDescription = if (isExpanded) stringResource(R.string.collapse) else stringResource(R.string.expand)
+                )
+            }
+        }
+
+        if (isExpanded) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Local backup limit dropdown
+            var localExpanded by remember { mutableStateOf(false) }
+            Text(
+                text = stringResource(id = R.string.max_local_backups_label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ExposedDropdownMenuBox(
+                expanded = localExpanded,
+                onExpandedChange = { localExpanded = !localExpanded }
+            ) {
+                TextButton(onClick = { localExpanded = true }) {
+                    Text(
+                        text = if (maxLocal == 0) {
+                            stringResource(id = R.string.unlimited)
+                        } else {
+                            stringResource(id = R.string.backup_limit_option, maxLocal)
+                        }
+                    )
+                }
+                ExposedDropdownMenu(
+                    expanded = localExpanded,
+                    onDismissRequest = { localExpanded = false }
+                ) {
+                    limitOptions.forEach { opt ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = if (opt == 0) {
+                                        stringResource(id = R.string.unlimited)
+                                    } else {
+                                        stringResource(id = R.string.backup_limit_option, opt)
+                                    }
+                                )
+                            },
+                            onClick = {
+                                onMaxLocalChange(opt)
+                                localExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Cloud backup limit dropdown
+            var cloudExpanded by remember { mutableStateOf(false) }
+            Text(
+                text = stringResource(id = R.string.max_cloud_backups_label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            ExposedDropdownMenuBox(
+                expanded = cloudExpanded,
+                onExpandedChange = { if (isCloudBackupEnabled) cloudExpanded = !cloudExpanded }
+            ) {
+                TextButton(
+                    onClick = { if (isCloudBackupEnabled) cloudExpanded = true },
+                    enabled = isCloudBackupEnabled
+                ) {
+                    Text(
+                        text = if (!isCloudBackupEnabled) {
+                            stringResource(id = R.string.unlimited)
+                        } else if (maxCloud == 0) {
+                            stringResource(id = R.string.unlimited)
+                        } else {
+                            stringResource(id = R.string.backup_limit_option, maxCloud)
+                        }
+                    )
+                }
+                if (isCloudBackupEnabled) {
+                    ExposedDropdownMenu(
+                        expanded = cloudExpanded,
+                        onDismissRequest = { cloudExpanded = false }
+                    ) {
+                        limitOptions.forEach { opt ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = if (opt == 0) {
+                                            stringResource(id = R.string.unlimited)
+                                        } else {
+                                            stringResource(id = R.string.backup_limit_option, opt)
+                                        }
+                                    )
+                                },
+                                onClick = {
+                                    onMaxCloudChange(opt)
+                                    cloudExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

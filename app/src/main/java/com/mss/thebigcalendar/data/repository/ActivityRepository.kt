@@ -257,6 +257,7 @@ class ActivityRepository(private val context: Context) {
             .addAllExcludedInstances(this.excludedInstances)
             .setWikipediaLink(this.wikipediaLink ?: "")
             .setRollover(this.rollover)
+            .setLastModified(this.lastModified)
             .build()
     }
 
@@ -285,7 +286,8 @@ class ActivityRepository(private val context: Context) {
             excludedDates = this.excludedDatesList.toList(),
             excludedInstances = this.excludedInstancesList.toList(),
             wikipediaLink = this.wikipediaLink.takeIf { it.isNotEmpty() },
-            rollover = this.rollover
+            rollover = this.rollover,
+            lastModified = this.lastModified
         )
     }
 

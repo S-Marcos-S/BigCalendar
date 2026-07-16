@@ -150,11 +150,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun restoreFromCloudBackup(fileId: String, fileName: String) {
+    fun restoreFromCloudBackup(fileId: String, fileName: String, password: String? = null) {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isRestoring = true, restoreMessage = null) }
-            backupService.restoreFromCloudBackup(account, fileId, fileName)
+            backupService.restoreFromCloudBackup(account, fileId, fileName, password)
                 .onSuccess { restoreResult ->
                     // Cancelar alarmes existentes e limpar o repositório de alarmes
                     val notificationService = NotificationService(getApplication())
@@ -193,11 +193,28 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Agendar notificações para as atividades
                     restoreResult.activities.forEach { activity -> notificationService.scheduleNotification(activity) }
 
-                    _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restored from ${restoreResult.backupFileName}") }
+                    _uiState.update { it.copy(
+                        isRestoring = false, 
+                        restoreMessage = "Restored from ${restoreResult.backupFileName}",
+                        showDecryptionDialog = false,
+                        decryptionCloudFileId = null,
+                        decryptionCloudFileName = null,
+                        decryptionErrorMessage = null
+                    ) }
                     loadData() // Reload all data
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restore failed: ${error.message}") }
+                    if (error is com.mss.thebigcalendar.crypto.DecryptionRequiredException || error is com.mss.thebigcalendar.crypto.DecryptionFailedException) {
+                        _uiState.update { it.copy(
+                            showDecryptionDialog = true,
+                            decryptionCloudFileId = fileId,
+                            decryptionCloudFileName = fileName,
+                            decryptionErrorMessage = error.message,
+                            isRestoring = false
+                        ) }
+                    } else {
+                        _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restore failed: ${error.message}") }
+                    }
                 }
         }
     }
@@ -249,6 +266,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+
+        // Observar duplicidades
+        viewModelScope.launch {
+            activityRepository.activities.collect { allActs ->
+                val duplicates = getDuplicateGroups(allActs)
+                _uiState.update { it.copy(duplicateGroups = duplicates) }
+            }
+        }
     }
 
     fun setCalendarScale(scale: Float) {
@@ -291,6 +316,45 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             settingsRepository.setCrashlyticsEnabled(enabled)
             FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
             _uiState.update { it.copy(isCrashlyticsEnabled = enabled) }
+        }
+    }
+
+    fun setEncryptionSettings(enabled: Boolean, password: String) {
+        viewModelScope.launch {
+            settingsRepository.saveEncryptionSettings(enabled, password)
+            _uiState.update { it.copy(isEncryptionEnabled = enabled, encryptionPassword = password) }
+        }
+    }
+
+    fun saveMaxLocalBackups(max: Int) {
+        viewModelScope.launch {
+            settingsRepository.saveMaxLocalBackups(max)
+            _uiState.update { it.copy(maxLocalBackups = max) }
+            val directoryUriString = _uiState.value.backupDirectoryUri
+            if (!directoryUriString.isNullOrBlank()) {
+                try {
+                    backupService.pruneLocalBackups(Uri.parse(directoryUriString))
+                    loadBackupFiles()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    fun saveMaxCloudBackups(max: Int) {
+        viewModelScope.launch {
+            settingsRepository.saveMaxCloudBackups(max)
+            _uiState.update { it.copy(maxCloudBackups = max) }
+            val account = _uiState.value.googleSignInAccount
+            if (account != null) {
+                try {
+                    backupService.pruneCloudBackups(account)
+                    listCloudBackups()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 
@@ -585,6 +649,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.isEncryptionEnabled.collect { enabled ->
+                _uiState.update { it.copy(isEncryptionEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.encryptionPassword.collect { password ->
+                _uiState.update { it.copy(encryptionPassword = password) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.backupDirectoryUri.collect { uri ->
                 _uiState.update { it.copy(backupDirectoryUri = uri) }
                 if (!uri.isNullOrBlank()) {
@@ -595,6 +669,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.hasSeenMainOnboarding.collect { seen ->
                 _uiState.update { it.copy(hasSeenMainOnboarding = seen) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.maxLocalBackups.collect { max ->
+                _uiState.update { it.copy(maxLocalBackups = max) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.maxCloudBackups.collect { max ->
+                _uiState.update { it.copy(maxCloudBackups = max) }
             }
         }
         viewModelScope.launch {
@@ -1453,6 +1537,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(showBackgroundPermissionDialog = false) }
     }
 
+    fun dismissDecryptionDialog() {
+        _uiState.update { it.copy(
+            showDecryptionDialog = false,
+            decryptionBackupUri = null,
+            decryptionCloudFileId = null,
+            decryptionCloudFileName = null,
+            decryptionErrorMessage = null
+        ) }
+    }
+
     /**
      * Solicita permissão de segundo plano (chamado pelo dialog)
      */
@@ -1461,10 +1555,109 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(showBackgroundPermissionDialog = false) }
     }
 
+    fun showDuplicateDialog() {
+        _uiState.update { it.copy(showDuplicateDialog = true) }
+    }
+
+    fun dismissDuplicateDialog() {
+        _uiState.update { it.copy(showDuplicateDialog = false) }
+    }
+
+    fun deleteActivityDirectly(activityId: String) {
+        viewModelScope.launch {
+            val activity = activityRepository.activities.first().find { it.id == activityId }
+            if (activity != null) {
+                deletedActivityRepository.addDeletedActivity(activity)
+            }
+            activityRepository.deleteActivity(activityId)
+            loadData()
+        }
+    }
+
+    fun removeAllDuplicates() {
+        viewModelScope.launch {
+            val allActs = activityRepository.activities.first()
+            val duplicates = getDuplicateGroups(allActs)
+            if (duplicates.isEmpty()) return@launch
+
+            duplicates.forEach { group ->
+                val toDelete = group.drop(1)
+                toDelete.forEach { act ->
+                    deletedActivityRepository.addDeletedActivity(act)
+                    activityRepository.deleteActivity(act.id)
+                }
+            }
+
+            _uiState.update { it.copy(showDuplicateDialog = false) }
+            loadData()
+        }
+    }
+
+    fun getDuplicateGroups(activities: List<Activity>): List<List<Activity>> {
+        data class ActivitySignature(
+            val title: String,
+            val date: String,
+            val startTime: java.time.LocalTime?,
+            val endTime: java.time.LocalTime?,
+            val isAllDay: Boolean,
+            val description: String,
+            val location: String,
+            val activityType: ActivityType,
+            val recurrenceRule: String
+        )
+        
+        fun Activity.toSignature(): ActivitySignature {
+            return ActivitySignature(
+                title = title.trim().lowercase(),
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                isAllDay = isAllDay,
+                description = description?.trim()?.lowercase() ?: "",
+                location = location?.trim()?.lowercase() ?: "",
+                activityType = activityType,
+                recurrenceRule = recurrenceRule?.trim()?.lowercase() ?: ""
+            )
+        }
+
+        val customActivities = activities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+        val groups = customActivities.groupBy { it.toSignature() }
+        return groups.values.filter { it.size > 1 }
+    }
+
 
 
     fun onSaveActivity(activityData: Activity, syncWithGoogle: Boolean = false) {
         viewModelScope.launch {
+            // Verificar duplicidade de agendamentos (ignorando ID e cor de prioridade, tratando instâncias recorrentes)
+            val baseIdToSave = activityData.id.split("_").first()
+            val isDuplicate = _uiState.value.activities.any { existing ->
+                val existingBaseId = existing.id.split("_").first()
+                if (existingBaseId == baseIdToSave) false
+                else {
+                    existing.title.trim().equals(activityData.title.trim(), ignoreCase = true) &&
+                    existing.date == activityData.date &&
+                    existing.startTime == activityData.startTime &&
+                    existing.endTime == activityData.endTime &&
+                    existing.isAllDay == activityData.isAllDay &&
+                    (existing.description?.trim() ?: "").equals(activityData.description?.trim() ?: "", ignoreCase = true) &&
+                    (existing.location?.trim() ?: "").equals(activityData.location?.trim() ?: "", ignoreCase = true) &&
+                    existing.activityType == activityData.activityType &&
+                    (existing.recurrenceRule?.trim() ?: "").equals(activityData.recurrenceRule?.trim() ?: "", ignoreCase = true)
+                }
+            }
+
+            if (isDuplicate) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        getApplication(),
+                        "Já existe um agendamento idêntico!",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                return@launch
+            }
+
             // Verificar se é uma edição de instância recorrente
             val isEditingRecurringInstance = activityData.id.contains("_") && 
                                            activityData.id != "new" && 
@@ -1521,9 +1714,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             
             // Lógica original para atividades não recorrentes ou novas
             var activityToSave = if (activityData.id == "new" || activityData.id.isBlank()) {
-                activityData.copy(id = UUID.randomUUID().toString())
+                activityData.copy(
+                    id = UUID.randomUUID().toString(),
+                    lastModified = System.currentTimeMillis()
+                )
             } else {
-                activityData
+                activityData.copy(lastModified = System.currentTimeMillis())
             }
 
             // Verificar se é uma edição de atividade existente do Google
@@ -2296,7 +2492,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         id = activityId,
                         date = instanceDate,
                         isCompleted = true,
-                        showInCalendar = false
+                        showInCalendar = false,
+                        lastModified = System.currentTimeMillis()
                     )
                     
                     // Salvar instância específica como concluída
@@ -2309,10 +2506,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         val timeString = instanceTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) ?: "00:00"
                         val instanceId = "${baseActivity.id}_${instanceDate}_${timeString}"
                         val updatedExcludedInstances = baseActivity.excludedInstances + instanceId
-                        baseActivity.copy(excludedInstances = updatedExcludedInstances)
+                        baseActivity.copy(
+                            excludedInstances = updatedExcludedInstances,
+                            lastModified = System.currentTimeMillis()
+                        )
                     } else {
                         val updatedExcludedDates = baseActivity.excludedDates + instanceDate
-                        baseActivity.copy(excludedDates = updatedExcludedDates)
+                        baseActivity.copy(
+                            excludedDates = updatedExcludedDates,
+                            lastModified = System.currentTimeMillis()
+                        )
                     }
                     
                         // Atualizar a atividade base com a nova lista de exclusões
@@ -2345,7 +2548,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             id = activityId,
                             date = activityDate,
                             isCompleted = true,
-                            showInCalendar = false
+                            showInCalendar = false,
+                            lastModified = System.currentTimeMillis()
                         )
                         
                         // Salvar instância específica como concluída
@@ -2359,10 +2563,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             
                             // Para TODAS as instâncias, apenas adicionar à lista de exclusões
                             val updatedExcludedInstances = activityToComplete.excludedInstances + instanceId
-                            activityToComplete.copy(excludedInstances = updatedExcludedInstances)
+                            activityToComplete.copy(
+                                excludedInstances = updatedExcludedInstances,
+                                lastModified = System.currentTimeMillis()
+                            )
                         } else {
                             val updatedExcludedDates = activityToComplete.excludedDates + activityDate
-                            activityToComplete.copy(excludedDates = updatedExcludedDates)
+                            activityToComplete.copy(
+                                excludedDates = updatedExcludedDates,
+                                lastModified = System.currentTimeMillis()
+                            )
                         }
                         
                         // Atualizar a atividade base com a nova lista de exclusões
@@ -2390,7 +2600,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         // Marcar como concluída e salvar no repositório de finalizadas
                         val completedActivity = activityToComplete.copy(
                             isCompleted = true,
-                            showInCalendar = false // Ocultar do calendário mensal
+                            showInCalendar = false, // Ocultar do calendário mensal
+                            lastModified = System.currentTimeMillis()
                         )
                         
                         // Salvar no repositório de atividades finalizadas
@@ -2914,7 +3125,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val restoredActivity = deletedActivityRepository.restoreActivity(deletedActivityId)
             if (restoredActivity != null) {
                 // Restaurar a atividade
-                activityRepository.addActivity(restoredActivity)
+                activityRepository.addActivity(restoredActivity.copy(lastModified = System.currentTimeMillis()))
                 println("✅ Atividade restaurada: ${restoredActivity.title}")
             }
         }
@@ -3049,14 +3260,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     
     fun onBackupIconClick() {
         println("💾 Abrindo tela de backup")
-        _uiState.update { it.copy(isBackupScreenOpen = true, isSidebarOpen = false) }
+        _uiState.update { it.copy(isBackupScreenOpen = true, isSidebarOpen = false, isSettingsScreenOpen = false) }
     }
     
     fun closeBackupScreen() {
         println("🚪 Fechando tela de backup")
         _uiState.update { it.copy(
             isBackupScreenOpen = false,
-            backupMessage = null
+            backupMessage = null,
+            isSettingsScreenOpen = true
         ) }
     }
     
@@ -3119,7 +3331,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun restoreFromBackup(backupUri: String) {
+    fun restoreFromBackup(backupUri: String, password: String? = null) {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(
@@ -3129,7 +3341,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     restoreProgress = 0f
                 ) }
 
-                val restoreResult = backupService.restoreFromBackup(Uri.parse(backupUri))
+                val restoreResult = backupService.restoreFromBackup(Uri.parse(backupUri), password)
                 restoreResult.fold(
                     onSuccess = { result ->
                         clearAllCurrentData()
@@ -3158,7 +3370,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             }
                         }
 
-                        _uiState.update { it.copy(backupMessage = "Backup restaurado com sucesso!") }
+                        _uiState.update { it.copy(
+                            backupMessage = "Backup restaurado com sucesso!",
+                            showDecryptionDialog = false,
+                            decryptionBackupUri = null,
+                            decryptionErrorMessage = null
+                        ) }
 
                         loadData()
                         loadBackupFiles()
@@ -3177,11 +3394,20 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
                     },
                     onFailure = { exception ->
-                        _uiState.update { it.copy(
-                            backupMessage = "Erro ao restaurar backup: ${exception.message}",
-                            isRestoringBackup = false,
-                            localBackupUriBeingRestored = null
-                        ) }
+                        if (exception is com.mss.thebigcalendar.crypto.DecryptionRequiredException || exception is com.mss.thebigcalendar.crypto.DecryptionFailedException) {
+                            _uiState.update { it.copy(
+                                showDecryptionDialog = true,
+                                decryptionBackupUri = backupUri,
+                                decryptionErrorMessage = exception.message,
+                                isRestoringBackup = false
+                            ) }
+                        } else {
+                            _uiState.update { it.copy(
+                                backupMessage = "Erro ao restaurar backup: ${exception.message}",
+                                isRestoringBackup = false,
+                                localBackupUriBeingRestored = null
+                            ) }
+                        }
                     }
                 )
 

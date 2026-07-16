@@ -275,22 +275,39 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
                 
                 // 3. Busca
-                OutlinedTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodyMedium) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-                    trailingIcon = {
-                        if (uiState.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
-                            }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    if (uiState.duplicateGroups.isNotEmpty()) {
+                        IconButton(
+                            onClick = { viewModel.showDuplicateDialog() },
+                            modifier = Modifier.padding(end = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "Agendamentos repetidos detectados",
+                                tint = Color.Red
+                            )
                         }
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                    }
+                    OutlinedTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        placeholder = { Text("Buscar...", style = MaterialTheme.typography.bodyMedium) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                        trailingIcon = {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Limpar busca")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
                 
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -1320,7 +1337,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                     try { LocalTime.parse(editEndTime) } catch(e: Exception) { null }
                                 } else null
 
-                                viewModel.addOrUpdateActivity(
+                                val success = viewModel.addOrUpdateActivity(
                                     title = editTitle.ifBlank { "Compromisso sem título" },
                                     description = editDesc.takeIf { it.isNotBlank() },
                                     date = editDate,
@@ -1330,7 +1347,9 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
                                     categoryColor = editColor,
                                     type = editType
                                 )
-                                showCreateDialog = false
+                                if (success) {
+                                    showCreateDialog = false
+                                }
                             }
                         ) {
                             Text("Salvar")
@@ -1489,8 +1508,148 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
         onGoogleConnect = { viewModel.syncActivitiesWithCloud() },
         onGoogleDisconnect = { viewModel.disconnectGoogleAccount() },
         isSyncing = uiState.isSyncing,
-        onManualSync = { viewModel.syncActivitiesWithCloud() }
+        onManualSync = { viewModel.syncActivitiesWithCloud() },
+        isEncryptionEnabled = uiState.isEncryptionEnabled,
+        onEncryptionToggle = { enabled, password -> viewModel.setEncryptionSettings(enabled, password) }
     )
+
+    if (uiState.showDuplicateDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDuplicateDialog() },
+            title = { Text("Agendamentos Duplicados") },
+            text = {
+                Column(modifier = Modifier.width(450.dp)) {
+                    Text(
+                        text = "Foram encontrados agendamentos com as mesmas informações. Você pode apagá-los de forma individual ou remover todas as cópias extras de uma vez, mantendo apenas um.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    Box(modifier = Modifier.height(250.dp)) {
+                        androidx.compose.foundation.lazy.LazyColumn {
+                            uiState.duplicateGroups.forEachIndexed { groupIndex, group ->
+                                item {
+                                    Text(
+                                        text = "Grupo ${groupIndex + 1} (${group.first().title})",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                    )
+                                }
+                                items(group) { activity ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "${activity.date} ${activity.startTime?.toString() ?: ""}",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            activity.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                                                Text(
+                                                    text = desc,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        IconButton(onClick = { viewModel.deleteActivity(activity.id) }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Apagar esta cópia",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.removeAllDuplicates() }
+                ) {
+                    Text("Manter apenas um")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissDuplicateDialog() }
+                ) {
+                    Text("Fechar")
+                }
+            }
+        )
+    }
+
+    if (uiState.showDecryptionDialog) {
+        var decryptionPassword by remember { mutableStateOf("") }
+        var decryptionError by remember { mutableStateOf<String?>(null) }
+        
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDecryptionDialog() },
+            title = { Text("Descriptografar Backup / Sincronização") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Este arquivo de backup ou sincronização está criptografado. Insira a senha correspondente para prosseguir com a restauração.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = decryptionPassword,
+                        onValueChange = { 
+                            decryptionPassword = it
+                            decryptionError = null
+                        },
+                        label = { Text("Senha de Criptografia") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (decryptionError != null) {
+                        Text(
+                            text = decryptionError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (uiState.decryptionErrorMessage != null) {
+                        Text(
+                            text = uiState.decryptionErrorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (decryptionPassword.isEmpty()) {
+                            decryptionError = "A senha não pode ser vazia!"
+                        } else {
+                            val backupFile = uiState.decryptionBackupFile
+                            if (backupFile != null) {
+                                viewModel.restoreBackup(backupFile, decryptionPassword)
+                            } else {
+                                viewModel.syncActivitiesWithCloud(decryptionPassword)
+                            }
+                        }
+                    }
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissDecryptionDialog() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable

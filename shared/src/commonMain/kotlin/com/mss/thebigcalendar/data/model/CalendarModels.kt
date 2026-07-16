@@ -44,7 +44,8 @@ data class Activity(
     val excludedDates: List<String> = emptyList(),
     val excludedInstances: List<String> = emptyList(),
     val wikipediaLink: String? = null,
-    val rollover: Boolean = false
+    val rollover: Boolean = false,
+    val lastModified: Long = 0L
 )
 
 @Immutable

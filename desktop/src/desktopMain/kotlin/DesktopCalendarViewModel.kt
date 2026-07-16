@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -120,7 +122,14 @@ data class DesktopUiState(
     val showCompletedActivities: Boolean = false,
     val showMoonPhases: Boolean = false,
     val jsonCalendars: List<DesktopJsonCalendar> = emptyList(),
-    val viewMode: ViewMode = ViewMode.MONTHLY
+    val viewMode: ViewMode = ViewMode.MONTHLY,
+    val isEncryptionEnabled: Boolean = false,
+    val encryptionPassword: String = "",
+    val showDecryptionDialog: Boolean = false,
+    val decryptionBackupFile: java.io.File? = null,
+    val decryptionErrorMessage: String? = null,
+    val duplicateGroups: List<List<Activity>> = emptyList(),
+    val showDuplicateDialog: Boolean = false
 )
 
 class DesktopCalendarViewModel(private val scope: CoroutineScope) {
@@ -142,6 +151,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     private val KEY_SHOW_MOON_PHASES = booleanPreferencesKey("show_moon_phases")
     private val KEY_LAST_QUOTE_DATE = stringPreferencesKey("last_quote_date")
     private val KEY_LAST_QUOTE_INDEX = intPreferencesKey("last_quote_index")
+    private val KEY_IS_ENCRYPTION_ENABLED = booleanPreferencesKey("is_encryption_enabled")
+    private val KEY_ENCRYPTION_PASSWORD = stringPreferencesKey("encryption_password")
 
     // Listas pré-carregadas de feriados e datas especiais
     var nationalHolidays: List<Holiday> = emptyList()
@@ -161,6 +172,16 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         if (hasTokens()) {
             checkGoogleAccount()
             syncActivitiesWithCloud()
+        }
+
+        scope.launch {
+            _uiState
+                .map { it.activities }
+                .distinctUntilChanged()
+                .collect { activitiesList ->
+                    val duplicates = getDuplicateGroups(activitiesList)
+                    _uiState.update { it.copy(duplicateGroups = duplicates) }
+                }
         }
     }
 
@@ -277,6 +298,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
                 val showCompletedActivities = preferences[KEY_SHOW_COMPLETED_ACTIVITIES] ?: false
                 val showMoonPhases = preferences[KEY_SHOW_MOON_PHASES] ?: false
+                val isEncryptionEnabled = preferences[KEY_IS_ENCRYPTION_ENABLED] ?: false
+                val encryptionPassword = preferences[KEY_ENCRYPTION_PASSWORD] ?: ""
 
                 val activitiesStr = preferences[KEY_ACTIVITIES]
                 val activitiesList = if (activitiesStr != null) {
@@ -302,37 +325,39 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
 
                 val lastDate = preferences[KEY_LAST_QUOTE_DATE] ?: ""
                 val lastIndex = preferences[KEY_LAST_QUOTE_INDEX] ?: 0
-                
-                val today = LocalDate.now().toString()
-                val selectedQuote = if (quotes.isNotEmpty()) {
-                    if (today != lastDate) {
-                        val nextIndex = (lastIndex + 1) % quotes.size
-                        scope.launch {
-                            dataStore.edit { prefs ->
-                                prefs[KEY_LAST_QUOTE_DATE] = today
-                                prefs[KEY_LAST_QUOTE_INDEX] = nextIndex
+                    
+                    val today = LocalDate.now().toString()
+                    val selectedQuote = if (quotes.isNotEmpty()) {
+                        if (today != lastDate) {
+                            val nextIndex = (lastIndex + 1) % quotes.size
+                            scope.launch {
+                                dataStore.edit { prefs ->
+                                    prefs[KEY_LAST_QUOTE_DATE] = today
+                                    prefs[KEY_LAST_QUOTE_INDEX] = nextIndex
+                                }
                             }
+                            quotes[nextIndex]
+                        } else {
+                            quotes[lastIndex]
                         }
-                        quotes[nextIndex]
-                    } else {
-                        quotes[lastIndex]
-                    }
-                } else null
+                    } else null
 
-                _uiState.update {
-                    it.copy(
-                        theme = theme,
-                        pureBlackTheme = pureBlack,
-                        welcomeName = welcomeName,
-                        filterOptions = filters,
-                        activities = activitiesList,
-                        sidebarFilterVisibility = sidebarFilterVisibility,
-                        showCompletedActivities = showCompletedActivities,
-                        showMoonPhases = showMoonPhases,
-                        quote = selectedQuote,
-                        deletedActivityIds = deletedList
-                    )
-                }
+                    _uiState.update {
+                        it.copy(
+                            theme = theme,
+                            pureBlackTheme = pureBlack,
+                            welcomeName = welcomeName,
+                            filterOptions = filters,
+                            activities = activitiesList,
+                            sidebarFilterVisibility = sidebarFilterVisibility,
+                            showCompletedActivities = showCompletedActivities,
+                            showMoonPhases = showMoonPhases,
+                            quote = selectedQuote,
+                            deletedActivityIds = deletedList,
+                            isEncryptionEnabled = isEncryptionEnabled,
+                            encryptionPassword = encryptionPassword
+                        )
+                    }
 
                 try {
                     val home = System.getProperty("user.home")
@@ -365,6 +390,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 preferences[KEY_SIDEBAR_FILTER_VISIBILITY] = Json.encodeToString(_uiState.value.sidebarFilterVisibility)
                 preferences[KEY_SHOW_COMPLETED_ACTIVITIES] = _uiState.value.showCompletedActivities
                 preferences[KEY_SHOW_MOON_PHASES] = _uiState.value.showMoonPhases
+                preferences[KEY_IS_ENCRYPTION_ENABLED] = _uiState.value.isEncryptionEnabled
+                preferences[KEY_ENCRYPTION_PASSWORD] = _uiState.value.encryptionPassword
             }
 
             try {
@@ -425,12 +452,38 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         isAllDay: Boolean,
         categoryColor: String,
         type: ActivityType
-    ) {
+    ): Boolean {
         val currentList = _uiState.value.activities.toMutableList()
         val editingActivity = _uiState.value.activityToEdit
 
+        val baseIdToSave = (editingActivity?.id ?: "").split("_").first()
+        val targetLocation = editingActivity?.location
+        val targetRecurrenceRule = editingActivity?.recurrenceRule
+
+        val isDuplicate = currentList.any { existing ->
+            val existingBaseId = existing.id.split("_").first()
+            if (existingBaseId == baseIdToSave) false
+            else if (existing.isCompleted) false // Ignorar concluídos
+            else {
+                existing.title.trim().equals(title.trim(), ignoreCase = true) &&
+                existing.date == date &&
+                existing.startTime == startTime &&
+                existing.endTime == endTime &&
+                existing.isAllDay == isAllDay &&
+                (existing.description?.trim() ?: "").equals(description?.trim() ?: "", ignoreCase = true) &&
+                (existing.location?.trim() ?: "").equals(targetLocation?.trim() ?: "", ignoreCase = true) &&
+                existing.activityType == type &&
+                (existing.recurrenceRule?.trim() ?: "").equals(targetRecurrenceRule?.trim() ?: "", ignoreCase = true)
+            }
+        }
+
+        if (isDuplicate) {
+            _uiState.update { it.copy(syncMessage = "Aviso: Já existe um agendamento idêntico!") }
+            return false
+        }
+
         if (editingActivity != null) {
-            if (editingActivity.location?.startsWith("JSON_IMPORTED_") == true) return
+            if (editingActivity.location?.startsWith("JSON_IMPORTED_") == true) return false
             val updated = editingActivity.copy(
                 title = title,
                 description = description,
@@ -439,7 +492,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 endTime = endTime,
                 isAllDay = isAllDay,
                 categoryColor = categoryColor,
-                activityType = type
+                activityType = type,
+                lastModified = System.currentTimeMillis()
             )
             val index = currentList.indexOfFirst { it.id == editingActivity.id }
             if (index != -1) {
@@ -457,16 +511,18 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 location = null,
                 categoryColor = categoryColor,
                 activityType = type,
-                recurrenceRule = null
+                recurrenceRule = null,
+                lastModified = System.currentTimeMillis()
             )
             currentList.add(newActivity)
         }
 
-        _uiState.update { it.copy(activities = currentList, activityToEdit = null) }
+        _uiState.update { it.copy(activities = currentList, activityToEdit = null, syncMessage = null) }
         saveData()
         if (hasTokens()) {
             syncActivitiesWithCloud()
         }
+        return true
     }
 
     fun deleteActivity(id: String) {
@@ -485,11 +541,79 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
     }
 
+    fun showDuplicateDialog() {
+        _uiState.update { it.copy(showDuplicateDialog = true) }
+    }
+
+    fun dismissDuplicateDialog() {
+        _uiState.update { it.copy(showDuplicateDialog = false) }
+    }
+
+    fun removeAllDuplicates() {
+        val allActs = _uiState.value.activities
+        val duplicates = getDuplicateGroups(allActs)
+        if (duplicates.isEmpty()) return
+
+        var currentList = _uiState.value.activities
+        var newDeleted = _uiState.value.deletedActivityIds
+
+        duplicates.forEach { group ->
+            val toDelete = group.drop(1)
+            toDelete.forEach { act ->
+                currentList = currentList.filter { it.id != act.id }
+                if (act.id !in newDeleted) {
+                    newDeleted = newDeleted + act.id
+                }
+            }
+        }
+
+        _uiState.update { it.copy(activities = currentList, deletedActivityIds = newDeleted, showDuplicateDialog = false) }
+        saveData()
+        if (hasTokens()) {
+            syncActivitiesWithCloud()
+        }
+    }
+
+    fun getDuplicateGroups(activities: List<Activity>): List<List<Activity>> {
+        data class ActivitySignature(
+            val title: String,
+            val date: String,
+            val startTime: java.time.LocalTime?,
+            val endTime: java.time.LocalTime?,
+            val isAllDay: Boolean,
+            val description: String,
+            val location: String,
+            val activityType: ActivityType,
+            val recurrenceRule: String
+        )
+        
+        fun Activity.toSignature(): ActivitySignature {
+            return ActivitySignature(
+                title = title.trim().lowercase(),
+                date = date,
+                startTime = startTime,
+                endTime = endTime,
+                isAllDay = isAllDay,
+                description = description?.trim()?.lowercase() ?: "",
+                location = location?.trim()?.lowercase() ?: "",
+                activityType = activityType,
+                recurrenceRule = recurrenceRule?.trim()?.lowercase() ?: ""
+            )
+        }
+
+        val customActivities = activities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+        val groups = customActivities.groupBy { it.toSignature() }
+        return groups.values.filter { it.size > 1 }
+    }
+
     fun toggleActivityCompletion(activity: Activity) {
         if (activity.location?.startsWith("JSON_IMPORTED_") == true) return
         val currentList = _uiState.value.activities.map {
             if (it.id == activity.id) {
-                it.copy(isCompleted = !it.isCompleted)
+                it.copy(
+                    isCompleted = !it.isCompleted,
+                    lastModified = System.currentTimeMillis()
+                )
             } else {
                 it
             }
@@ -676,6 +800,19 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     fun setPureBlackTheme(enabled: Boolean) {
         _uiState.update { it.copy(pureBlackTheme = enabled) }
         saveData()
+    }
+
+    fun setEncryptionSettings(enabled: Boolean, password: String) {
+        _uiState.update { it.copy(isEncryptionEnabled = enabled, encryptionPassword = password) }
+        saveData()
+    }
+
+    fun dismissDecryptionDialog() {
+        _uiState.update { it.copy(
+            showDecryptionDialog = false,
+            decryptionBackupFile = null,
+            decryptionErrorMessage = null
+        ) }
     }
 
     fun setShowSettings(show: Boolean) {
@@ -914,12 +1051,24 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
     }
 
-    fun restoreBackup(file: java.io.File) {
+    fun restoreBackup(file: java.io.File, password: String? = null) {
         scope.launch {
             _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando restauração do backup...") }
             try {
-                val content = withContext(Dispatchers.IO) {
+                var content = withContext(Dispatchers.IO) {
                     file.readText(Charsets.UTF_8)
+                }
+
+                if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
+                    val passwordToUse = password ?: _uiState.value.encryptionPassword
+                    if (passwordToUse.isEmpty()) {
+                        throw com.mss.thebigcalendar.crypto.DecryptionRequiredException("Este arquivo de backup está criptografado. Uma senha é necessária.")
+                    }
+                    try {
+                        content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
+                    } catch (e: Exception) {
+                        throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar arquivo de backup.")
+                    }
                 }
 
                 val jsonElement = Json.parseToJsonElement(content)
@@ -995,60 +1144,81 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         welcomeName = restoredWelcomeName,
                         theme = restoredTheme,
                         isSyncing = false,
-                        syncMessage = "Backup restaurado! $insertedCount novos compromissos importados, $updatedCount atualizados."
+                        syncMessage = "Backup restaurado! $insertedCount novos compromissos importados, $updatedCount atualizados.",
+                        showDecryptionDialog = false,
+                        decryptionBackupFile = null,
+                        decryptionErrorMessage = null
                     )
                 }
                 saveData()
 
             } catch (e: Exception) {
                 e.printStackTrace()
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        syncMessage = "Erro ao restaurar backup: ${e.message}"
-                    )
+                if (e is com.mss.thebigcalendar.crypto.DecryptionRequiredException || e is com.mss.thebigcalendar.crypto.DecryptionFailedException) {
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            showDecryptionDialog = true,
+                            decryptionBackupFile = file,
+                            decryptionErrorMessage = e.message
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isSyncing = false,
+                            syncMessage = "Erro ao restaurar backup: ${e.message}"
+                        )
+                    }
                 }
             }
         }
     }
 
+    private fun kotlinx.serialization.json.JsonElement?.asStringOrNull(): String? {
+        if (this == null || this is kotlinx.serialization.json.JsonNull) return null
+        val content = this.jsonPrimitive.content
+        return content.takeIf { it.isNotEmpty() && it != "null" }
+    }
+
     private fun parseActivityFromJsonObject(obj: kotlinx.serialization.json.JsonObject): Activity {
-        val id = obj["id"]?.jsonPrimitive?.content ?: UUID.randomUUID().toString()
-        val title = obj["title"]?.jsonPrimitive?.content ?: "Sem título"
-        val description = obj["description"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
-        val date = obj["date"]?.jsonPrimitive?.content ?: LocalDate.now().toString()
+        val id = obj["id"].asStringOrNull() ?: UUID.randomUUID().toString()
+        val title = obj["title"].asStringOrNull() ?: "Sem título"
+        val description = obj["description"].asStringOrNull() ?: ""
+        val date = obj["date"].asStringOrNull() ?: LocalDate.now().toString()
         
-        val startTimeStr = obj["startTime"]?.jsonPrimitive?.content
+        val startTimeStr = obj["startTime"].asStringOrNull()
         val startTime = startTimeStr?.takeIf { it.isNotEmpty() }?.let {
             try { LocalTime.parse(it) } catch (e: Exception) { null }
         }
         
-        val endTimeStr = obj["endTime"]?.jsonPrimitive?.content
+        val endTimeStr = obj["endTime"].asStringOrNull()
         val endTime = endTimeStr?.takeIf { it.isNotEmpty() }?.let {
             try { LocalTime.parse(it) } catch (e: Exception) { null }
         }
         
         val isAllDay = obj["isAllDay"]?.jsonPrimitive?.booleanOrNull ?: true
-        val location = obj["location"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
-        val categoryColor = obj["categoryColor"]?.jsonPrimitive?.content ?: "#4285F4"
+        val location = obj["location"].asStringOrNull()
+        val categoryColor = obj["categoryColor"].asStringOrNull() ?: "#4285F4"
         
-        val activityTypeStr = obj["activityType"]?.jsonPrimitive?.content ?: "EVENT"
+        val activityTypeStr = obj["activityType"].asStringOrNull() ?: "EVENT"
         val activityType = try { ActivityType.valueOf(activityTypeStr) } catch(e: Exception) { ActivityType.EVENT }
         
-        val recurrenceRule = obj["recurrenceRule"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        val recurrenceRule = obj["recurrenceRule"].asStringOrNull()
         val isCompleted = obj["isCompleted"]?.jsonPrimitive?.booleanOrNull ?: false
         
-        val visibilityStr = obj["visibility"]?.jsonPrimitive?.content ?: "LOW"
+        val visibilityStr = obj["visibility"].asStringOrNull() ?: "LOW"
         val visibility = try { VisibilityLevel.valueOf(visibilityStr) } catch(e: Exception) { VisibilityLevel.LOW }
         
         val showInCalendar = obj["showInCalendar"]?.jsonPrimitive?.booleanOrNull ?: true
         val isFromGoogle = obj["isFromGoogle"]?.jsonPrimitive?.booleanOrNull ?: false
         
-        val excludedDates = obj["excludedDates"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-        val excludedInstances = obj["excludedInstances"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-        val wikipediaLink = obj["wikipediaLink"]?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
+        val excludedDates = obj["excludedDates"]?.jsonArray?.mapNotNull { it.asStringOrNull() } ?: emptyList()
+        val excludedInstances = obj["excludedInstances"]?.jsonArray?.mapNotNull { it.asStringOrNull() } ?: emptyList()
+        val wikipediaLink = obj["wikipediaLink"].asStringOrNull()
         
         val rollover = obj["rollover"]?.jsonPrimitive?.booleanOrNull ?: false
+        val lastModified = obj["lastModified"]?.jsonPrimitive?.longOrNull ?: 0L
 
         val notifObj = obj["notificationSettings"]?.jsonObject
         val notificationSettings = if (notifObj != null) {
@@ -1094,7 +1264,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
             excludedInstances = excludedInstances,
             wikipediaLink = wikipediaLink,
             notificationSettings = notificationSettings,
-            rollover = rollover
+            rollover = rollover,
+            lastModified = lastModified
         )
     }
 
@@ -1189,7 +1360,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
     }
 
-    fun restoreCloudBackup(fileId: String) {
+    fun restoreCloudBackup(fileId: String, password: String? = null) {
         scope.launch {
             _uiState.update {
                 it.copy(
@@ -1243,7 +1414,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 }
 
                 // Restore from the temp file we downloaded
-                restoreBackup(tempFile)
+                restoreBackup(tempFile, password)
 
                 _uiState.update {
                     it.copy(
@@ -1438,7 +1609,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
         }
     }
 
-    fun syncActivitiesWithCloud() {
+    fun syncActivitiesWithCloud(providedPassword: String? = null) {
         scope.launch {
             _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando sincronização...") }
             try {
@@ -1479,8 +1650,19 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         val tempFile = java.io.File.createTempFile("temp_sync_download", ".json")
                         try {
                             driveService.files().get(fileId).executeMediaAndDownloadTo(tempFile.outputStream())
-                            val content = tempFile.readText(Charsets.UTF_8)
+                            var content = tempFile.readText(Charsets.UTF_8)
                             if (content.isNotEmpty()) {
+                                if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
+                                    val passwordToUse = providedPassword ?: _uiState.value.encryptionPassword
+                                    if (passwordToUse.isEmpty()) {
+                                        throw com.mss.thebigcalendar.crypto.DecryptionRequiredException("Sincronização em nuvem está criptografada, mas nenhuma senha está configurada localmente.")
+                                    }
+                                    try {
+                                        content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
+                                    } catch (e: Exception) {
+                                        throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar dados de sincronização em nuvem.")
+                                    }
+                                }
                                 val jsonObject = Json.parseToJsonElement(content).jsonObject
                                 
                                 remoteDevicesArray = jsonObject["devices"]?.jsonArray ?: emptyList()
@@ -1538,7 +1720,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     val localActivities = _uiState.value.activities
                     val localDeletedIds = _uiState.value.deletedActivityIds.toSet()
                     
-                    val finalDeletedIds = localDeletedIds + remoteDeletedIds
+                    var finalDeletedIds = localDeletedIds + remoteDeletedIds
 
                     // Separar locais personalizadas e importadas
                     val localCustomActive = localActivities.filter { !it.isCompleted && it.location?.startsWith("JSON_IMPORTED_") != true }
@@ -1551,13 +1733,94 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
                     val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
                     
-                    val mergedCustomActive = (localCustomActive + remoteCustomActive)
-                        .distinctBy { it.id }
-                        .filter { it.id !in finalDeletedIds }
+                    data class SyncSignature(
+                        val title: String,
+                        val date: String,
+                        val startTime: String?,
+                        val endTime: String?,
+                        val isAllDay: Boolean,
+                        val description: String,
+                        val location: String,
+                        val activityType: String,
+                        val recurrenceRule: String
+                    )
+                    
+                    fun Activity.toSyncSignature() = SyncSignature(
+                        title = title.trim().lowercase(),
+                        date = date,
+                        startTime = startTime?.toString(),
+                        endTime = endTime?.toString(),
+                        isAllDay = isAllDay,
+                        description = description?.trim()?.lowercase() ?: "",
+                        location = location?.trim()?.lowercase() ?: "",
+                        activityType = activityType.name,
+                        recurrenceRule = recurrenceRule?.trim()?.lowercase() ?: ""
+                    )
 
-                    val mergedCustomCompleted = (localCustomCompleted + remoteCustomCompleted)
-                        .distinctBy { it.id }
+                    val allCustomActivities = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
                         .filter { it.id !in finalDeletedIds }
+                        .distinctBy { it.id }
+
+                    val mergedCustomCompleted = mutableListOf<Activity>()
+                    val mergedCustomActive = mutableListOf<Activity>()
+
+                    val completedSignatures = mutableSetOf<SyncSignature>()
+                    val activeSignatures = mutableSetOf<SyncSignature>()
+                    val discardedIds = mutableSetOf<String>()
+
+                    allCustomActivities.forEach { act ->
+                        val id = act.id
+                        val localActiveAct = localCustomActive.find { it.id == id }
+                        val remoteActiveAct = remoteCustomActive.find { it.id == id }
+                        val localCompletedAct = localCustomCompleted.find { it.id == id }
+                        val remoteCompletedAct = remoteCustomCompleted.find { it.id == id }
+
+                        val activeVersion = if (localActiveAct != null && remoteActiveAct != null) {
+                            if (localActiveAct.lastModified >= remoteActiveAct.lastModified) localActiveAct else remoteActiveAct
+                        } else {
+                            localActiveAct ?: remoteActiveAct
+                        }
+
+                        val completedVersion = if (localCompletedAct != null && remoteCompletedAct != null) {
+                            if (localCompletedAct.lastModified >= remoteCompletedAct.lastModified) localCompletedAct else remoteCompletedAct
+                        } else {
+                            localCompletedAct ?: remoteCompletedAct
+                        }
+
+                        if (activeVersion != null && completedVersion != null) {
+                            if (activeVersion.lastModified > completedVersion.lastModified) {
+                                val sig = activeVersion.toSyncSignature()
+                                if (activeSignatures.add(sig)) {
+                                    mergedCustomActive.add(activeVersion)
+                                } else {
+                                    discardedIds.add(id)
+                                }
+                            } else {
+                                val sig = completedVersion.toSyncSignature()
+                                if (completedSignatures.add(sig)) {
+                                    mergedCustomCompleted.add(completedVersion.copy(isCompleted = true))
+                                } else {
+                                    discardedIds.add(id)
+                                }
+                            }
+                        } else if (activeVersion != null) {
+                            val sig = activeVersion.toSyncSignature()
+                            if (activeSignatures.add(sig)) {
+                                    mergedCustomActive.add(activeVersion)
+                            } else {
+                                discardedIds.add(id)
+                            }
+                        } else if (completedVersion != null) {
+                            val sig = completedVersion.toSyncSignature()
+                            if (completedSignatures.add(sig)) {
+                                    mergedCustomCompleted.add(completedVersion.copy(isCompleted = true))
+                            } else {
+                                discardedIds.add(id)
+                            }
+                        }
+                    }
+
+                    finalDeletedIds = finalDeletedIds + discardedIds
                     
                     val finalActive = mergedCustomActive + localJsonActive
                     val finalCompleted = mergedCustomCompleted + localJsonCompleted
@@ -1570,7 +1833,9 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                             activities = mergedActivities,
                             deletedActivityIds = finalDeletedIds.toList(),
                             isSyncing = false,
-                            syncMessage = "Sincronização com a nuvem concluída!"
+                            syncMessage = "Sincronização com a nuvem concluída!",
+                            showDecryptionDialog = false,
+                            decryptionErrorMessage = null
                         ) 
                     }
                     saveData()
@@ -1611,8 +1876,6 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         }
                     }
                     
-                    val hasOtherDevices = mergedDevices.isNotEmpty()
-
                     val currentDeviceJson = kotlinx.serialization.json.buildJsonObject {
                         put("platform", kotlinx.serialization.json.JsonPrimitive(currentPlatform))
                         put("deviceName", kotlinx.serialization.json.JsonPrimitive(currentDeviceName))
@@ -1620,71 +1883,83 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     }
                     mergedDevices.add(currentDeviceJson)
 
-                    if (hasOtherDevices) {
-                        // 4. Upload do arquivo atualizado
-                        val activitiesJsonList = mergedCustomActive
-                        val completedJsonList = mergedCustomCompleted
+                    // 4. Upload do arquivo atualizado
+                    val activitiesJsonList = mergedCustomActive
+                    val completedJsonList = mergedCustomCompleted
 
-                        val tempUploadFile = java.io.File.createTempFile("TBCalendar_Sync_Data", ".json")
-                        try {
-                            val syncJson = kotlinx.serialization.json.buildJsonObject {
-                                put("backupVersion", kotlinx.serialization.json.JsonPrimitive("1.1"))
-                                put("createdAt", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDateTime.now().toString()))
-                                put("appVersion", kotlinx.serialization.json.JsonPrimitive("TheBigCalendar"))
-                                
-                                put("activities", kotlinx.serialization.json.buildJsonArray {
-                                    activitiesJsonList.forEach { act ->
-                                        add(Json.parseToJsonElement(Json.encodeToString(act)))
-                                    }
-                                })
-                                
-                                put("completedActivities", kotlinx.serialization.json.buildJsonArray {
-                                    completedJsonList.forEach { act ->
-                                        add(Json.parseToJsonElement(Json.encodeToString(act)))
-                                    }
-                                })
-                                
-                                put("deletedActivities", kotlinx.serialization.json.buildJsonArray {
-                                    finalDeletedIds.forEach { id ->
-                                        add(kotlinx.serialization.json.JsonPrimitive(id))
-                                    }
-                                })
-
-                                put("devices", kotlinx.serialization.json.buildJsonArray {
-                                    mergedDevices.forEach { add(it) }
-                                })
-                            }
-
-                            tempUploadFile.writeText(Json.encodeToString(syncJson), Charsets.UTF_8)
-
-                            val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
-
-                            if (fileId != null) {
-                                val updateMetadata = com.google.api.services.drive.model.File().apply {
-                                    name = "TBCalendar_Sync_Data.json"
+                    val tempUploadFile = java.io.File.createTempFile("TBCalendar_Sync_Data", ".json")
+                    try {
+                        val syncJson = kotlinx.serialization.json.buildJsonObject {
+                            put("backupVersion", kotlinx.serialization.json.JsonPrimitive("1.1"))
+                            put("createdAt", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDateTime.now().toString()))
+                            put("appVersion", kotlinx.serialization.json.JsonPrimitive("TheBigCalendar"))
+                            
+                            put("activities", kotlinx.serialization.json.buildJsonArray {
+                                activitiesJsonList.forEach { act ->
+                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
                                 }
-                                driveService.files().update(fileId, updateMetadata, mediaContent).execute()
-                            } else {
-                                val createMetadata = com.google.api.services.drive.model.File().apply {
-                                    name = "TBCalendar_Sync_Data.json"
-                                    parents = listOf("appDataFolder")
+                            })
+                            
+                            put("completedActivities", kotlinx.serialization.json.buildJsonArray {
+                                completedJsonList.forEach { act ->
+                                    add(Json.parseToJsonElement(Json.encodeToString(act)))
                                 }
-                                driveService.files().create(createMetadata, mediaContent).execute()
-                            }
-                        } finally {
-                            if (tempUploadFile.exists()) tempUploadFile.delete()
+                            })
+                            
+                            put("deletedActivities", kotlinx.serialization.json.buildJsonArray {
+                                finalDeletedIds.forEach { id ->
+                                    add(kotlinx.serialization.json.JsonPrimitive(id))
+                                }
+                            })
+
+                            put("devices", kotlinx.serialization.json.buildJsonArray {
+                                mergedDevices.forEach { add(it) }
+                            })
                         }
-                    } else {
-                        println("Sincronização: Nenhum outro dispositivo ativo detectado nos últimos 30 dias. Ignorando upload do arquivo para o Google Drive.")
+
+                        val syncContent = if (_uiState.value.isEncryptionEnabled && _uiState.value.encryptionPassword.isNotEmpty()) {
+                            com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(Json.encodeToString(syncJson), _uiState.value.encryptionPassword)
+                        } else {
+                            Json.encodeToString(syncJson)
+                        }
+
+                        tempUploadFile.writeText(syncContent, Charsets.UTF_8)
+
+                        val mediaContent = com.google.api.client.http.FileContent("application/json", tempUploadFile)
+
+                        if (fileId != null) {
+                            val updateMetadata = com.google.api.services.drive.model.File().apply {
+                                name = "TBCalendar_Sync_Data.json"
+                            }
+                            driveService.files().update(fileId, updateMetadata, mediaContent).execute()
+                        } else {
+                            val createMetadata = com.google.api.services.drive.model.File().apply {
+                                name = "TBCalendar_Sync_Data.json"
+                                parents = listOf("appDataFolder")
+                            }
+                            driveService.files().create(createMetadata, mediaContent).execute()
+                        }
+                    } finally {
+                        if (tempUploadFile.exists()) tempUploadFile.delete()
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                _uiState.update { 
-                    it.copy(
-                        isSyncing = false,
-                        syncMessage = "Erro na sincronização: ${e.message}"
-                    ) 
+                if (e is com.mss.thebigcalendar.crypto.DecryptionRequiredException || e is com.mss.thebigcalendar.crypto.DecryptionFailedException) {
+                    _uiState.update { 
+                        it.copy(
+                            isSyncing = false,
+                            showDecryptionDialog = true,
+                            decryptionErrorMessage = e.message
+                        ) 
+                    }
+                } else {
+                    _uiState.update { 
+                        it.copy(
+                            isSyncing = false,
+                            syncMessage = "Erro na sincronização: ${e.message}"
+                        ) 
+                    }
                 }
             }
         }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,10 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,11 +59,21 @@ fun SyncSettingsScreen(
     syncProgress: com.mss.thebigcalendar.data.model.SyncProgress?,
     isCrashlyticsEnabled: Boolean,
     onCrashlyticsToggle: (Boolean) -> Unit,
+    isEncryptionEnabled: Boolean,
+    onEncryptionToggle: (Boolean, String) -> Unit,
     onBackClick: () -> Unit,
     unfixHeadersOnScroll: Boolean,
     syncedDevices: List<SyncedDevice>
 ) {
     Log.d("SyncSettingsScreen", "📱 SyncSettingsScreen iniciada")
+
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var showDisableConfirmDialog by remember { mutableStateOf(false) }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var showCrashlyticsInfoDialog by remember { mutableStateOf(false) }
 
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = if (unfixHeadersOnScroll) {
@@ -293,7 +308,178 @@ fun SyncSettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Criptografia de Dados (Zero-Knowledge)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+                    .clickable {
+                        if (isEncryptionEnabled) {
+                            showDisableConfirmDialog = true
+                        } else {
+                            showPasswordDialog = true
+                            password = ""
+                            confirmPassword = ""
+                            passwordError = null
+                        }
+                    }
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.encryption_setting_title),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { showInfoDialog = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Mais informações sobre criptografia de dados",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = stringResource(id = R.string.encryption_setting_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Switch(
+                    checked = isEncryptionEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            showPasswordDialog = true
+                            password = ""
+                            confirmPassword = ""
+                            passwordError = null
+                        } else {
+                            showDisableConfirmDialog = true
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (showInfoDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showInfoDialog = false },
+                    title = { Text("Sobre a Criptografia de Dados") },
+                    text = {
+                        Text(
+                            text = "A criptografia de dados protege seus compromissos e tarefas contra acessos não autorizados.\n\n" +
+                                    "• Privacidade Absoluta (Zero-Knowledge): Seus dados são criptografados diretamente no seu dispositivo antes de serem enviados para a nuvem. Isso significa que apenas você, com a sua senha, pode descriptografá-los.\n\n" +
+                                    "• Algoritmo de Alta Segurança: Utilizamos o padrão AES com chaves de 256 bits geradas a partir de sua senha usando derivação robusta (PBKDF2). Nem mesmo o Google ou os desenvolvedores do app podem acessar suas informações.\n\n" +
+                                    "• Proteção de Backups: Seus arquivos de backup locais salvos no armazenamento do aparelho também ficam totalmente protegidos contra leituras por outros aplicativos.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = { showInfoDialog = false }) {
+                            Text("Entendi")
+                        }
+                    }
+                )
+            }
+
+            if (showPasswordDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showPasswordDialog = false },
+                    title = { Text(stringResource(id = R.string.encryption_dialog_title)) },
+                    text = {
+                        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = stringResource(id = R.string.encryption_dialog_warning),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.material3.OutlinedTextField(
+                                value = password,
+                                onValueChange = { 
+                                    password = it
+                                    passwordError = null
+                                },
+                                label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                                singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            androidx.compose.material3.OutlinedTextField(
+                                value = confirmPassword,
+                                onValueChange = { 
+                                    confirmPassword = it
+                                    passwordError = null
+                                },
+                                label = { Text(stringResource(id = R.string.encryption_confirm_password_placeholder)) },
+                                singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (passwordError != null) {
+                                Text(
+                                    text = passwordError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (password.isEmpty()) {
+                                    passwordError = "A senha não pode ser vazia!"
+                                } else if (password != confirmPassword) {
+                                    passwordError = "As senhas não coincidem!"
+                                } else {
+                                    onEncryptionToggle(true, password)
+                                    showPasswordDialog = false
+                                }
+                            }
+                        ) {
+                            Text(stringResource(id = R.string.confirm))
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showPasswordDialog = false }) {
+                            Text(stringResource(id = R.string.cancel))
+                        }
+                    }
+                )
+            }
+
+            if (showDisableConfirmDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showDisableConfirmDialog = false },
+                    title = { Text(stringResource(id = R.string.encryption_disable_title)) },
+                    text = { Text(stringResource(id = R.string.encryption_disable_message)) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                onEncryptionToggle(false, "")
+                                showDisableConfirmDialog = false
+                            }
+                        ) {
+                            Text(stringResource(id = R.string.confirm))
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showDisableConfirmDialog = false }) {
+                            Text(stringResource(id = R.string.cancel))
+                        }
+                    }
+                )
+            }
 
             // Envio de Relatório de Erros (Crashlytics Opt-in)
             Row(
@@ -304,10 +490,26 @@ fun SyncSettingsScreen(
                     .clickable { onCrashlyticsToggle(!isCrashlyticsEnabled) }
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(id = R.string.crashlytics_setting_title),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.crashlytics_setting_title),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { showCrashlyticsInfoDialog = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Mais informações sobre relatórios de erros",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = stringResource(id = R.string.crashlytics_setting_description),
                         style = MaterialTheme.typography.bodySmall,
@@ -318,6 +520,27 @@ fun SyncSettingsScreen(
                 Switch(
                     checked = isCrashlyticsEnabled,
                     onCheckedChange = onCrashlyticsToggle
+                )
+            }
+
+            if (showCrashlyticsInfoDialog) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showCrashlyticsInfoDialog = false },
+                    title = { Text("Sobre os Relatórios de Erros") },
+                    text = {
+                        Text(
+                            text = "Os relatórios de erros nos ajudam a identificar e corrigir travamentos no aplicativo de forma automática e rápida.\n\n" +
+                                    "• Anonimato Completo: Não coletamos nenhuma informação pessoal identificável, como seu nome, e-mail, tarefas ou compromissos. Apenas dados de diagnóstico do sistema são enviados.\n\n" +
+                                    "• Informações Técnicas: São enviados detalhes de hardware (modelo do aparelho, versão do Android) e rastreamento de pilha (stack trace) da falha ocorrida.\n\n" +
+                                    "• Melhoria Contínua: Com esses dados, podemos corrigir bugs e instabilidades antes mesmo que afetem outros usuários.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = { showCrashlyticsInfoDialog = false }) {
+                            Text("Entendi")
+                        }
+                    }
                 )
             }
         }

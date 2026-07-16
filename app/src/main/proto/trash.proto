@@ -29,6 +29,7 @@ message TrashActivityDataProto {
   string recurrence_rule = 11;
   bool is_completed = 12;
   bool show_in_calendar = 13; // Novo campo para controlar se a atividade aparece no calendário
+  int64 last_modified = 14;
 }
 
 enum TrashActivityTypeProto {

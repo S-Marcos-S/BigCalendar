@@ -48,7 +48,8 @@ data class Activity(
     val excludedDates: List<String> = emptyList(), // Datas de instâncias recorrentes excluídas
     val excludedInstances: List<String> = emptyList(), // Instâncias específicas excluídas (para HOURLY)
     val wikipediaLink: String? = null, // Link para mais informações (usado em agendamentos JSON)
-    val rollover: Boolean = false
+    val rollover: Boolean = false,
+    val lastModified: Long = 0L
 )
 
 // Representa cada célula individual na grade do calendário
@@ -172,7 +173,18 @@ data class CalendarUiState(
     ),
     val isCrashlyticsEnabled: Boolean = false,
     val hasSeenMainOnboarding: Boolean = false,
-    val syncedDevices: List<SyncedDevice> = emptyList()
+    val syncedDevices: List<SyncedDevice> = emptyList(),
+    val isEncryptionEnabled: Boolean = false,
+    val encryptionPassword: String = "",
+    val showDecryptionDialog: Boolean = false,
+    val decryptionBackupUri: String? = null,
+    val decryptionCloudFileId: String? = null,
+    val decryptionCloudFileName: String? = null,
+    val decryptionErrorMessage: String? = null,
+    val duplicateGroups: List<List<Activity>> = emptyList(),
+    val showDuplicateDialog: Boolean = false,
+    val maxLocalBackups: Int = 10,
+    val maxCloudBackups: Int = 10
 )
 
 data class SyncedDevice(
