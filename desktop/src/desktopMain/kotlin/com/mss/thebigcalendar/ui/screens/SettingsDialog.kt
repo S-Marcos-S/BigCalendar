@@ -486,17 +486,51 @@ private fun TabSincronizacaoContent(
     }
 
     if (showDisableConfirmationDialog) {
+        var disablePasswordInput by remember { mutableStateOf("") }
+        var disablePasswordError by remember { mutableStateOf<String?>(null) }
+
         AlertDialog(
-            onDismissRequest = { showDisableConfirmationDialog = false },
-            title = { Text("Desativar Criptografia?") },
+            onDismissRequest = {
+                showDisableConfirmationDialog = false
+                disablePasswordInput = ""
+                disablePasswordError = null
+            },
+            title = { Text("Desativar Criptografia") },
             text = {
-                Text("Seus dados na nuvem serão enviados sem criptografia a partir de agora. Os backups criptografados existentes ainda exigirão a senha original para restauração.")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Digite sua senha atual de criptografia para desativar a proteção e re-salvar seus dados na nuvem sem criptografia.")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = disablePasswordInput,
+                        onValueChange = { 
+                            disablePasswordInput = it
+                            disablePasswordError = null
+                        },
+                        label = { Text("Senha de Criptografia") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (disablePasswordError != null) {
+                        Text(
+                            text = disablePasswordError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onEncryptionToggle(false, "")
-                        showDisableConfirmationDialog = false
+                        if (disablePasswordInput.isEmpty()) {
+                            disablePasswordError = "A senha não pode ser vazia."
+                        } else {
+                            onEncryptionToggle(false, disablePasswordInput)
+                            showDisableConfirmationDialog = false
+                            disablePasswordInput = ""
+                            disablePasswordError = null
+                        }
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -504,7 +538,13 @@ private fun TabSincronizacaoContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDisableConfirmationDialog = false }) {
+                TextButton(
+                    onClick = {
+                        showDisableConfirmationDialog = false
+                        disablePasswordInput = ""
+                        disablePasswordError = null
+                    }
+                ) {
                     Text("Cancelar")
                 }
             }

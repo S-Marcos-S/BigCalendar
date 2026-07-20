@@ -320,9 +320,52 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setEncryptionSettings(enabled: Boolean, password: String) {
-        viewModelScope.launch {
-            settingsRepository.saveEncryptionSettings(enabled, password)
-            _uiState.update { it.copy(isEncryptionEnabled = enabled, encryptionPassword = password) }
+        if (!enabled) {
+            disableEncryption(password)
+        } else {
+            viewModelScope.launch {
+                settingsRepository.saveEncryptionSettings(true, password)
+                _uiState.update { it.copy(isEncryptionEnabled = true, encryptionPassword = password) }
+                syncActivitiesWithCloud(password)
+            }
+        }
+    }
+
+    fun disableEncryption(password: String) {
+        val account = _uiState.value.googleSignInAccount
+        if (account == null) {
+            viewModelScope.launch {
+                settingsRepository.saveEncryptionSettings(false, "")
+                _uiState.update { it.copy(isEncryptionEnabled = false, encryptionPassword = "") }
+            }
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null) }
+            backupService.syncActivitiesWithCloud(account, providedPassword = password, isDisablingEncryption = true)
+                .onSuccess {
+                    settingsRepository.saveEncryptionSettings(false, "")
+                    _uiState.update { it.copy(
+                        isSyncing = false,
+                        isEncryptionEnabled = false,
+                        encryptionPassword = "",
+                        showDecryptionDialog = false,
+                        decryptionErrorMessage = null,
+                        lastGoogleSyncTime = System.currentTimeMillis()
+                    ) }
+                    loadData()
+                    viewModelScope.launch {
+                        delay(500)
+                        notifyWidgetsDataChanged()
+                    }
+                }
+                .onFailure { exception ->
+                    Log.e("CalendarViewModel", "❌ Erro ao desativar criptografia", exception)
+                    _uiState.update { it.copy(
+                        isSyncing = false,
+                        syncErrorMessage = "Falha ao desativar criptografia: ${exception.message}"
+                    ) }
+                }
         }
     }
 
@@ -3002,15 +3045,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         syncActivitiesWithCloud()
     }
 
-    fun syncActivitiesWithCloud() {
+    fun syncActivitiesWithCloud(providedPassword: String? = null) {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isSyncing = true, syncErrorMessage = null) }
             try {
-                backupService.syncActivitiesWithCloud(account)
+                backupService.syncActivitiesWithCloud(account, providedPassword)
                     .onSuccess {
                         _uiState.update { it.copy(
                             isSyncing = false,
+                            showDecryptionDialog = false,
+                            decryptionErrorMessage = null,
                             lastGoogleSyncTime = System.currentTimeMillis()
                         ) }
                         loadData()
@@ -3021,10 +3066,18 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
                     .onFailure { exception ->
                         Log.e("CalendarViewModel", "❌ Erro na sincronização com o Drive", exception)
-                        _uiState.update { it.copy(
-                            isSyncing = false,
-                            syncErrorMessage = "Falha na sincronização: ${exception.message}"
-                        ) }
+                        if (exception is com.mss.thebigcalendar.crypto.DecryptionRequiredException || exception is com.mss.thebigcalendar.crypto.DecryptionFailedException) {
+                            _uiState.update { it.copy(
+                                isSyncing = false,
+                                showDecryptionDialog = true,
+                                decryptionErrorMessage = exception.message
+                            ) }
+                        } else {
+                            _uiState.update { it.copy(
+                                isSyncing = false,
+                                syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                            ) }
+                        }
                     }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização com o Drive", e)

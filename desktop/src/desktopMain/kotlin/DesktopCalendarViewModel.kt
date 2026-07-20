@@ -126,6 +126,7 @@ data class DesktopUiState(
     val isEncryptionEnabled: Boolean = false,
     val encryptionPassword: String = "",
     val showDecryptionDialog: Boolean = false,
+    val isDecryptionLoading: Boolean = false,
     val decryptionBackupFile: java.io.File? = null,
     val decryptionErrorMessage: String? = null,
     val duplicateGroups: List<List<Activity>> = emptyList(),
@@ -803,13 +804,45 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
     }
 
     fun setEncryptionSettings(enabled: Boolean, password: String) {
-        _uiState.update { it.copy(isEncryptionEnabled = enabled, encryptionPassword = password) }
-        saveData()
+        if (!enabled) {
+            disableEncryption(password)
+        } else {
+            _uiState.update { it.copy(isEncryptionEnabled = true, encryptionPassword = password) }
+            saveData()
+            syncActivitiesWithCloud(password)
+        }
+    }
+
+    fun disableEncryption(password: String) {
+        scope.launch {
+            _uiState.update { it.copy(isSyncing = true, isDecryptionLoading = true, syncMessage = "Desativando criptografia e atualizando nuvem...") }
+            val oldEncryptionState = _uiState.value.isEncryptionEnabled
+            val oldPassword = _uiState.value.encryptionPassword
+            
+            _uiState.update { it.copy(isEncryptionEnabled = false, encryptionPassword = "") }
+            saveData()
+            
+            try {
+                syncActivitiesWithCloud(providedPassword = password, isDisablingEncryption = true)
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isEncryptionEnabled = oldEncryptionState, 
+                        encryptionPassword = oldPassword,
+                        isSyncing = false,
+                        isDecryptionLoading = false,
+                        syncMessage = "Falha ao desativar criptografia: ${e.message}"
+                    ) 
+                }
+                saveData()
+            }
+        }
     }
 
     fun dismissDecryptionDialog() {
         _uiState.update { it.copy(
             showDecryptionDialog = false,
+            isDecryptionLoading = false,
             decryptionBackupFile = null,
             decryptionErrorMessage = null
         ) }
@@ -1034,7 +1067,9 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     it.copy(
                         activities = currentActivities,
                         isSyncing = false,
-                        syncMessage = finalMessage
+                        syncMessage = finalMessage,
+                        showDecryptionDialog = false,
+                        isDecryptionLoading = false
                     )
                 }
                 saveData()
@@ -1068,6 +1103,14 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
                     } catch (e: Exception) {
                         throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar arquivo de backup.")
+                    }
+                    _uiState.update { 
+                        it.copy(
+                            isDecryptionLoading = true, 
+                            decryptionErrorMessage = null,
+                            isEncryptionEnabled = true,
+                            encryptionPassword = passwordToUse
+                        ) 
                     }
                 }
 
@@ -1146,6 +1189,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         isSyncing = false,
                         syncMessage = "Backup restaurado! $insertedCount novos compromissos importados, $updatedCount atualizados.",
                         showDecryptionDialog = false,
+                        isDecryptionLoading = false,
                         decryptionBackupFile = null,
                         decryptionErrorMessage = null
                     )
@@ -1159,6 +1203,7 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         it.copy(
                             isSyncing = false,
                             showDecryptionDialog = true,
+                            isDecryptionLoading = false,
                             decryptionBackupFile = file,
                             decryptionErrorMessage = e.message
                         )
@@ -1167,6 +1212,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                     _uiState.update {
                         it.copy(
                             isSyncing = false,
+                            showDecryptionDialog = false,
+                            isDecryptionLoading = false,
                             syncMessage = "Erro ao restaurar backup: ${e.message}"
                         )
                     }
@@ -1602,14 +1649,21 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                 if (tokensDir.exists() && tokensDir.isDirectory) {
                     tokensDir.listFiles()?.forEach { it.delete() }
                 }
-                _uiState.update { it.copy(googleAccountEmail = null) }
+                _uiState.update { 
+                    it.copy(
+                        googleAccountEmail = null,
+                        isEncryptionEnabled = false,
+                        encryptionPassword = ""
+                    ) 
+                }
+                saveData()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun syncActivitiesWithCloud(providedPassword: String? = null) {
+    fun syncActivitiesWithCloud(providedPassword: String? = null, isDisablingEncryption: Boolean = false) {
         scope.launch {
             _uiState.update { it.copy(isSyncing = true, syncMessage = "Iniciando sincronização...") }
             try {
@@ -1661,6 +1715,35 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                                         content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
                                     } catch (e: Exception) {
                                         throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar dados de sincronização em nuvem.")
+                                    }
+                                    if (!isDisablingEncryption) {
+                                        _uiState.update { 
+                                            it.copy(
+                                                isDecryptionLoading = true, 
+                                                decryptionErrorMessage = null,
+                                                isEncryptionEnabled = true,
+                                                encryptionPassword = passwordToUse
+                                            ) 
+                                        }
+                                    }
+                                } else {
+                                    if (!isDisablingEncryption) {
+                                        if (providedPassword != null && providedPassword.isNotEmpty()) {
+                                            _uiState.update { 
+                                                it.copy(
+                                                    isEncryptionEnabled = true,
+                                                    encryptionPassword = providedPassword
+                                                ) 
+                                            }
+                                        } else {
+                                            _uiState.update { 
+                                                it.copy(
+                                                    isEncryptionEnabled = false,
+                                                    encryptionPassword = ""
+                                                ) 
+                                            }
+                                        }
+                                        saveData()
                                     }
                                 }
                                 val jsonObject = Json.parseToJsonElement(content).jsonObject
@@ -1917,7 +2000,8 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                             })
                         }
 
-                        val syncContent = if (_uiState.value.isEncryptionEnabled && _uiState.value.encryptionPassword.isNotEmpty()) {
+                        val shouldEncrypt = if (isDisablingEncryption) false else (_uiState.value.isEncryptionEnabled && _uiState.value.encryptionPassword.isNotEmpty())
+                        val syncContent = if (shouldEncrypt) {
                             com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(Json.encodeToString(syncJson), _uiState.value.encryptionPassword)
                         } else {
                             Json.encodeToString(syncJson)
@@ -1939,6 +2023,15 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                             }
                             driveService.files().create(createMetadata, mediaContent).execute()
                         }
+                        _uiState.update { 
+                            it.copy(
+                                isSyncing = false,
+                                syncMessage = "Sincronização com a nuvem concluída!",
+                                showDecryptionDialog = false,
+                                isDecryptionLoading = false
+                            ) 
+                        }
+                        saveData()
                     } finally {
                         if (tempUploadFile.exists()) tempUploadFile.delete()
                     }
@@ -1950,13 +2043,19 @@ class DesktopCalendarViewModel(private val scope: CoroutineScope) {
                         it.copy(
                             isSyncing = false,
                             showDecryptionDialog = true,
+                            isDecryptionLoading = false,
+                            encryptionPassword = "",
+                            isEncryptionEnabled = false,
                             decryptionErrorMessage = e.message
                         ) 
                     }
+                    saveData()
                 } else {
                     _uiState.update { 
                         it.copy(
                             isSyncing = false,
+                            showDecryptionDialog = false,
+                            isDecryptionLoading = false,
                             syncMessage = "Erro na sincronização: ${e.message}"
                         ) 
                     }

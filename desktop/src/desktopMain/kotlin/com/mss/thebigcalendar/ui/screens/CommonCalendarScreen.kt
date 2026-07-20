@@ -1589,66 +1589,92 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
     }
 
     if (uiState.showDecryptionDialog) {
-        var decryptionPassword by remember { mutableStateOf("") }
-        var decryptionError by remember { mutableStateOf<String?>(null) }
-        
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissDecryptionDialog() },
-            title = { Text("Descriptografar Backup / Sincronização") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Este arquivo de backup ou sincronização está criptografado. Insira a senha correspondente para prosseguir com a restauração.")
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = decryptionPassword,
-                        onValueChange = { 
-                            decryptionPassword = it
-                            decryptionError = null
-                        },
-                        label = { Text("Senha de Criptografia") },
-                        singleLine = true,
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (decryptionError != null) {
-                        Text(
-                            text = decryptionError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
+        if (uiState.isDecryptionLoading) {
+            AlertDialog(
+                onDismissRequest = { },
+                title = { Text("Restaurando e Sincronizando...") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
                         )
-                    } else if (uiState.decryptionErrorMessage != null) {
                         Text(
-                            text = uiState.decryptionErrorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Aguarde enquanto os dados são restaurados e sincronizados...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (decryptionPassword.isEmpty()) {
-                            decryptionError = "A senha não pode ser vazia!"
-                        } else {
-                            val backupFile = uiState.decryptionBackupFile
-                            if (backupFile != null) {
-                                viewModel.restoreBackup(backupFile, decryptionPassword)
-                            } else {
-                                viewModel.syncActivitiesWithCloud(decryptionPassword)
-                            }
+                },
+                confirmButton = {},
+                dismissButton = {}
+            )
+        } else {
+            var decryptionPassword by remember { mutableStateOf("") }
+            var decryptionError by remember { mutableStateOf<String?>(null) }
+            
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissDecryptionDialog() },
+                title = { Text("Descriptografar Backup / Sincronização") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Este arquivo de backup ou sincronização está criptografado. Insira a senha correspondente para prosseguir com a restauração.")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = decryptionPassword,
+                            onValueChange = { 
+                                decryptionPassword = it
+                                decryptionError = null
+                            },
+                            label = { Text("Senha de Criptografia") },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (decryptionError != null) {
+                            Text(
+                                text = decryptionError!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else if (uiState.decryptionErrorMessage != null) {
+                            Text(
+                                text = uiState.decryptionErrorMessage!!,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
-                ) {
-                    Text("Confirmar")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (decryptionPassword.isEmpty()) {
+                                decryptionError = "A senha não pode ser vazia!"
+                            } else {
+                                val backupFile = uiState.decryptionBackupFile
+                                if (backupFile != null) {
+                                    viewModel.restoreBackup(backupFile, decryptionPassword)
+                                } else {
+                                    viewModel.syncActivitiesWithCloud(decryptionPassword)
+                                }
+                            }
+                        }
+                    ) {
+                        Text("Confirmar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissDecryptionDialog() }) {
+                        Text("Cancelar")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissDecryptionDialog() }) {
-                    Text("Cancelar")
-                }
-            }
-        )
+            )
+        }
     }
 }
 

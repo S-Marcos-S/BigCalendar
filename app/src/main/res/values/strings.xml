@@ -873,4 +873,5 @@
     <string name="max_cloud_backups_label">Limitar backups na nuvem</string>
     <string name="unlimited">Ilimitado</string>
     <string name="backup_limit_option">%1$d backups</string>
+    <string name="encryption_disable_password_message">Digite sua senha atual de criptografia para desativar a proteção e re-salvar seus dados na nuvem sem criptografia.</string>
 </resources>

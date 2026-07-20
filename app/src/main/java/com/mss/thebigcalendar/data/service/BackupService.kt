@@ -1008,7 +1008,7 @@ class BackupService(
         return activityJson
     }
 
-    suspend fun syncActivitiesWithCloud(account: GoogleSignInAccount): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun syncActivitiesWithCloud(account: GoogleSignInAccount, providedPassword: String? = null, isDisablingEncryption: Boolean = false): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val driveService = getGoogleDriveService(account)
             val drive = driveService.drive
@@ -1036,14 +1036,28 @@ class BackupService(
                     var content = tempFile.readText(Charsets.UTF_8)
                     if (content.isNotEmpty()) {
                         if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
-                            val password = settingsRepository.encryptionPassword.first()
-                            if (password.isEmpty()) {
+                            val passwordToUse = providedPassword ?: settingsRepository.encryptionPassword.first()
+                            if (passwordToUse.isEmpty()) {
                                 throw com.mss.thebigcalendar.crypto.DecryptionRequiredException("Sincronização em nuvem está criptografada, mas nenhuma senha está configurada localmente.")
                             }
                             try {
-                                content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, password)
+                                content = com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
+                                if (!isDisablingEncryption) {
+                                    settingsRepository.saveEncryptionSettings(true, passwordToUse)
+                                }
                             } catch (e: Exception) {
+                                if (!isDisablingEncryption) {
+                                    settingsRepository.saveEncryptionSettings(false, "")
+                                }
                                 throw com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ao descriptografar dados de sincronização em nuvem.")
+                            }
+                        } else {
+                            if (!isDisablingEncryption) {
+                                if (providedPassword != null && providedPassword.isNotEmpty()) {
+                                    settingsRepository.saveEncryptionSettings(true, providedPassword)
+                                } else {
+                                    settingsRepository.saveEncryptionSettings(false, "")
+                                }
                             }
                         }
                         val json = JSONObject(content)
@@ -1317,7 +1331,7 @@ class BackupService(
                 put("devices", updatedDevicesArray)
             }
             
-            val isEncrypted = settingsRepository.isEncryptionEnabled.first()
+            val isEncrypted = if (isDisablingEncryption) false else settingsRepository.isEncryptionEnabled.first()
             val password = settingsRepository.encryptionPassword.first()
             val syncContent = if (isEncrypted && password.isNotEmpty()) {
                 com.mss.thebigcalendar.crypto.CryptoHelper.encrypt(syncJson.toString(), password)

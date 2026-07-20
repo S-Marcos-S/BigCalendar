@@ -457,7 +457,11 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onBackClick = { viewModel.closeSyncSettings() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll,
-                                syncedDevices = uiState.syncedDevices
+                                syncedDevices = uiState.syncedDevices,
+                                showDecryptionDialog = uiState.showDecryptionDialog,
+                                decryptionErrorMessage = uiState.decryptionErrorMessage,
+                                onConfirmDecryption = { password -> viewModel.syncActivitiesWithCloud(password) },
+                                onDismissDecryption = { viewModel.dismissDecryptionDialog() }
                             )
                         }
                         uiState.isBackupScreenOpen -> {

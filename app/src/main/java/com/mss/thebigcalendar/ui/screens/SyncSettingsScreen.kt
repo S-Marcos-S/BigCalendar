@@ -63,7 +63,11 @@ fun SyncSettingsScreen(
     onEncryptionToggle: (Boolean, String) -> Unit,
     onBackClick: () -> Unit,
     unfixHeadersOnScroll: Boolean,
-    syncedDevices: List<SyncedDevice>
+    syncedDevices: List<SyncedDevice>,
+    showDecryptionDialog: Boolean = false,
+    decryptionErrorMessage: String? = null,
+    onConfirmDecryption: (String) -> Unit = {},
+    onDismissDecryption: () -> Unit = {}
 ) {
     Log.d("SyncSettingsScreen", "📱 SyncSettingsScreen iniciada")
 
@@ -459,22 +463,65 @@ fun SyncSettingsScreen(
             }
 
             if (showDisableConfirmDialog) {
+                var disablePasswordInput by remember { mutableStateOf("") }
+                var disablePasswordError by remember { mutableStateOf<String?>(null) }
+                val emptyPasswordMsg = stringResource(id = R.string.encryption_password_empty)
+
                 androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showDisableConfirmDialog = false },
+                    onDismissRequest = {
+                        showDisableConfirmDialog = false
+                        disablePasswordInput = ""
+                        disablePasswordError = null
+                    },
                     title = { Text(stringResource(id = R.string.encryption_disable_title)) },
-                    text = { Text(stringResource(id = R.string.encryption_disable_message)) },
+                    text = {
+                        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(id = R.string.encryption_disable_password_message))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            androidx.compose.material3.OutlinedTextField(
+                                value = disablePasswordInput,
+                                onValueChange = { 
+                                    disablePasswordInput = it
+                                    disablePasswordError = null
+                                },
+                                label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                                singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (disablePasswordError != null) {
+                                Text(
+                                    text = disablePasswordError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    },
                     confirmButton = {
                         Button(
                             onClick = {
-                                onEncryptionToggle(false, "")
-                                showDisableConfirmDialog = false
+                                if (disablePasswordInput.isEmpty()) {
+                                    disablePasswordError = emptyPasswordMsg
+                                } else {
+                                    onEncryptionToggle(false, disablePasswordInput)
+                                    showDisableConfirmDialog = false
+                                    disablePasswordInput = ""
+                                    disablePasswordError = null
+                                }
                             }
                         ) {
                             Text(stringResource(id = R.string.confirm))
                         }
                     },
                     dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { showDisableConfirmDialog = false }) {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                showDisableConfirmDialog = false
+                                disablePasswordInput = ""
+                                disablePasswordError = null
+                            }
+                        ) {
                             Text(stringResource(id = R.string.cancel))
                         }
                     }
@@ -539,6 +586,64 @@ fun SyncSettingsScreen(
                     confirmButton = {
                         Button(onClick = { showCrashlyticsInfoDialog = false }) {
                             Text("Entendi")
+                        }
+                    }
+                )
+            }
+
+            if (showDecryptionDialog) {
+                var decryptionPassword by remember { mutableStateOf("") }
+                var decryptionError by remember { mutableStateOf<String?>(null) }
+                
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = onDismissDecryption,
+                    title = { Text(stringResource(id = R.string.decryption_dialog_title)) },
+                    text = {
+                        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(id = R.string.decryption_dialog_message))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            androidx.compose.material3.OutlinedTextField(
+                                value = decryptionPassword,
+                                onValueChange = { 
+                                    decryptionPassword = it
+                                    decryptionError = null
+                                },
+                                label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                                singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (decryptionError != null) {
+                                Text(
+                                    text = decryptionError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else if (decryptionErrorMessage != null) {
+                                Text(
+                                    text = decryptionErrorMessage,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                if (decryptionPassword.isEmpty()) {
+                                    decryptionError = "A senha não pode ser vazia!"
+                                } else {
+                                    onConfirmDecryption(decryptionPassword)
+                                }
+                            }
+                        ) {
+                            Text(stringResource(id = R.string.confirm))
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = onDismissDecryption) {
+                            Text(stringResource(id = R.string.cancel))
                         }
                     }
                 )
