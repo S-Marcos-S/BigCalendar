@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.outlined.Settings
@@ -88,6 +91,7 @@ fun Sidebar(
         drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
     ) {
         val scrollState = rememberScrollState()
+        var showFiltersSection by remember { mutableStateOf(false) }
         
         Box(
             modifier = Modifier.width(320.dp)
@@ -188,90 +192,108 @@ fun Sidebar(
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             // Seção de Filtros
-            Text(
-                text = stringResource(id = R.string.show_on_calendar),
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Cache dos recursos de string para evitar recomposição
-            val filterLabels = remember {
-                filterItems.associate { (key, labelResId) -> key to labelResId }
-            }
-            
-            filterLabels.forEach { (key, labelResId) ->
-                val isVisible = when (key) {
-                    "showHolidays" -> uiState.sidebarFilterVisibility.showHolidays
-                    "showEvents" -> uiState.sidebarFilterVisibility.showEvents
-                    "showTasks" -> uiState.sidebarFilterVisibility.showTasks
-                    "showBirthdays" -> uiState.sidebarFilterVisibility.showBirthdays
-                    "showNotes" -> uiState.sidebarFilterVisibility.showNotes
-                    "showCommemorative" -> uiState.sidebarFilterVisibility.showCommemorative
-                    else -> true
-                }
-                
-                if (isVisible) {
-                    val isChecked = when (key) {
-                        "showHolidays" -> uiState.filterOptions.showHolidays
-                        "showEvents" -> uiState.filterOptions.showEvents
-                        "showTasks" -> uiState.filterOptions.showTasks
-                        "showBirthdays" -> uiState.filterOptions.showBirthdays
-                        "showNotes" -> uiState.filterOptions.showNotes
-                        "showCommemorative" -> uiState.filterOptions.showCommemorative
-                        else -> false
-                    }
-                    FilterCheckboxItem(
-                        label = stringResource(id = labelResId),
-                        checked = isChecked,
-                        onCheckedChange = { onFilterChange(key, it) },
-                        onLongPress = { onToggleSidebarFilterVisibility(key) }
-                    )
-                }
-            }
-            
-            // Opção para mostrar tarefas finalizadas
-            if (uiState.sidebarFilterVisibility.showCompletedTasks) {
-                FilterCheckboxItem(
-                    label = stringResource(id = R.string.completed_tasks_filter),
-                    checked = uiState.showCompletedActivities,
-                    onCheckedChange = { onFilterChange("showCompletedActivities", it) },
-                    onLongPress = { onToggleSidebarFilterVisibility("showCompletedActivities") }
-                )
-            }
-            
-            // Opção para mostrar fases da lua
-            if (uiState.sidebarFilterVisibility.showMoonPhases) {
-                FilterCheckboxItem(
-                    label = stringResource(id = R.string.moon_phases_filter),
-                    checked = uiState.showMoonPhases,
-                    onCheckedChange = { onFilterChange("showMoonPhases", it) },
-                    onLongPress = { onToggleSidebarFilterVisibility("showMoonPhases") }
-                )
-            }
-            
-            // Calendários JSON importados
-            if (uiState.jsonCalendars.isNotEmpty()) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showFiltersSection = !showFiltersSection }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
                 Text(
-                    text = stringResource(id = R.string.imported_calendars),
+                    text = stringResource(id = R.string.show_on_calendar),
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
-                
-                uiState.jsonCalendars.forEach { jsonCalendar ->
-                    JsonCalendarItem(
-                        jsonCalendar = jsonCalendar,
-                        checked = jsonCalendar.isVisible,
-                        onCheckedChange = { isVisible ->
-                            onFilterChange("jsonCalendar_${jsonCalendar.id}", isVisible)
-                        },
-                        onDeleteClick = {
-                            onDeleteJsonCalendar(jsonCalendar)
+                Icon(
+                    imageVector = if (showFiltersSection) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (showFiltersSection) stringResource(id = R.string.collapse) else stringResource(id = R.string.expand),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            AnimatedVisibility(visible = showFiltersSection) {
+                Column {
+                    // Cache dos recursos de string para evitar recomposição
+                    val filterLabels = remember {
+                        filterItems.associate { (key, labelResId) -> key to labelResId }
+                    }
+                    
+                    filterLabels.forEach { (key, labelResId) ->
+                        val isVisible = when (key) {
+                            "showHolidays" -> uiState.sidebarFilterVisibility.showHolidays
+                            "showEvents" -> uiState.sidebarFilterVisibility.showEvents
+                            "showTasks" -> uiState.sidebarFilterVisibility.showTasks
+                            "showBirthdays" -> uiState.sidebarFilterVisibility.showBirthdays
+                            "showNotes" -> uiState.sidebarFilterVisibility.showNotes
+                            "showCommemorative" -> uiState.sidebarFilterVisibility.showCommemorative
+                            else -> true
                         }
-                    )
+                        
+                        if (isVisible) {
+                            val isChecked = when (key) {
+                                "showHolidays" -> uiState.filterOptions.showHolidays
+                                "showEvents" -> uiState.filterOptions.showEvents
+                                "showTasks" -> uiState.filterOptions.showTasks
+                                "showBirthdays" -> uiState.filterOptions.showBirthdays
+                                "showNotes" -> uiState.filterOptions.showNotes
+                                "showCommemorative" -> uiState.filterOptions.showCommemorative
+                                else -> false
+                            }
+                            FilterCheckboxItem(
+                                label = stringResource(id = labelResId),
+                                checked = isChecked,
+                                onCheckedChange = { onFilterChange(key, it) },
+                                onLongPress = { onToggleSidebarFilterVisibility(key) }
+                            )
+                        }
+                    }
+                    
+                    // Opção para mostrar tarefas finalizadas
+                    if (uiState.sidebarFilterVisibility.showCompletedTasks) {
+                        FilterCheckboxItem(
+                            label = stringResource(id = R.string.completed_tasks_filter),
+                            checked = uiState.showCompletedActivities,
+                            onCheckedChange = { onFilterChange("showCompletedActivities", it) },
+                            onLongPress = { onToggleSidebarFilterVisibility("showCompletedActivities") }
+                        )
+                    }
+                    
+                    // Opção para mostrar fases da lua
+                    if (uiState.sidebarFilterVisibility.showMoonPhases) {
+                        FilterCheckboxItem(
+                            label = stringResource(id = R.string.moon_phases_filter),
+                            checked = uiState.showMoonPhases,
+                            onCheckedChange = { onFilterChange("showMoonPhases", it) },
+                            onLongPress = { onToggleSidebarFilterVisibility("showMoonPhases") }
+                        )
+                    }
+                    
+                    // Calendários JSON importados
+                    if (uiState.jsonCalendars.isNotEmpty()) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        
+                        Text(
+                            text = stringResource(id = R.string.imported_calendars),
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        uiState.jsonCalendars.forEach { jsonCalendar ->
+                            JsonCalendarItem(
+                                jsonCalendar = jsonCalendar,
+                                checked = jsonCalendar.isVisible,
+                                onCheckedChange = { isVisible ->
+                                    onFilterChange("jsonCalendar_${jsonCalendar.id}", isVisible)
+                                },
+                                onDeleteClick = {
+                                    onDeleteJsonCalendar(jsonCalendar)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
