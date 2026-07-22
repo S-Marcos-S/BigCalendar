@@ -44,6 +44,14 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "TheBigCalendar"
             packageVersion = "1.0.0"
+
+            linux {
+                shortcut = true // garantir a criação do atalho no menu
+                menuGroup = "Office;Calendar;"
+                appCategory = "Office"
+
+                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
+            }
         }
     }
 }

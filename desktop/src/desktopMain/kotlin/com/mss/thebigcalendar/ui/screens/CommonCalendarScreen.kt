@@ -117,7 +117,7 @@ fun CommonCalendarScreen(viewModel: DesktopCalendarViewModel) {
 
     var editingWelcomeName by remember { mutableStateOf(false) }
     var tempWelcomeName by remember { mutableStateOf(uiState.welcomeName) }
-    var showFiltersSection by remember { mutableStateOf(true) }
+    var showFiltersSection by remember { mutableStateOf(false) }
 
     val selectedDate = uiState.selectedDate
     val displayedMonth = uiState.displayedYearMonth
