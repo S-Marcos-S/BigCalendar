@@ -742,7 +742,6 @@ fun MainCalendarView(
                             },
                             onBirthdayLongClick = { viewModel.onTaskLongPressed(it) },
                             onDeleteClick = { viewModel.requestDeleteActivity(it) },
-                            onCompleteClick = { viewModel.markActivityAsCompleted(it) },
                             onAddBirthdayClick = { viewModel.openCreateActivityModal(activityType = ActivityType.BIRTHDAY) }
                         )
                     }

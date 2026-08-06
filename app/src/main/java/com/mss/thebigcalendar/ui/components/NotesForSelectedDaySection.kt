@@ -169,12 +169,22 @@ private fun NoteItem(
 
             // Informações da nota
             Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
-                Text(
-                    text = note.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (note.isCompleted) {
+                        Text(
+                            text = "✅ ",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        text = note.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = if (note.isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else androidx.compose.ui.text.style.TextDecoration.None,
+                        color = if (note.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 
                 if (!deleteButtonVisible && !note.description.isNullOrBlank()) {
                     Text(
@@ -224,53 +234,55 @@ private fun NoteItem(
                     )
                 }
                 
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Botão de concluir
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .height(40.dp)
-                            .width(80.dp)
-                            .clickable { onCompleteClick() }
+                if (!note.isCompleted) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        // Botão de concluir
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .height(40.dp)
+                                .width(80.dp)
+                                .clickable { onCompleteClick() }
                         ) {
-                            Text(
-                                text = stringResource(id = R.string.ok_button),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.ok_button),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    // Botão de deletar
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .height(40.dp)
-                            .width(80.dp)
-                            .clickable { onDeleteClick() }
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        // Botão de deletar
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .height(40.dp)
+                                .width(80.dp)
+                                .clickable { onDeleteClick() }
                         ) {
-                            Text(
-                                text = stringResource(id = R.string.del_button),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onError,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.del_button),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onError,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

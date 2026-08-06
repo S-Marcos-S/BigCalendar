@@ -222,7 +222,22 @@ fun TaskItem(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f).padding(vertical = 12.dp)) {
-                Text(text = task.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (task.isCompleted) {
+                        Text(
+                            text = "✅ ",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 if (task.startTime != null) {
                     Text(
                         text = stringResource(id = R.string.at_time, task.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))),
@@ -258,57 +273,59 @@ fun TaskItem(
                     )
                 }
                 
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .height(40.dp)
-                            .width(80.dp)
-                            .clickable { 
-                                if (hasUncheckedChecklistItems(task.description)) {
-                                    showConfirmCompleteDialog = true
-                                } else {
-                                    onCompleteClick(task.id)
+                if (!task.isCompleted) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .height(40.dp)
+                                .width(80.dp)
+                                .clickable { 
+                                    if (hasUncheckedChecklistItems(task.description)) {
+                                        showConfirmCompleteDialog = true
+                                    } else {
+                                        onCompleteClick(task.id)
+                                    }
                                 }
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "OK",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "OK",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
                         }
-                    }
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier
-                            .height(40.dp)
-                            .width(80.dp)
-                            .clickable { onDeleteClick(task.id) }
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .height(40.dp)
+                                .width(80.dp)
+                                .clickable { onDeleteClick(task.id) }
                         ) {
-                            Text(
-                                text = "DEL",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onError,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "DEL",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onError,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

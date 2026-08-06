@@ -119,7 +119,12 @@ class BackupService(
         try {
             val driveService = getGoogleDriveService(account)
             val tempFile = File.createTempFile("restore_", ".json", context.cacheDir)
+
+            android.util.Log.d("BackupService", "📥 Baixando arquivo do Google Drive...")
             driveService.downloadBackupFile(fileId, tempFile)
+
+            val fileContent = tempFile.readText(Charsets.UTF_8)
+            android.util.Log.d("BackupService", "📄 Conteúdo do arquivo baixado (tamanho=${fileContent.length}): $fileContent")
 
             val result = restoreFromBackup(Uri.fromFile(tempFile), providedPassword)
 
@@ -128,11 +133,13 @@ class BackupService(
             if (result.isSuccess) {
                 notificationService.showRestoreCompleteNotification(fileName)
             } else {
+                android.util.Log.e("BackupService", "❌ Falha na restauração do backup", result.exceptionOrNull())
                 notificationService.showRestoreFailedNotification(result.exceptionOrNull()?.message ?: "Erro desconhecido")
             }
 
             result
         } catch (e: Exception) {
+            android.util.Log.e("BackupService", "❌ Erro durante o processo de restore em nuvem", e)
             notificationService.showRestoreFailedNotification(e.message ?: "Erro desconhecido")
             Result.failure(e)
         }

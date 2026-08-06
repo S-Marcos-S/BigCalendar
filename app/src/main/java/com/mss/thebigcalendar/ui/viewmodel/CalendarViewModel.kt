@@ -667,6 +667,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.showCompletedActivities.collect { showCompleted ->
+                _uiState.update { it.copy(showCompletedActivities = showCompleted) }
+                updateAllDateDependentUI()
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.animationType.collect { animationType ->
                 _uiState.update { it.copy(animationType = animationType) }
             }
@@ -1427,6 +1433,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             "showCompletedActivities" -> {
                 // Atualizar o estado imediatamente
                 _uiState.update { it.copy(showCompletedActivities = value) }
+                
+                // Salvar a configuração
+                viewModelScope.launch {
+                    settingsRepository.saveShowCompletedActivities(value)
+                }
                 
                 // Atualizar a UI
                 updateAllDateDependentUI()
@@ -3205,7 +3216,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     // --- Tarefas Finalizadas ---
     
     fun toggleCompletedActivitiesVisibility() {
-        _uiState.update { it.copy(showCompletedActivities = !it.showCompletedActivities) }
+        val newValue = !_uiState.value.showCompletedActivities
+        _uiState.update { it.copy(showCompletedActivities = newValue) }
+        viewModelScope.launch {
+            settingsRepository.saveShowCompletedActivities(newValue)
+        }
         updateAllDateDependentUI()
     }
     

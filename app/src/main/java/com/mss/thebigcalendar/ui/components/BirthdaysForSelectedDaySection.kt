@@ -51,7 +51,6 @@ fun BirthdaysForSelectedDaySection(
     onBirthdayClick: (Activity) -> Unit = {},
     onBirthdayLongClick: (String) -> Unit = {},
     onDeleteClick: (String) -> Unit = {},
-    onCompleteClick: (String) -> Unit = {},
     onAddBirthdayClick: () -> Unit = {}
 ) {
     // Otimização: Usar derivedStateOf para evitar recálculos desnecessários
@@ -105,8 +104,7 @@ fun BirthdaysForSelectedDaySection(
                     deleteButtonVisible = activityIdWithDeleteVisible == birthday.id,
                     onClick = { onBirthdayLongClick(birthday.id) },
                     onLongClick = { onBirthdayClick(birthday) },
-                    onDeleteClick = { onDeleteClick(birthday.id) },
-                    onCompleteClick = { onCompleteClick(birthday.id) }
+                    onDeleteClick = { onDeleteClick(birthday.id) }
                 )
             }
         }
@@ -121,7 +119,6 @@ private fun BirthdayItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onCompleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -187,27 +184,6 @@ private fun BirthdayItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-                // Botão de concluir
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clickable { onCompleteClick() }
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "OK",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
                 // Botão de deletar
                 Surface(
                     shape = RoundedCornerShape(8.dp),

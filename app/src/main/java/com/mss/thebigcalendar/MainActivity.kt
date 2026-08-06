@@ -243,7 +243,7 @@ class MainActivity : ComponentActivity() {
                             isListingCloudBackups = uiState.isListingCloudBackups,
                             isRestoring = uiState.isRestoring,
                             onCheckBackup = { viewModel.listCloudBackups() },
-                            onRestoreBackup = { fileId, fileName -> viewModel.restoreFromCloudBackup(fileId, fileName) },
+                            onRestoreBackup = { fileId, fileName, password -> viewModel.restoreFromCloudBackup(fileId, fileName, password) },
                             onComplete = {
                                 showOnboarding = false
                             },
@@ -267,8 +267,23 @@ class MainActivity : ComponentActivity() {
                             onRestoreLocalBackup = { uriString -> viewModel.restoreFromBackup(uriString) },
                             onLoadLocalBackups = { viewModel.loadBackupFiles() },
                             isCrashlyticsEnabled = uiState.isCrashlyticsEnabled,
-                            onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) }
+                            onCrashlyticsToggle = { viewModel.setCrashlyticsEnabled(it) },
+                            showDecryptionDialog = uiState.showDecryptionDialog,
+                            decryptionErrorMessage = uiState.decryptionErrorMessage,
+                            decryptionBackupUri = uiState.decryptionBackupUri,
+                            decryptionCloudFileId = uiState.decryptionCloudFileId,
+                            decryptionCloudFileName = uiState.decryptionCloudFileName,
+                            onConfirmDecryption = { password, backupUri, cloudFileId, cloudFileName ->
+                                if (backupUri != null) {
+                                    viewModel.restoreFromBackup(backupUri, password)
+                                } else if (cloudFileId != null && cloudFileName != null) {
+                                    viewModel.restoreFromCloudBackup(cloudFileId, cloudFileName, password)
+                                }
+                            },
+                            onDismissDecryption = { viewModel.dismissDecryptionDialog() }
                         )
+
+
                     } else {
 //... existing code ...
                         // Mostrar loading até o calendário estar carregado

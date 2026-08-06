@@ -34,6 +34,7 @@ class SettingsRepository(private val context: Context) {
         val SHOW_NOTES = booleanPreferencesKey("show_notes")
         val SHOW_COMMEMORATIVE = booleanPreferencesKey("show_commemorative")
         val SHOW_MOON_PHASES = booleanPreferencesKey("show_moon_phases")
+        val SHOW_COMPLETED_ACTIVITIES = booleanPreferencesKey("show_completed_activities")
         val ANIMATION_TYPE = stringPreferencesKey("animation_type")
         val LANGUAGE = stringPreferencesKey("language")
         val CALENDAR_SCALE = stringPreferencesKey("calendar_scale")
@@ -176,6 +177,11 @@ class SettingsRepository(private val context: Context) {
     val showMoonPhases: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[PreferencesKeys.SHOW_MOON_PHASES] ?: false
+        }
+
+    val showCompletedActivities: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.SHOW_COMPLETED_ACTIVITIES] ?: false
         }
 
     val animationType: Flow<AnimationType> = context.dataStore.data
@@ -322,6 +328,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveShowMoonPhases(showMoonPhases: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.SHOW_MOON_PHASES] = showMoonPhases
+        }
+    }
+
+    suspend fun saveShowCompletedActivities(showCompletedActivities: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SHOW_COMPLETED_ACTIVITIES] = showCompletedActivities
         }
     }
 

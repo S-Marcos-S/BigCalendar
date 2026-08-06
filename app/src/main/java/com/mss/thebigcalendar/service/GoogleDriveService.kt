@@ -50,15 +50,32 @@ class GoogleDriveService(
     }
 
     fun getBackupFiles(): List<com.google.api.services.drive.model.File> {
-        return drive.files().list()
+        val files = drive.files().list()
             .setSpaces(BACKUP_FOLDER)
             .setFields("files(id, name, createdTime, appProperties)")
             .execute()
-            .files
+            .files ?: emptyList()
+        android.util.Log.d("GoogleDriveService", "📂 Arquivos listados no AppDataFolder: ${files.map { "${it.name} (ID: ${it.id})" }}")
+        return files
     }
-
     fun downloadBackupFile(fileId: String, destination: File) {
-        drive.files().get(fileId).executeMediaAndDownloadTo(destination.outputStream())
+        android.util.Log.d("GoogleDriveService", "📥 Iniciando download do backup. FileId: $fileId")
+        try {
+            // 1. Tenta obter os metadados para ver se o arquivo existe e está acessível
+            val metadata = drive.files().get(fileId).execute()
+            android.util.Log.d("GoogleDriveService", "✅ Metadados encontrados: nome=${metadata.name}, tamanho=${metadata.size}")
+
+            // 2. Realiza o download
+            drive.files().get(fileId).executeMediaAndDownloadTo(destination.outputStream())
+            android.util.Log.d("GoogleDriveService", "✅ Arquivo baixado com sucesso em: ${destination.absolutePath}")
+        } catch (e: com.google.api.client.googleapis.json.GoogleJsonResponseException) {
+            android.util.Log.e("GoogleDriveService", "❌ Erro da API do Google (Código ${e.statusCode}): ${e.message}")
+            android.util.Log.e("GoogleDriveService", "❌ Detalhes do erro: ${e.content}")
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("GoogleDriveService", "❌ Erro geral ao baixar o arquivo: ${e.message}", e)
+            throw e
+        }
     }
 
     fun deleteBackupFile(fileId: String) {

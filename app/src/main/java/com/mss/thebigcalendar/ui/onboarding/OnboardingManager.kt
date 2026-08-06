@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -379,16 +380,18 @@ enum class OnboardingStep {
 fun RestoreCloudBackupDialog(
     isLoading: Boolean,
     backupFile: DriveFile?,
-    onRestore: () -> Unit,
+    onRestore: (String?) -> Unit, // Alterado para receber a senha opcional
     onSelectLocalBackup: () -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
+    showDecryptionField: Boolean = false,
+    decryptionErrorMessage: String? = null
 ) {
     if (backupFile == null) return
-    
+
     val appProperties = backupFile.appProperties ?: emptyMap()
     val totalActivities = appProperties["totalActivities"]?.toIntOrNull() ?: 0
     val format = stringResource(id = R.string.backup_date_time_format)
-    
+
     val dateString = try {
         val instant = java.time.Instant.ofEpochMilli(backupFile.createdTime.value)
         val localDateTime = java.time.LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
@@ -397,7 +400,8 @@ fun RestoreCloudBackupDialog(
     } catch (e: Exception) {
         ""
     }
-
+    var password by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
     Dialog(
         onDismissRequest = onSkip,
         properties = DialogProperties(
@@ -424,7 +428,7 @@ fun RestoreCloudBackupDialog(
                     fontSize = 48.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                
+
                 // Título
                 Text(
                     text = stringResource(R.string.onboarding_restore_title),
@@ -434,19 +438,51 @@ fun RestoreCloudBackupDialog(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                
+
                 // Descrição com detalhes do backup encontrado
                 Text(
                     text = stringResource(R.string.onboarding_restore_desc, dateString, totalActivities),
                     fontSize = 15.sp,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 32.dp)
+                    modifier = Modifier.padding(bottom = 24.dp)
                 )
-                
+                // Campo de senha (se estiver criptografado)
+                if (showDecryptionField) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            passwordError = null
+                        },
+                        label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
+
+                    val currentError = passwordError ?: decryptionErrorMessage
+                    if (currentError != null) {
+                        Text(
+                            text = currentError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                }
+
                 // Botão Restaurar
                 Button(
-                    onClick = onRestore,
+                    onClick = {
+                        if (showDecryptionField && password.isEmpty()) {
+                            passwordError = "A senha não pode ser vazia!"
+                        } else {
+                            onRestore(password.takeIf { it.isNotEmpty() })
+                        }
+                    },
                     enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -469,7 +505,7 @@ fun RestoreCloudBackupDialog(
                         )
                     }
                 }
-                
+
                 // Botão Buscar Backup Local
                 OutlinedButton(
                     onClick = onSelectLocalBackup,
@@ -484,7 +520,7 @@ fun RestoreCloudBackupDialog(
                         fontWeight = FontWeight.Medium
                     )
                 }
-                
+
                 // Botão Pular / Iniciar do zero
                 TextButton(
                     onClick = onSkip,
@@ -866,7 +902,7 @@ fun OnboardingFlow(
     isListingCloudBackups: Boolean,
     isRestoring: Boolean,
     onCheckBackup: () -> Unit,
-    onRestoreBackup: (String, String) -> Unit,
+    onRestoreBackup: (String, String, String?) -> Unit,
     onComplete: () -> Unit,
     onGoogleSignIn: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
@@ -879,7 +915,14 @@ fun OnboardingFlow(
     onRestoreLocalBackup: (String) -> Unit = {},
     onLoadLocalBackups: () -> Unit = {},
     isCrashlyticsEnabled: Boolean = false,
-    onCrashlyticsToggle: (Boolean) -> Unit = {}
+    onCrashlyticsToggle: (Boolean) -> Unit = {},
+    showDecryptionDialog: Boolean = false,
+    decryptionErrorMessage: String? = null,
+    decryptionBackupUri: String? = null,
+    decryptionCloudFileId: String? = null,
+    decryptionCloudFileName: String? = null,
+    onConfirmDecryption: (String, String?, String?, String?) -> Unit = { _, _, _, _ ->},
+    onDismissDecryption: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val onboardingManager = remember { OnboardingManager(context) }
@@ -890,7 +933,7 @@ fun OnboardingFlow(
     var wasListingBackups by remember { mutableStateOf(false) }
     var wasRestoring by remember { mutableStateOf(false) }
     var wasRestoringLocal by remember { mutableStateOf(false) }
-    
+
     val directoryPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree(),
         onResult = { uri ->
@@ -899,7 +942,7 @@ fun OnboardingFlow(
             }
         }
     )
-    
+
     // Inicializar o passo correto
     LaunchedEffect(Unit) {
         currentStep = when {
@@ -907,7 +950,7 @@ fun OnboardingFlow(
             onboardingManager.shouldShowNotificationPermission() -> OnboardingStep.NOTIFICATION_PERMISSION
             else -> OnboardingStep.COMPLETED
         }
-        
+
         if (currentStep == OnboardingStep.COMPLETED) {
             onComplete()
         }
@@ -958,22 +1001,26 @@ fun OnboardingFlow(
     }
 
     // Monitorar a restauração do backup
-    LaunchedEffect(isRestoring) {
+    LaunchedEffect(isRestoring, showDecryptionDialog) {
         if (wasRestoring && !isRestoring && currentStep == OnboardingStep.RESTORE_BACKUP_PROMPT) {
-            currentStep = OnboardingStep.CRASH_REPORT_CONSENT
+            if (!showDecryptionDialog) {
+                currentStep = OnboardingStep.CRASH_REPORT_CONSENT
+            }
         }
         wasRestoring = isRestoring
     }
 
     // Monitorar a restauração do backup local
-    LaunchedEffect(isRestoringLocalBackup) {
+    LaunchedEffect(isRestoringLocalBackup, showDecryptionDialog) {
         if (wasRestoringLocal && !isRestoringLocalBackup && currentStep == OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT) {
-            if (googleSignInAccount != null) {
-                currentStep = OnboardingStep.CRASH_REPORT_CONSENT
-            } else {
-                currentStep = OnboardingStep.COMPLETED
-                onboardingManager.markOnboardingCompleted()
-                onComplete()
+            if (!showDecryptionDialog) {
+                if (googleSignInAccount != null) {
+                    currentStep = OnboardingStep.CRASH_REPORT_CONSENT
+                } else {
+                    currentStep = OnboardingStep.COMPLETED
+                    onboardingManager.markOnboardingCompleted()
+                    onComplete()
+                }
             }
         }
         wasRestoringLocal = isRestoringLocalBackup
@@ -995,14 +1042,14 @@ fun OnboardingFlow(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            
+
             // Overlay escuro para melhorar legibilidade
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.3f))
             )
-            
+
             // Janela de boas-vindas
             if (currentStep == OnboardingStep.WELCOME) {
                 WelcomeDialog(
@@ -1115,16 +1162,20 @@ fun OnboardingFlow(
                 RestoreCloudBackupDialog(
                     isLoading = isRestoring,
                     backupFile = latestBackupFile,
-                    onRestore = {
-                        onRestoreBackup(latestBackupFile.id, latestBackupFile.name)
+                    onRestore = { password ->
+                        onRestoreBackup(latestBackupFile.id, latestBackupFile.name, password)
                     },
                     onSelectLocalBackup = {
+                        onDismissDecryption()
                         currentStep = OnboardingStep.RESTORE_LOCAL_BACKUP_PROMPT
                         directoryPickerLauncher.launch(null)
                     },
                     onSkip = {
+                        onDismissDecryption()
                         currentStep = OnboardingStep.CRASH_REPORT_CONSENT
-                    }
+                    },
+                    showDecryptionField = showDecryptionDialog && decryptionCloudFileId == latestBackupFile.id,
+                    decryptionErrorMessage = decryptionErrorMessage
                 )
             }
 
@@ -1195,6 +1246,71 @@ fun OnboardingFlow(
                             )
                         }
                     }
+                }
+            }
+            // Diálogo de Descriptografia para o Onboarding
+            if (showDecryptionDialog) {
+                if (showDecryptionDialog && decryptionBackupUri != null) {
+                    var decryptionPassword by remember { mutableStateOf("") }
+                    var decryptionError by remember { mutableStateOf<String?>(null) }
+
+                    AlertDialog(
+                        onDismissRequest = onDismissDecryption,
+                        title = { Text(stringResource(id = R.string.decryption_dialog_title)) },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(stringResource(id = R.string.decryption_dialog_message))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = decryptionPassword,
+                                    onValueChange = {
+                                        decryptionPassword = it
+                                        decryptionError = null
+                                    },
+                                    label = { Text(stringResource(id = R.string.encryption_password_placeholder)) },
+                                    singleLine = true,
+                                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (decryptionError != null) {
+                                    Text(
+                                        text = decryptionError!!,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else if (decryptionErrorMessage != null) {
+                                    Text(
+                                        text = decryptionErrorMessage,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    if (decryptionPassword.isEmpty()) {
+                                        decryptionError = "A senha não pode ser vazia!"
+                                    } else {
+                                        onConfirmDecryption(
+                                            decryptionPassword,
+                                            decryptionBackupUri,
+                                            decryptionCloudFileId,
+                                            decryptionCloudFileName
+                                        )
+                                    }
+                                }
+                            ) {
+                                Text(stringResource(id = R.string.confirm))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = onDismissDecryption) {
+                                Text(stringResource(id = R.string.cancel))
+                            }
+                        }
+                    )
                 }
             }
         }

@@ -1877,11 +1877,15 @@ fun ActivityItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (activity.activityType == ActivityType.TASK) {
-                        Checkbox(
-                            checked = activity.isCompleted,
-                            onCheckedChange = { onToggleCompletion() },
-                            modifier = Modifier.size(24.dp).padding(end = 4.dp)
-                        )
+                        if (activity.activityType == ActivityType.TASK && !activity.isCompleted){
+                            Checkbox(
+                                checked = activity.isCompleted,
+                                onCheckedChange = { onToggleCompletion() },
+                                modifier = Modifier.size(24.dp).padding(end = 4.dp)
+                            )
+                        }
+
+
                     }
                     Text(
                         text = activity.title,
@@ -1917,15 +1921,16 @@ fun ActivityItemCard(
                 }
             }
 
-            if (activity.location?.startsWith("JSON_IMPORTED_") != true) {
-                Row {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (activity.location?.startsWith("JSON_IMPORTED_") != true && !activity.isCompleted){
+                    Row {
+                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Editar", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = "Excluir", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                        }
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Excluir", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
-                    }
-                }
+
             }
         }
     }
