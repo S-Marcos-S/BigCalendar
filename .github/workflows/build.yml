@@ -33,11 +33,21 @@ jobs:
           if not data:
               print('Erro: KEYSTORE_BASE64 nao encontrado')
               sys.exit(1)
-          # Remove espacos e quebras de linha acidentais
+          
           clean_data = ''.join(data.split())
-          with open('app/key01.jks', 'wb') as f:
-              f.write(base64.b64decode(clean_data))
-          print('Keystore decodificada com sucesso via Python!')
+          
+          # Ajusta o padding para garantir multiplo de 4
+          missing_padding = len(clean_data) % 4
+          if missing_padding:
+              clean_data += '=' * (4 - missing_padding)
+          
+          try:
+              with open('app/key01.jks', 'wb') as f:
+                  f.write(base64.b64decode(clean_data))
+              print('Keystore decodificada com sucesso via Python!')
+          except Exception as e:
+              print(f'Erro ao decodificar: {e}')
+              sys.exit(1)
           "
 
       - name: Create keystore.properties
@@ -60,3 +70,4 @@ jobs:
         with:
           name: BigCalendar-Release-APK
           path: app/build/outputs/apk/release/*.apk
+
