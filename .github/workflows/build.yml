@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # Permite disparar o build manualmente pelo botão no GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -27,7 +27,12 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           mkdir -p app
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/key01.jks
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Erro: O segredo KEYSTORE_BASE64 nao esta preenchido no GitHub!"
+            exit 1
+          fi
+          # Remove quebras de linha e espacos antes de decodificar
+          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > app/key01.jks
 
       - name: Create keystore.properties
         run: |
