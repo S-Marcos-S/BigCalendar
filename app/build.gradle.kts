@@ -33,7 +33,7 @@ android {
     }
 
     // Adicione este bloco para carregar as propriedades da sua keystore
-    val keystorePropertiesFile = rootProject.file("app/keystore.properties")
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(keystorePropertiesFile.inputStream())
@@ -90,10 +90,11 @@ protobuf {
     protoc {
         artifact = libs.protobuf.protoc.get().toString()
     }
+
     generateProtoTasks {
         all().forEach { task ->
-            task.plugins {
-                create("java") {
+            task.builtins {
+                findByName("java")?.option("lite") ?: create("java") {
                     option("lite")
                 }
             }

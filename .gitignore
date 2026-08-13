@@ -24,3 +24,4 @@ captures/
 # --- Arquivos Confidenciais e Testes Locais (Segurança) ---
 client_secrets.json
 calendar_events.txt
+keystore.properties

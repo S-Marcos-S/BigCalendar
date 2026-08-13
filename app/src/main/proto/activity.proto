@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+option optimize_for = LITE_RUNTIME;
+
+
 option java_package = "com.mss.thebigcalendar.data.model.proto";
 option java_multiple_files = true;
 
