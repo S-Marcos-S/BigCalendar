@@ -27,16 +27,3 @@ enum class AnimationType {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
