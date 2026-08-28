@@ -502,7 +502,7 @@ class NotificationReceiver : BroadcastReceiver() {
                         // Forçar atualização dos widgets para refletir as mudanças
                         try {
                             val widgetIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE)
-                            widgetIntent.component = ComponentName(context, "com.mss.thebigcalendar.widget.GreetingWidgetProvider")
+                            widgetIntent.component = ComponentName(context, "com.mss.thebigcalendar.widget.EventListWidgetProvider")
                             context.sendBroadcast(widgetIntent)
                             Log.d(TAG, "🔔 Widget atualizado após adiamento")
                         } catch (e: Exception) {

@@ -183,26 +183,6 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/event_list_widget_info" />
         </receiver>
 
-        <receiver android:name=".widget.GreetingWidgetProvider" android:exported="true">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/greeting_widget_info" />
-        </receiver>
-
-        <receiver android:name=".widget.CompactGreetingWidgetProvider" android:exported="true">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/compact_greeting_widget_info" />
-        </receiver>
-
-        <receiver android:name=".widget.SimpleGreetingWidgetProvider" android:exported="true">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/simple_greeting_widget_info" />
-        </receiver>
-
-        <receiver android:name=".widget.TestWidgetProvider" android:exported="true">
-            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
-            <meta-data android:name="android.appwidget.provider" android:resource="@xml/test_widget_info" />
-        </receiver>
-
         <service
             android:name=".widget.EventListWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"

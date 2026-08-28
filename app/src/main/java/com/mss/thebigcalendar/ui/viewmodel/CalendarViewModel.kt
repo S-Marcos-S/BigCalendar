@@ -1287,32 +1287,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val context = getApplication<Application>()
             val appWidgetManager = AppWidgetManager.getInstance(context)
             
-            // Lista de todos os provedores de widget do app
-            val widgetProviders = listOf(
-                com.mss.thebigcalendar.widget.GreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.CompactGreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.SimpleGreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java
-            )
-
-            for (providerClass in widgetProviders) {
-                val componentName = ComponentName(context, providerClass)
-                val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            // Notificar EventListWidgetProvider
+            val componentName = ComponentName(context, com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            
+            if (appWidgetIds.isNotEmpty()) {
+                Log.d("CalendarViewModel", "📱 Notificando ${appWidgetIds.size} widgets do tipo EventListWidgetProvider")
                 
-                if (appWidgetIds.isNotEmpty()) {
-                    Log.d("CalendarViewModel", "📱 Notificando ${appWidgetIds.size} widgets do tipo ${providerClass.simpleName}")
-                    
-                    val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
-                        component = componentName
-                    }
-                    context.sendBroadcast(intent)
-                    
-                    // Se for o widget de lista, forçar atualização do RemoteViewsFactory
-                    if (providerClass == com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
-                    }
+                val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+                    component = componentName
                 }
+                context.sendBroadcast(intent)
+                
+                // Forçar atualização do RemoteViewsFactory
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
             }
             // Trigger automatic sync with the cloud
             triggerCloudSync()

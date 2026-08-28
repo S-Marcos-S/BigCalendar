@@ -14,6 +14,8 @@ import kotlinx.coroutines.runBlocking
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import android.util.Log
 
 class EventListRemoteViewsFactory(private val context: Context, intent: Intent) : RemoteViewsService.RemoteViewsFactory {
@@ -29,6 +31,8 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
         activityRepository = ActivityRepository(context)
     }
 
+    private var todayTasksCount: Int = 0
+
     override fun onDataSetChanged() {
         // This is called by the app widget manager whenever the data set has changed.
         // You can use this to update your data.
@@ -40,117 +44,225 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
             val isNightTime = isNightTime(currentTime)
 
             val allActivities = activityRepository.activities.firstOrNull() ?: emptyList()
-            val recurrenceService = RecurrenceService()
-            val todayTasks = mutableListOf<Activity>()
-
-            allActivities.forEach { activity ->
-                try {
-                    val activityDate = LocalDate.parse(activity.date)
-                    val isExcluded = if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                        activity.excludedDates.contains(today.toString())
-                    } else {
-                        false
-                    }
-
-                    if (!isExcluded) {
-                        if (activity.activityType == ActivityType.BIRTHDAY) {
-                            if (activityDate.month == today.month && activityDate.dayOfMonth == today.dayOfMonth) {
-                                todayTasks.add(activity)
-                            }
-                        } else {
-                            // Para atividades normais e recorrentes
-                            if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                                // Verificar se a atividade base é para hoje
-                                if (activityDate == today) {
-                                    todayTasks.add(activity)
-                                }
-                                
-                                // Gerar instâncias recorrentes para o dia atual
-                                val recurringInstances = recurrenceService.generateRecurringInstances(activity, today, today)
-                                val instancesForToday = recurringInstances.filter { instance ->
-                                    val instanceDate = LocalDate.parse(instance.date)
-                                    instanceDate == today
-                                }
-                                todayTasks.addAll(instancesForToday)
-                            } else {
-                                // Atividade única - verificar se é para hoje
-                                if (activityDate == today) {
-                                    todayTasks.add(activity)
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore activities with invalid dates
-                }
-            }
-
-            todayTasks.sortWith(
-                compareBy<Activity> { it.startTime ?: LocalTime.MAX }
-                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
-            )
-
+            
+            val todayTasks = getActivitiesForDate(today, allActivities)
             val tomorrowTasks = if (isNightTime) {
-                val tomorrowTasksList = mutableListOf<Activity>()
-                
-                allActivities.forEach { activity ->
-                    try {
-                        val activityDate = LocalDate.parse(activity.date)
-                        val isExcluded = if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                            activity.excludedDates.contains(tomorrow.toString())
-                        } else {
-                            false
-                        }
-
-                        if (!isExcluded) {
-                            if (activity.activityType == ActivityType.BIRTHDAY) {
-                                if (activityDate.month == tomorrow.month && activityDate.dayOfMonth == tomorrow.dayOfMonth) {
-                                    tomorrowTasksList.add(activity)
-                                }
-                            } else {
-                                // Para atividades normais e recorrentes
-                                if (activity.recurrenceRule?.isNotEmpty() == true && activity.recurrenceRule != "CUSTOM") {
-                                    // Verificar se a atividade base é para amanhã
-                                    if (activityDate == tomorrow) {
-                                        tomorrowTasksList.add(activity)
-                                    }
-                                    
-                                    // Gerar instâncias recorrentes para amanhã
-                                    val recurringInstances = recurrenceService.generateRecurringInstances(activity, tomorrow, tomorrow)
-                                    val instancesForTomorrow = recurringInstances.filter { instance ->
-                                        val instanceDate = LocalDate.parse(instance.date)
-                                        instanceDate == tomorrow
-                                    }
-                                    tomorrowTasksList.addAll(instancesForTomorrow)
-                                } else {
-                                    // Atividade única - verificar se é para amanhã
-                                    if (activityDate == tomorrow) {
-                                        tomorrowTasksList.add(activity)
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Ignore activities with invalid dates
-                    }
-                }
-                
-                tomorrowTasksList.sortWith(
-                    compareBy<Activity> { it.startTime ?: LocalTime.MAX }
-                        .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
-                )
-                
-                tomorrowTasksList
+                getActivitiesForDate(tomorrow, allActivities)
             } else {
                 emptyList()
             }
 
+            todayTasksCount = todayTasks.size
             activities = todayTasks + tomorrowTasks
             
             Log.d(TAG, "📋 Widget atualizado - ${activities.size} atividades encontradas")
             Log.d(TAG, "📋 Atividades de hoje: ${todayTasks.size}")
             Log.d(TAG, "📋 Atividades de amanhã: ${tomorrowTasks.size}")
         }
+    }
+
+    private fun getActivitiesForDate(
+        targetDate: LocalDate,
+        allActivities: List<Activity>
+    ): List<Activity> {
+        val tasks = mutableListOf<Activity>()
+
+        allActivities.forEach { activity ->
+            try {
+                // Excluir notas e itens JSON importados de feriados
+                if (activity.activityType == ActivityType.NOTE || activity.location?.startsWith("JSON_IMPORTED_") == true) {
+                    return@forEach
+                }
+
+                val activityDate = LocalDate.parse(activity.date)
+
+                // Para aniversários, verificar se coincide o dia e mês
+                if (activity.activityType == ActivityType.BIRTHDAY) {
+                    if (activityDate.month == targetDate.month && activityDate.dayOfMonth == targetDate.dayOfMonth) {
+                        tasks.add(activity)
+                    }
+                    return@forEach
+                }
+
+                val isRecurring = !activity.recurrenceRule.isNullOrEmpty() && activity.recurrenceRule != "NONE"
+
+                // Verificar se a atividade base coincide com a data alvo
+                if (activityDate.isEqual(targetDate)) {
+                    val isExcluded = if (isRecurring) {
+                        if (activity.recurrenceRule?.startsWith("FREQ=HOURLY") == true || activity.recurrenceRule == "HOURLY") {
+                            val timeString = activity.startTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "00:00"
+                            activity.excludedInstances.contains("${activity.id}_${targetDate}_${timeString}")
+                        } else {
+                            activity.excludedDates.contains(targetDate.toString())
+                        }
+                    } else {
+                        false
+                    }
+
+                    if (!isExcluded) {
+                        tasks.add(activity)
+                    }
+                }
+
+                // Se a atividade for recorrente, calcular instâncias para esta data alvo
+                if (isRecurring) {
+                    val recurringInstances = calculateRecurringInstancesForDate(activity, targetDate)
+                    tasks.addAll(recurringInstances)
+                }
+            } catch (e: Exception) {
+                // Ignorar atividades com datas inválidas
+            }
+        }
+
+        tasks.sortWith(
+            compareBy<Activity> { it.startTime ?: LocalTime.MAX }
+                .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
+        )
+
+        return tasks
+    }
+
+    private fun calculateRecurringInstancesForDate(baseActivity: Activity, targetDate: LocalDate): List<Activity> {
+        val instances = mutableListOf<Activity>()
+        
+        try {
+            val baseDate = LocalDate.parse(baseActivity.date)
+            val targetDateString = targetDate.toString()
+            
+            // Verificar se esta data específica foi excluída
+            if (baseActivity.excludedDates.contains(targetDateString)) {
+                return instances
+            }
+            
+            // Se a data base é posterior à data alvo, não há instâncias
+            if (baseDate.isAfter(targetDate)) {
+                return instances
+            }
+            
+            // Para atividades não-HOURLY, a atividade base já é adicionada quando baseDate == targetDate
+            if (baseDate.isEqual(targetDate) && 
+                !(baseActivity.recurrenceRule == "HOURLY" || baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true)) {
+                return instances
+            }
+            
+            when {
+                baseActivity.recurrenceRule == "HOURLY" || baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true -> {
+                    if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true) {
+                        val recurrenceService = RecurrenceService()
+                        val startOfMonth = targetDate.withDayOfMonth(1)
+                        val endOfMonth = targetDate.with(TemporalAdjusters.lastDayOfMonth())
+                        
+                        val recurringInstances = recurrenceService.generateRecurringInstances(
+                            baseActivity,
+                            startOfMonth,
+                            endOfMonth
+                        )
+                        
+                        val instancesForTargetDate = recurringInstances.filter { 
+                            try {
+                                LocalDate.parse(it.date).isEqual(targetDate)
+                            } catch (_: Exception) {
+                                false
+                            }
+                        }
+                        
+                        instancesForTargetDate.forEach { instance ->
+                            val timeString = instance.startTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "00:00"
+                            val instanceId = "${baseActivity.id}_${targetDate}_${timeString}"
+                            val isExcluded = baseActivity.excludedInstances.contains(instanceId)
+                            
+                            if (!isExcluded) {
+                                instances.add(instance)
+                            }
+                        }
+                    } else {
+                        val daysDiff = ChronoUnit.DAYS.between(baseDate, targetDate)
+                        if (daysDiff > 0) {
+                            val instance = baseActivity.copy(
+                                id = "${baseActivity.id}_${targetDate}",
+                                date = targetDate.toString()
+                            )
+                            instances.add(instance)
+                        }
+                    }
+                }
+                baseActivity.recurrenceRule == "DAILY" -> {
+                    val daysDiff = ChronoUnit.DAYS.between(baseDate, targetDate)
+                    if (daysDiff > 0) {
+                        val instance = baseActivity.copy(
+                            id = "${baseActivity.id}_${targetDate}",
+                            date = targetDate.toString()
+                        )
+                        instances.add(instance)
+                    }
+                }
+                baseActivity.recurrenceRule == "WEEKLY" -> {
+                    val daysDiff = ChronoUnit.DAYS.between(baseDate, targetDate)
+                    if (daysDiff > 0 && daysDiff % 7 == 0L) {
+                        val instance = baseActivity.copy(
+                            id = "${baseActivity.id}_${targetDate}",
+                            date = targetDate.toString()
+                        )
+                        instances.add(instance)
+                    }
+                }
+                baseActivity.recurrenceRule == "MONTHLY" -> {
+                    val monthsDiff = ChronoUnit.MONTHS.between(baseDate, targetDate)
+                    if (monthsDiff > 0) {
+                        val targetDay = minOf(baseDate.dayOfMonth, targetDate.lengthOfMonth())
+                        val adjustedDate = targetDate.withDayOfMonth(targetDay)
+                        
+                        if (adjustedDate.isEqual(targetDate)) {
+                            val instance = baseActivity.copy(
+                                id = "${baseActivity.id}_${targetDate}",
+                                date = targetDate.toString()
+                            )
+                            instances.add(instance)
+                        }
+                    }
+                }
+                baseActivity.recurrenceRule == "YEARLY" -> {
+                    val yearsDiff = ChronoUnit.YEARS.between(baseDate, targetDate)
+                    if (yearsDiff > 0) {
+                        val targetDay = minOf(baseDate.dayOfMonth, targetDate.lengthOfMonth())
+                        val adjustedDate = targetDate.withDayOfMonth(targetDay)
+                        if (baseDate.month == targetDate.month && adjustedDate.isEqual(targetDate)) {
+                            val instance = baseActivity.copy(
+                                id = "${baseActivity.id}_${targetDate}",
+                                date = targetDate.toString()
+                            )
+                            instances.add(instance)
+                        }
+                    }
+                }
+                else -> {
+                    if (baseActivity.recurrenceRule?.startsWith("FREQ=") == true || baseActivity.recurrenceRule == "CUSTOM") {
+                        val recurrenceService = RecurrenceService()
+                        val startOfMonth = targetDate.withDayOfMonth(1)
+                        val endOfMonth = targetDate.with(TemporalAdjusters.lastDayOfMonth())
+                        
+                        val recurringInstances = recurrenceService.generateRecurringInstances(
+                            baseActivity,
+                            startOfMonth,
+                            endOfMonth
+                        )
+                        
+                        val matchingInstances = recurringInstances.filter { instance ->
+                            try {
+                                LocalDate.parse(instance.date).isEqual(targetDate)
+                            } catch (_: Exception) {
+                                false
+                            }
+                        }
+                        
+                        instances.addAll(matchingInstances)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        
+        return instances
     }
 
     override fun onDestroy() {
@@ -169,7 +281,15 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
         val activity = activities[position]
         val views = RemoteViews(context.packageName, R.layout.event_list_widget_item)
 
-        val prefix = if (activity.activityType == ActivityType.BIRTHDAY) {
+        val isTomorrow = position >= todayTasksCount
+        val tomorrowTag = if (isTomorrow) {
+            val headerText = context.getString(R.string.widget_tomorrow_header).trimEnd(':', ' ', '：')
+            "[$headerText] "
+        } else {
+            ""
+        }
+
+        val typePrefix = if (activity.activityType == ActivityType.BIRTHDAY) {
             "🎂 " // Birthday icon
         } else if (activity.startTime != null) {
             "${activity.startTime!!.format(DateTimeFormatter.ofPattern("HH:mm"))} "
@@ -177,7 +297,7 @@ class EventListRemoteViewsFactory(private val context: Context, intent: Intent) 
             ""
         }
 
-        views.setTextViewText(R.id.event_item_title, "$prefix${activity.title}")
+        views.setTextViewText(R.id.event_item_title, "$tomorrowTag$typePrefix${activity.title}")
 
         val descriptionText = activity.description.takeIf { !it.isNullOrBlank() } ?: ""
         views.setTextViewText(R.id.event_item_time, descriptionText)
