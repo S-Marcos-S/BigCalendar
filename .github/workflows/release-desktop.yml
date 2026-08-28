@@ -29,7 +29,8 @@ jobs:
       - name: Build Debian Package
         run: |
           sed -i '/org.gradle.java.home/d' gradle.properties
-          ./gradlew :desktop:packageDeb
+          sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
+          ./gradlew :desktop:packageDeb --no-daemon
 
       - name: Upload DEB to GitHub Release
         uses: softprops/action-gh-release@v2

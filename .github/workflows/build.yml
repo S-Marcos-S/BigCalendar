@@ -66,6 +66,11 @@ jobs:
           EOF
           cp app/keystore.properties keystore.properties
 
+      - name: Configure gradle.properties for CI
+        run: |
+          sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
+          sed -i '/org.gradle.java.home/d' gradle.properties
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
