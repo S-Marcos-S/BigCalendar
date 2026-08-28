@@ -59,14 +59,24 @@ jobs:
           "
 
       - name: Create keystore.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cat <<EOF > app/keystore.properties
-          storeFile=key01.jks
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
-          cp app/keystore.properties keystore.properties
+          python3 -c "
+          import os
+          store_pass = os.environ.get('STORE_PASSWORD', '')
+          key_alias = os.environ.get('KEY_ALIAS', '')
+          key_pass = os.environ.get('KEY_PASSWORD', '')
+          
+          with open('app/keystore.properties', 'w') as f:
+              f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
+          
+          with open('keystore.properties', 'w') as f:
+              f.write(f'storeFile=app/key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
+          print('keystore.properties gerado com sucesso!')
+          "
 
       - name: Configure gradle.properties for CI
         run: |
@@ -77,7 +87,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
