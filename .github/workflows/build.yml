@@ -74,7 +74,7 @@ jobs:
               f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
           
           with open('keystore.properties', 'w') as f:
-              f.write(f'storeFile=app/key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
+              f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
           print('keystore.properties gerado com sucesso!')
           "
 

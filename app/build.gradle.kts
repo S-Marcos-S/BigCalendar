@@ -49,8 +49,18 @@ android {
             keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
             val storeFilePath = keystoreProperties.getProperty("storeFile")
-            if (storeFilePath != null) {
-                storeFile = file(storeFilePath)
+            if (!storeFilePath.isNullOrBlank()) {
+                val candidate1 = file(storeFilePath)
+                val candidate2 = rootProject.file(storeFilePath)
+                val candidate3 = file("key01.jks")
+                val candidate4 = rootProject.file("app/key01.jks")
+                storeFile = when {
+                    candidate1.exists() -> candidate1
+                    candidate2.exists() -> candidate2
+                    candidate3.exists() -> candidate3
+                    candidate4.exists() -> candidate4
+                    else -> candidate1
+                }
             }
             storePassword = keystoreProperties.getProperty("storePassword") ?: ""
         }
