@@ -12,6 +12,7 @@ Thumbs.db
 **/build/
 *.class
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.aar
 *.bak
 .externalNativeBuild
