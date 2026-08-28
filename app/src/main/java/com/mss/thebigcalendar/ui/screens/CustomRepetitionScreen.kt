@@ -24,7 +24,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 data class ParsedRule(
-    val freq: String = "hours",
+    val freq: String = "days",
     val interval: Int = 1,
     val selectedDays: Set<Int> = emptySet(),
     val endDate: String = "",
@@ -76,15 +76,15 @@ fun CustomRepetitionScreen(
     // Parse da regra existente para carregar os dados
     val parsedRule = remember(existingRule) { parseExistingRule(existingRule) }
     
-    var repetitionType by remember { mutableStateOf(parsedRule.freq) }
-    var interval by remember { mutableStateOf(parsedRule.interval) }
-    var intervalText by remember { mutableStateOf(parsedRule.interval.toString()) }
-    var selectedDays by remember { mutableStateOf(parsedRule.selectedDays) }
-    var endDate by remember { mutableStateOf(parsedRule.endDate) }
-    var maxOccurrences by remember { mutableStateOf(parsedRule.maxOccurrences) }
-    var maxOccurrencesText by remember { mutableStateOf(parsedRule.maxOccurrences.toString()) }
-    var hasEndDate by remember { mutableStateOf(parsedRule.hasEndDate) }
-    var hasMaxOccurrences by remember { mutableStateOf(parsedRule.hasMaxOccurrences) }
+    var repetitionType by remember(existingRule) { mutableStateOf(parsedRule.freq) }
+    var interval by remember(existingRule) { mutableStateOf(parsedRule.interval) }
+    var intervalText by remember(existingRule) { mutableStateOf(parsedRule.interval.toString()) }
+    var selectedDays by remember(existingRule) { mutableStateOf(parsedRule.selectedDays) }
+    var endDate by remember(existingRule) { mutableStateOf(parsedRule.endDate) }
+    var maxOccurrences by remember(existingRule) { mutableStateOf(parsedRule.maxOccurrences) }
+    var maxOccurrencesText by remember(existingRule) { mutableStateOf(parsedRule.maxOccurrences.toString()) }
+    var hasEndDate by remember(existingRule) { mutableStateOf(parsedRule.hasEndDate) }
+    var hasMaxOccurrences by remember(existingRule) { mutableStateOf(parsedRule.hasMaxOccurrences) }
     
     val weekDays = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
     
@@ -417,12 +417,16 @@ private fun buildCustomRecurrenceRule(
     }
     
     // Adicionar data de término
-    if (endDate != null && endDate != "") {
+    if (endDate != null && endDate.isNotBlank()) {
         try {
-            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-            val parsedDate = LocalDate.parse(endDate, formatter)
-            rule.append(";UNTIL=${parsedDate}")
-        } catch (e: Exception) {
+            val parsedDate = if (endDate.contains("/")) {
+                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                LocalDate.parse(endDate, formatter)
+            } else {
+                LocalDate.parse(endDate)
+            }
+            rule.append(";UNTIL=$parsedDate")
+        } catch (_: Exception) {
             // Ignorar data inválida
         }
     }

@@ -212,7 +212,9 @@ fun CreateActivityScreen(
     
     var showAlarmScreen by remember { mutableStateOf(false) }
     var showCustomRepetitionScreen by remember { mutableStateOf(false) }
-    var customRepetitionRule by remember { mutableStateOf("") }
+    var customRepetitionRule by remember(currentActivity.id) { 
+        mutableStateOf(currentActivity.recurrenceRule?.takeIf { it.startsWith("FREQ=") } ?: "") 
+    }
     var isRepetitionMenuExpanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember(currentActivity.id) { mutableStateOf(LocalDate.parse(currentActivity.date)) }
@@ -241,20 +243,11 @@ fun CreateActivityScreen(
     var selectedRepetition by remember(currentActivity.id) {
         mutableStateOf(
             if (currentActivity.id != "new" && !currentActivity.id.isBlank()) {
-                val option = convertRecurrenceRuleToOption(currentActivity.recurrenceRule, repetitionMapping)
-                option
+                convertRecurrenceRuleToOption(currentActivity.recurrenceRule, repetitionMapping, customRepetitionText)
             } else {
                 repetitionOptions.first()
             }
         )
-    }
-    
-    // Carregar regra personalizada se a atividade já tem uma
-    LaunchedEffect(currentActivity.id) {
-        if (currentActivity.recurrenceRule?.startsWith("FREQ=") == true) {
-            customRepetitionRule = currentActivity.recurrenceRule
-            selectedRepetition = customRepetitionText
-        }
     }
 
     val formatter = DateTimeFormatter.ofPattern(stringResource(id = R.string.date_format_day_month), java.util.Locale.getDefault())
@@ -692,6 +685,7 @@ fun CreateActivityScreen(
                                     showCustomRepetitionScreen = true
                                 } else {
                                     selectedRepetition = option
+                                    customRepetitionRule = ""
                                 }
                                 isRepetitionMenuExpanded = false
                             }
@@ -829,10 +823,14 @@ fun CreateActivityScreen(
     if (showCustomRepetitionScreen) {
         CustomRepetitionScreen(
             onBackClick = { 
+                if (customRepetitionRule.isEmpty()) {
+                    selectedRepetition = repetitionOptions.first()
+                }
                 showCustomRepetitionScreen = false
             },
             onSaveCustomRepetition = { rule ->
                 customRepetitionRule = rule
+                selectedRepetition = customRepetitionText
                 showCustomRepetitionScreen = false
             },
             existingRule = customRepetitionRule,
@@ -1215,14 +1213,25 @@ private fun convertRepetitionOptionToRule(selectedOption: String, repetitionMapp
     return repetitionMapping[selectedOption] ?: ""
 }
 
-private fun convertRecurrenceRuleToOption(recurrenceRule: String?, repetitionMapping: Map<String, String>): String {
-    return when (recurrenceRule) {
-        null, "", "NONE" -> repetitionMapping.entries.find { it.value == "" }?.key ?: repetitionMapping.keys.first()
-        "DAILY" -> repetitionMapping.entries.find { it.value == "DAILY" }?.key ?: repetitionMapping.keys.first()
-        "WEEKLY" -> repetitionMapping.entries.find { it.value == "WEEKLY" }?.key ?: repetitionMapping.keys.first()
-        "MONTHLY" -> repetitionMapping.entries.find { it.value == "MONTHLY" }?.key ?: repetitionMapping.keys.first()
-        "YEARLY" -> repetitionMapping.entries.find { it.value == "YEARLY" }?.key ?: repetitionMapping.keys.first()
-        "CUSTOM" -> repetitionMapping.entries.find { it.value == "CUSTOM" }?.key ?: repetitionMapping.keys.first()
-        else -> repetitionMapping.keys.first()
+private fun convertRecurrenceRuleToOption(
+    recurrenceRule: String?,
+    repetitionMapping: Map<String, String>,
+    customRepetitionText: String = ""
+): String {
+    return when {
+        recurrenceRule.isNullOrEmpty() || recurrenceRule == "NONE" ->
+            repetitionMapping.entries.find { it.value == "" }?.key ?: repetitionMapping.keys.first()
+        recurrenceRule == "DAILY" ->
+            repetitionMapping.entries.find { it.value == "DAILY" }?.key ?: repetitionMapping.keys.first()
+        recurrenceRule == "WEEKLY" ->
+            repetitionMapping.entries.find { it.value == "WEEKLY" }?.key ?: repetitionMapping.keys.first()
+        recurrenceRule == "MONTHLY" ->
+            repetitionMapping.entries.find { it.value == "MONTHLY" }?.key ?: repetitionMapping.keys.first()
+        recurrenceRule == "YEARLY" ->
+            repetitionMapping.entries.find { it.value == "YEARLY" }?.key ?: repetitionMapping.keys.first()
+        recurrenceRule == "CUSTOM" || recurrenceRule.startsWith("FREQ=") ->
+            if (customRepetitionText.isNotEmpty()) customRepetitionText else (repetitionMapping.entries.find { it.value == "CUSTOM" }?.key ?: repetitionMapping.keys.first())
+        else ->
+            repetitionMapping.keys.first()
     }
 }
