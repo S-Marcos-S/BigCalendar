@@ -66,16 +66,20 @@ jobs:
         run: |
           python3 -c "
           import os
-          store_pass = os.environ.get('STORE_PASSWORD', '')
-          key_alias = os.environ.get('KEY_ALIAS', '')
-          key_pass = os.environ.get('KEY_PASSWORD', '')
+          store_pass = os.environ.get('STORE_PASSWORD', '').strip()
+          key_alias = os.environ.get('KEY_ALIAS', '').strip()
+          key_pass = os.environ.get('KEY_PASSWORD', '').strip()
+          
+          # Garante o alias exato do keystore
+          if not key_alias or key_alias != 'tbc-key01':
+              key_alias = 'tbc-key01'
           
           with open('app/keystore.properties', 'w') as f:
               f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
           
           with open('keystore.properties', 'w') as f:
               f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
-          print('keystore.properties gerado com sucesso!')
+          print('keystore.properties gerado com sucesso com alias:', key_alias)
           "
 
       - name: Configure gradle.properties for CI
