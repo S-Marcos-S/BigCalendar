@@ -42,17 +42,19 @@ jobs:
           
           clean_data = ''.join(data.split())
           
-          # Ajusta o padding para garantir multiplo de 4
+          # Ajusta o padding apenas quando necessario (2 ou 3 caracteres restantes)
           missing_padding = len(clean_data) % 4
-          if missing_padding:
-              clean_data += '=' * (4 - missing_padding)
+          if missing_padding == 2:
+              clean_data += '=='
+          elif missing_padding == 3:
+              clean_data += '='
           
           try:
               with open('app/key01.jks', 'wb') as f:
                   f.write(base64.b64decode(clean_data))
               print('Keystore decodificada com sucesso via Python!')
           except Exception as e:
-              print(f'Erro ao decodificar: {e}')
+              print(f'Erro ao decodificar (tamanho={len(clean_data)}): {e}')
               sys.exit(1)
           "
 
