@@ -172,6 +172,68 @@ class QuoteService(private val context: Context) {
     }
     
     /**
+     * Obtém o índice da última frase exibida
+     */
+    fun getLastQuoteIndex(): Int {
+        val lastDate = prefs.getString(KEY_LAST_QUOTE_DATE, "")
+        if (lastDate.isNullOrEmpty()) {
+            getQuoteOfTheDaySync()
+        }
+        return prefs.getInt(KEY_LAST_QUOTE_INDEX, 0)
+    }
+
+    /**
+     * Obtém a data da última frase exibida
+     */
+    fun getLastQuoteDate(): String {
+        val lastDate = prefs.getString(KEY_LAST_QUOTE_DATE, "")
+        if (lastDate.isNullOrEmpty()) {
+            getQuoteOfTheDaySync()
+        }
+        return prefs.getString(KEY_LAST_QUOTE_DATE, "") ?: ""
+    }
+
+    /**
+     * Obtém a frase atualmente ativa/mostrada no sidebar
+     */
+    fun getCurrentQuote(): Quote? {
+        val quotes = loadQuotesSync()
+        if (quotes.isEmpty()) return null
+        val lastDate = prefs.getString(KEY_LAST_QUOTE_DATE, "")
+        if (lastDate.isNullOrEmpty()) {
+            return getQuoteOfTheDaySync()
+        }
+        val lastIndex = prefs.getInt(KEY_LAST_QUOTE_INDEX, 0)
+        return if (lastIndex in quotes.indices) quotes[lastIndex] else quotes[0]
+    }
+
+    /**
+     * Restaura o estado da frase (índice, data e opcionalmente valida pelo texto da frase)
+     */
+    fun restoreQuoteState(index: Int, date: String = "", quoteText: String = "") {
+        val quotes = loadQuotesSync()
+        var targetIndex = index
+
+        if (quoteText.isNotBlank() && quotes.isNotEmpty()) {
+            val foundIndex = quotes.indexOfFirst { it.frase.trim().equals(quoteText.trim(), ignoreCase = true) }
+            if (foundIndex != -1) {
+                targetIndex = foundIndex
+            }
+        }
+
+        if (quotes.isNotEmpty()) {
+            targetIndex = if (targetIndex in quotes.indices) targetIndex else targetIndex.coerceIn(0, quotes.size - 1)
+        }
+
+        prefs.edit()
+            .putInt(KEY_LAST_QUOTE_INDEX, targetIndex)
+            .putString(KEY_LAST_QUOTE_DATE, date)
+            .apply()
+
+        Log.d(TAG, "Frase restaurada com sucesso: index=$targetIndex, date=$date")
+    }
+
+    /**
      * Força o recarregamento das frases (ignora cache)
      */
     suspend fun forceReloadQuotes(): List<Quote> = withContext(Dispatchers.IO) {
@@ -179,3 +241,4 @@ class QuoteService(private val context: Context) {
         loadQuotes() // Recarrega do arquivo
     }
 }
+

@@ -25,3 +25,5 @@ captures/
 client_secrets.json
 calendar_events.txt
 keystore.properties
+.kotlin/
+

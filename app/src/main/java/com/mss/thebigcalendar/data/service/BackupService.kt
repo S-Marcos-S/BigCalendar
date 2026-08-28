@@ -283,8 +283,31 @@ class BackupService(
                 put("crashlyticsEnabled", settingsRepository.isCrashlyticsEnabled.first())
                 put("hasSeenMainOnboarding", settingsRepository.hasSeenMainOnboarding.first())
                 put("backupDirectoryUri", backupDirUriVal)
+
+                // Frase do Sidebar (Quote)
+                val quoteService = com.mss.thebigcalendar.service.QuoteService(context)
+                val currentQuote = quoteService.getCurrentQuote()
+                put("lastQuoteIndex", quoteService.getLastQuoteIndex())
+                put("lastQuoteDate", quoteService.getLastQuoteDate())
+                if (currentQuote != null) {
+                    put("currentQuoteText", currentQuote.frase)
+                    put("currentQuoteAuthor", currentQuote.autor)
+                }
             }
             backupJson.put("settings", settingsJson)
+
+            // Seção explícita quoteState no JSON do backup
+            val quoteService = com.mss.thebigcalendar.service.QuoteService(context)
+            val currentQuote = quoteService.getCurrentQuote()
+            val quoteJson = JSONObject().apply {
+                put("lastQuoteIndex", quoteService.getLastQuoteIndex())
+                put("lastQuoteDate", quoteService.getLastQuoteDate())
+                if (currentQuote != null) {
+                    put("frase", currentQuote.frase)
+                    put("autor", currentQuote.autor)
+                }
+            }
+            backupJson.put("quoteState", quoteJson)
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Erro ao serializar configurações no backup: ${e.message}", e)
         }
@@ -696,6 +719,25 @@ class BackupService(
                 } catch (e: Exception) {
                     android.util.Log.e(TAG, "Erro ao restaurar configurações do backup: ${e.message}", e)
                 }
+            }
+
+            // Restaurar estado da frase do sidebar (Quote)
+            try {
+                val quoteService = com.mss.thebigcalendar.service.QuoteService(context)
+                val quoteStateJson = json.optJSONObject("quoteState")
+                if (quoteStateJson != null) {
+                    val lastIndex = quoteStateJson.optInt("lastQuoteIndex", 0)
+                    val lastDate = quoteStateJson.optString("lastQuoteDate", "")
+                    val frase = quoteStateJson.optString("frase", "")
+                    quoteService.restoreQuoteState(lastIndex, lastDate, frase)
+                } else if (settingsJson != null && settingsJson.has("lastQuoteIndex")) {
+                    val lastIndex = settingsJson.optInt("lastQuoteIndex", 0)
+                    val lastDate = settingsJson.optString("lastQuoteDate", "")
+                    val frase = settingsJson.optString("currentQuoteText", "")
+                    quoteService.restoreQuoteState(lastIndex, lastDate, frase)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Erro ao restaurar frase do sidebar: ${e.message}", e)
             }
 
             // Restaurar calendários JSON
