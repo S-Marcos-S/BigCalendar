@@ -945,5 +945,25 @@
     <string name="quick_sync_failed">快速同步失败</string>
     <string name="backup_error_delete_file_failed">删除备份文件失败。</string>
     <string name="backup_error_delete_permission_failed">无法获取删除文件的权限。</string>
+    <string name="gemini_assistant_title">Gemini 助手</string>
+    <string name="gemini_assistant_desc">使用 AI 语音和文本命令管理您的日程</string>
+    <string name="gemini_settings_title">Gemini 设置</string>
+    <string name="gemini_settings_intro">Gemini 允许您通过语音命令创建提醒、购物清单和约会。</string>
+    <string name="gemini_api_key">Gemini API 密钥</string>
+    <string name="gemini_api_key_hint">在此粘贴您的 API 密钥</string>
+    <string name="gemini_get_api_key">在 Google AI Studio 获取密钥</string>
+    <string name="gemini_model">人工智能模型</string>
+    <string name="gemini_voice_feedback">语音回复</string>
+    <string name="gemini_voice_feedback_desc">完成操作后朗读确认信息</string>
+    <string name="gemini_speak_now">请现在说出您的指令...</string>
+    <string name="gemini_prompt_hint">例如：提醒我明天买奶酪...</string>
+    <string name="gemini_processing">Gemini 正在处理...</string>
+    <string name="gemini_send">发送</string>
+    <string name="gemini_undo">撤消</string>
+    <string name="gemini_done">完成</string>
+    <string name="gemini_action_undone">已成功撤消操作。</string>
+    <string name="gemini_no_api_key">请在设置中配置您的 Gemini API 密钥以使用助手。</string>
+    <string name="gemini_open_settings">配置 API</string>
+    <string name="gemini_speech_not_supported">此设备不支持语音识别，请使用键盘输入。</string>
 </resources>
 

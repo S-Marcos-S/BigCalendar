@@ -186,6 +186,8 @@ class MainActivity : ComponentActivity() {
                 when {
                     state.activityToEdit != null -> viewModel.closeCreateActivityModal()
                     state.isSidebarOpen -> viewModel.closeSidebar()
+                    state.isGeminiAssistantOpen -> viewModel.closeGeminiAssistant()
+                    state.isGeminiSettingsOpen -> viewModel.closeGeminiSettings()
                     state.isCalendarVisualizationSettingsOpen -> viewModel.closeCalendarVisualizationSettings()
                     state.isSyncScreenOpen -> viewModel.closeSyncSettings()
                     state.isSettingsScreenOpen -> viewModel.closeSettingsScreen()
@@ -440,6 +442,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
                                 onOpenSyncSettings = { viewModel.openSyncSettings() },
                                 onOpenBackupSettings = { viewModel.onBackupIconClick() },
+                                onOpenGeminiSettings = { viewModel.openGeminiSettings() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }

@@ -953,4 +953,24 @@
     <string name="quick_sync_failed">Échec de la synchronisation rapide</string>
     <string name="backup_error_delete_file_failed">Échec de la suppression du fichier de sauvegarde.</string>
     <string name="backup_error_delete_permission_failed">Impossible d\'obtenir l\'autorisation de supprimer le fichier.</string>
+    <string name="gemini_assistant_title">Assistant Gemini</string>
+    <string name="gemini_assistant_desc">Commandes vocales et textuelles IA pour gérer vos événements</string>
+    <string name="gemini_settings_title">Paramètres Gemini</string>
+    <string name="gemini_settings_intro">Gemini vous permet de créer des rappels, listes de courses et rendez-vous par commande vocale.</string>
+    <string name="gemini_api_key">Clé API Gemini</string>
+    <string name="gemini_api_key_hint">Collez votre clé API ici</string>
+    <string name="gemini_get_api_key">Obtenir une clé sur Google AI Studio</string>
+    <string name="gemini_model">Modèle d\'intelligence artificielle</string>
+    <string name="gemini_voice_feedback">Réponse vocale</string>
+    <string name="gemini_voice_feedback_desc">Entendre la confirmation à voix haute après l\'action</string>
+    <string name="gemini_speak_now">Dites votre commande maintenant...</string>
+    <string name="gemini_prompt_hint">Ex. : Rappelle-moi demain d\'acheter du fromage...</string>
+    <string name="gemini_processing">Traitement avec Gemini...</string>
+    <string name="gemini_send">Envoyer</string>
+    <string name="gemini_undo">Annuler</string>
+    <string name="gemini_done">Terminé</string>
+    <string name="gemini_action_undone">Action annulée avec succès.</string>
+    <string name="gemini_no_api_key">Configurez votre clé API Gemini dans les paramètres pour utiliser l\'assistant.</string>
+    <string name="gemini_open_settings">Configurer l\'API</string>
+    <string name="gemini_speech_not_supported">Reconnaissance vocale non prise en charge sur cet appareil. Utilisez le clavier.</string>
 </resources>

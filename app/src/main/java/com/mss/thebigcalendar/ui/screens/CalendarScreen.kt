@@ -33,6 +33,9 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.AutoAwesome
+import com.mss.thebigcalendar.ui.components.GeminiAssistantDialog
+import com.mss.thebigcalendar.ui.components.GeminiSettingsDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -320,6 +323,19 @@ fun CalendarScreen(
                                             )
                                         }
                                     }
+                                    IconButton(onClick = {
+                                        if (uiState.geminiApiKey.isBlank()) {
+                                            viewModel.openGeminiSettings()
+                                        } else {
+                                            viewModel.openGeminiAssistant()
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = stringResource(id = R.string.gemini_assistant_title),
+                                            tint = appBarContentColor
+                                        )
+                                    }
                                     IconButton(onClick = { viewModel.onSearchIconClick() }) {
                                         Icon(
                                             Icons.Default.Search,
@@ -536,6 +552,36 @@ fun CalendarScreen(
                                     Text(stringResource(R.string.close))
                                 }
                             }
+                        )
+                    }
+
+                    if (uiState.isGeminiAssistantOpen) {
+                        GeminiAssistantDialog(
+                            isOpen = uiState.isGeminiAssistantOpen,
+                            isProcessing = uiState.isGeminiProcessing,
+                            apiKey = uiState.geminiApiKey,
+                            lastResult = uiState.geminiLastResult,
+                            lastActivity = uiState.geminiLastActivity,
+                            errorMessage = uiState.geminiErrorMessage,
+                            errorDetails = uiState.geminiErrorDetails,
+                            canUndo = uiState.canUndoGeminiAction,
+                            onSendCommand = { prompt -> viewModel.processGeminiCommand(prompt) },
+                            onUndoAction = { viewModel.undoLastGeminiAction() },
+                            onUpdateDescription = { newDesc -> viewModel.updateGeminiActivityDescription(newDesc) },
+                            onOpenSettings = { viewModel.openGeminiSettings() },
+                            onDismissRequest = { viewModel.closeGeminiAssistant() }
+                        )
+                    }
+
+                    if (uiState.isGeminiSettingsOpen) {
+                        GeminiSettingsDialog(
+                            currentApiKey = uiState.geminiApiKey,
+                            currentVoiceFeedback = uiState.geminiVoiceFeedback,
+                            currentModel = uiState.geminiModel,
+                            onSaveSettings = { apiKey, voiceFeedback, model ->
+                                viewModel.saveGeminiSettings(apiKey, voiceFeedback, model)
+                            },
+                            onDismissRequest = { viewModel.closeGeminiSettings() }
                         )
                     }
                 }

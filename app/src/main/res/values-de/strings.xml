@@ -953,5 +953,25 @@
     <string name="quick_sync_failed">Schnelle Synchronisierung fehlgeschlagen</string>
     <string name="backup_error_delete_file_failed">Fehler beim Löschen der Backup-Datei.</string>
     <string name="backup_error_delete_permission_failed">Berechtigung zum Löschen der Datei konnte nicht eingeholt werden.</string>
+    <string name="gemini_assistant_title">Gemini Assistent</string>
+    <string name="gemini_assistant_desc">KI-Sprach- und Textbefehle zur Verwaltung Ihrer Termine</string>
+    <string name="gemini_settings_title">Gemini-Einstellungen</string>
+    <string name="gemini_settings_intro">Gemini ermöglicht das Erstellen von Erinnerungen, Einkaufslisten und Terminen per Sprachbefehl.</string>
+    <string name="gemini_api_key">Gemini API-Schlüssel</string>
+    <string name="gemini_api_key_hint">Fügen Sie hier Ihren API-Schlüssel ein</string>
+    <string name="gemini_get_api_key">Schlüssel im Google AI Studio holen</string>
+    <string name="gemini_model">Künstliche Intelligenz-Modell</string>
+    <string name="gemini_voice_feedback">Sprachausgabe</string>
+    <string name="gemini_voice_feedback_desc">Bestätigung nach Abschluss der Aktion laut vorlesen</string>
+    <string name="gemini_speak_now">Sprechen Sie jetzt Ihren Befehl...</string>
+    <string name="gemini_prompt_hint">Z.B.: Erinnere mich morgen daran Käse zu kaufen...</string>
+    <string name="gemini_processing">Wird mit Gemini verarbeitet...</string>
+    <string name="gemini_send">Senden</string>
+    <string name="gemini_undo">Rückgängig</string>
+    <string name="gemini_done">Fertig</string>
+    <string name="gemini_action_undone">Aktion erfolgreich rückgängig gemacht.</string>
+    <string name="gemini_no_api_key">Richten Sie Ihren Gemini-API-Schlüssel in den Einstellungen ein.</string>
+    <string name="gemini_open_settings">API konfigurieren</string>
+    <string name="gemini_speech_not_supported">Spracherkennung auf diesem Gerät nicht unterstützt. Bitte tippen.</string>
 </resources>
 

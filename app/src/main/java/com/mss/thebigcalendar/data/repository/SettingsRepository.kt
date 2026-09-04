@@ -68,6 +68,9 @@ class SettingsRepository(private val context: Context) {
         val ENCRYPTION_PASSWORD = stringPreferencesKey("encryption_password")
         val MAX_LOCAL_BACKUPS = intPreferencesKey("max_local_backups")
         val MAX_CLOUD_BACKUPS = intPreferencesKey("max_cloud_backups")
+        val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        val GEMINI_VOICE_FEEDBACK = booleanPreferencesKey("gemini_voice_feedback")
+        val GEMINI_MODEL = stringPreferencesKey("gemini_model")
     }
 
     val isEncryptionEnabled: Flow<Boolean> = context.dataStore.data
@@ -374,6 +377,37 @@ class SettingsRepository(private val context: Context) {
                 preferences[PreferencesKeys.AUTO_BACKUP_TYPE] = settings.backupType.name
             }
         }
-    
-    
+
+        val geminiApiKey: Flow<String> = context.dataStore.data
+            .map { preferences ->
+                preferences[PreferencesKeys.GEMINI_API_KEY] ?: ""
+            }
+
+        suspend fun saveGeminiApiKey(apiKey: String) {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.GEMINI_API_KEY] = apiKey.trim()
+            }
+        }
+
+        val geminiVoiceFeedback: Flow<Boolean> = context.dataStore.data
+            .map { preferences ->
+                preferences[PreferencesKeys.GEMINI_VOICE_FEEDBACK] ?: true
+            }
+
+        suspend fun saveGeminiVoiceFeedback(enabled: Boolean) {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.GEMINI_VOICE_FEEDBACK] = enabled
+            }
+        }
+
+        val geminiModel: Flow<String> = context.dataStore.data
+            .map { preferences ->
+                preferences[PreferencesKeys.GEMINI_MODEL] ?: "gemini-3.6-flash"
+            }
+
+        suspend fun saveGeminiModel(model: String) {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.GEMINI_MODEL] = model.trim()
+            }
+        }
     }

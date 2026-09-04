@@ -945,5 +945,25 @@
     <string name="quick_sync_failed">Сбой быстрой синхронизации</string>
     <string name="backup_error_delete_file_failed">Не удалось удалить файл резервной копии.</string>
     <string name="backup_error_delete_permission_failed">Не удалось получить разрешение на удаление файла.</string>
+    <string name="gemini_assistant_title">Ассистент Gemini</string>
+    <string name="gemini_assistant_desc">Голосовые и текстовые команды ИИ для управления расписанием</string>
+    <string name="gemini_settings_title">Настройки Gemini</string>
+    <string name="gemini_settings_intro">Gemini позволяет создавать напоминания, списки покупок и встречи с помощью голосовых команд.</string>
+    <string name="gemini_api_key">Ключ API Gemini</string>
+    <string name="gemini_api_key_hint">Вставьте сюда ключ API</string>
+    <string name="gemini_get_api_key">Получить ключ в Google AI Studio</string>
+    <string name="gemini_model">Модель искусственного интеллекта</string>
+    <string name="gemini_voice_feedback">Голосовой ответ</string>
+    <string name="gemini_voice_feedback_desc">Озвучивать подтверждение после завершения действия</string>
+    <string name="gemini_speak_now">Произнесите команду...</string>
+    <string name="gemini_prompt_hint">Напр.: Напомни завтра купить сыр...</string>
+    <string name="gemini_processing">Обработка в Gemini...</string>
+    <string name="gemini_send">Отправить</string>
+    <string name="gemini_undo">Отменить</string>
+    <string name="gemini_done">Готово</string>
+    <string name="gemini_action_undone">Действие успешно отменено.</string>
+    <string name="gemini_no_api_key">Настройте ключ API Gemini в настройках, чтобы использовать ассистента.</string>
+    <string name="gemini_open_settings">Настроить API</string>
+    <string name="gemini_speech_not_supported">Распознавание речи не поддерживается на этом устройстве. Используйте клавиатуру.</string>
 </resources>
 

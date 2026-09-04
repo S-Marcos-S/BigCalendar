@@ -186,7 +186,20 @@ data class CalendarUiState(
     val duplicateGroups: List<List<Activity>> = emptyList(),
     val showDuplicateDialog: Boolean = false,
     val maxLocalBackups: Int = 10,
-    val maxCloudBackups: Int = 10
+    val maxCloudBackups: Int = 10,
+    val isGeminiAssistantOpen: Boolean = false,
+    val isGeminiSettingsOpen: Boolean = false,
+    val isGeminiProcessing: Boolean = false,
+    val geminiApiKey: String = "",
+    val geminiVoiceFeedback: Boolean = true,
+    val geminiModel: String = "gemini-3.6-flash",
+    val geminiLastPrompt: String = "",
+    val geminiLastResult: GeminiCommandResult? = null,
+    val geminiLastActivity: Activity? = null,
+    val geminiPreviousActivity: Activity? = null,
+    val geminiErrorMessage: String? = null,
+    val geminiErrorDetails: String? = null,
+    val canUndoGeminiAction: Boolean = false
 )
 
 data class SyncedDevice(

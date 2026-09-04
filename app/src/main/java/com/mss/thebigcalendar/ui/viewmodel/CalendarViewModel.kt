@@ -39,6 +39,15 @@ import com.mss.thebigcalendar.data.repository.SyncRepository
 import com.mss.thebigcalendar.data.service.BackupService
 import com.mss.thebigcalendar.data.service.BackupInfo
 import com.mss.thebigcalendar.service.VisibilityService
+import com.mss.thebigcalendar.data.model.GeminiAction
+import com.mss.thebigcalendar.data.model.GeminiCommandResult
+import com.mss.thebigcalendar.data.model.NotificationSettings
+import com.mss.thebigcalendar.data.model.NotificationType
+import com.mss.thebigcalendar.data.model.VisibilityLevel
+import com.mss.thebigcalendar.service.GeminiService
+import com.mss.thebigcalendar.service.GeminiExecutionResult
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +114,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val visibilityService = VisibilityService(application)
     private val pdfGenerationService = com.mss.thebigcalendar.data.service.PdfGenerationService(application)
     private val backupScheduler = com.mss.thebigcalendar.service.BackupScheduler(application)
+    private val geminiService = GeminiService()
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsReady: Boolean = false
 
     // State Management
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -454,6 +466,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         } catch (_: Exception) {
             // Ignorar erro se o receiver não estiver registrado
         }
+        try {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+        } catch (_: Exception) {
+            // Ignorar erro ao liberar TextToSpeech
+        }
     }
     
     private val notificationBroadcastReceiver = object : android.content.BroadcastReceiver() {
@@ -757,6 +775,32 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             settingsRepository.syncedDevicesJson.collect { json ->
                 _uiState.update { it.copy(syncedDevices = parseSyncedDevices(json)) }
             }
+        }
+        viewModelScope.launch {
+            settingsRepository.geminiApiKey.collect { key ->
+                _uiState.update { it.copy(geminiApiKey = key) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.geminiVoiceFeedback.collect { feedback ->
+                _uiState.update { it.copy(geminiVoiceFeedback = feedback) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.geminiModel.collect { model ->
+                _uiState.update { it.copy(geminiModel = model) }
+            }
+        }
+        try {
+            textToSpeech = TextToSpeech(getApplication()) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    val result = textToSpeech?.setLanguage(Locale.getDefault())
+                    isTtsReady = (result != TextToSpeech.LANG_MISSING_DATA &&
+                                  result != TextToSpeech.LANG_NOT_SUPPORTED)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CalendarViewModel", "Erro ao inicializar TextToSpeech", e)
         }
         viewModelScope.launch {
             // Observar o estado de login do Google e o nome de boas-vindas
@@ -4241,4 +4285,442 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // ===== GEMINI ASSISTANT FUNCTIONS =====
+
+    fun openGeminiAssistant() {
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = true,
+                geminiErrorMessage = null
+            )
+        }
+    }
+
+    fun closeGeminiAssistant() {
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = false
+            )
+        }
+    }
+
+    fun openGeminiSettings() {
+        _uiState.update { it.copy(isGeminiSettingsOpen = true) }
+    }
+
+    fun closeGeminiSettings() {
+        _uiState.update { it.copy(isGeminiSettingsOpen = false) }
+    }
+
+    fun saveGeminiSettings(apiKey: String, voiceFeedback: Boolean, model: String) {
+        viewModelScope.launch {
+            settingsRepository.saveGeminiApiKey(apiKey)
+            settingsRepository.saveGeminiVoiceFeedback(voiceFeedback)
+            settingsRepository.saveGeminiModel(model)
+        }
+    }
+
+    fun speakGeminiResponse(text: String) {
+        if (_uiState.value.geminiVoiceFeedback && isTtsReady && text.isNotBlank()) {
+            try {
+                textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "gemini_tts_${System.currentTimeMillis()}")
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao reproduzir voz", e)
+            }
+        }
+    }
+
+    fun updateGeminiActivityDescription(newDescription: String) {
+        val currentActivity = _uiState.value.geminiLastActivity ?: return
+        val updatedActivity = currentActivity.copy(
+            description = newDescription,
+            lastModified = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            activityRepository.saveActivity(updatedActivity)
+            _uiState.update {
+                it.copy(
+                    geminiLastActivity = updatedActivity,
+                    activities = it.activities.map { act -> if (act.id == updatedActivity.id) updatedActivity else act }
+                )
+            }
+            loadActivitiesForCurrentMonth()
+            notifyWidgetsDataChanged()
+        }
+    }
+
+    fun processGeminiCommand(prompt: String) {
+        if (prompt.isBlank()) return
+        val apiKey = _uiState.value.geminiApiKey
+        if (apiKey.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    isGeminiAssistantOpen = true,
+                    isGeminiSettingsOpen = true,
+                    geminiErrorMessage = getApplication<Application>().getString(R.string.gemini_no_api_key)
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = true,
+                isGeminiProcessing = true,
+                geminiLastPrompt = prompt,
+                geminiErrorMessage = null,
+                geminiErrorDetails = null
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val existingActivities = _uiState.value.activities
+            val model = _uiState.value.geminiModel
+            val result = geminiService.executeCommand(
+                prompt = prompt,
+                apiKey = apiKey,
+                model = model,
+                existingActivities = existingActivities
+            )
+
+            when (result) {
+                is GeminiExecutionResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiErrorMessage = result.message,
+                                geminiErrorDetails = result.details
+                            )
+                        }
+                    }
+                }
+                is GeminiExecutionResult.Success -> {
+                    handleGeminiCommandResult(result.command)
+                }
+            }
+        }
+    }
+
+    private suspend fun handleGeminiCommandResult(command: GeminiCommandResult) {
+        val notificationService = NotificationService(getApplication())
+
+        when (command.action) {
+            GeminiAction.CREATE -> {
+                val actType = try {
+                    command.activityType?.let { ActivityType.valueOf(it.uppercase()) } ?: ActivityType.TASK
+                } catch (e: Exception) {
+                    ActivityType.TASK
+                }
+
+                val visibility = try {
+                    command.visibility?.let { VisibilityLevel.valueOf(it.uppercase()) } ?: VisibilityLevel.LOW
+                } catch (e: Exception) {
+                    VisibilityLevel.LOW
+                }
+
+                val startTime = command.startTime?.let {
+                    try { java.time.LocalTime.parse(it) } catch (e: Exception) { null }
+                }
+
+                val endTime = command.endTime?.let {
+                    try { java.time.LocalTime.parse(it) } catch (e: Exception) { null }
+                }
+
+                val actDate = command.date ?: LocalDate.now().toString()
+
+                val categoryColor = when (actType) {
+                    ActivityType.TASK -> "#3B82F6"
+                    ActivityType.NOTE -> "#10B981"
+                    ActivityType.BIRTHDAY -> "#FF69B4"
+                    ActivityType.EVENT -> "#F43F5E"
+                    ActivityType.COMMEMORATIVE -> "#8B5CF6"
+                }
+
+                val newActivity = Activity(
+                    id = UUID.randomUUID().toString(),
+                    title = command.title?.ifBlank { "Nova atividade" } ?: "Nova atividade",
+                    description = command.description,
+                    date = actDate,
+                    startTime = startTime,
+                    endTime = endTime,
+                    isAllDay = command.isAllDay,
+                    location = null,
+                    categoryColor = categoryColor,
+                    activityType = actType,
+                    recurrenceRule = null,
+                    notificationSettings = NotificationSettings(
+                        isEnabled = command.notificationEnabled,
+                        notificationType = if (command.notificationEnabled) {
+                            if (command.notificationMinutesBefore > 0) NotificationType.CUSTOM else NotificationType.BEFORE_ACTIVITY
+                        } else NotificationType.NONE,
+                        customMinutesBefore = if (command.notificationMinutesBefore > 0) command.notificationMinutesBefore else null
+                    ),
+                    isCompleted = false,
+                    visibility = visibility,
+                    showInCalendar = true,
+                    isFromGoogle = false,
+                    lastModified = System.currentTimeMillis()
+                )
+
+                activityRepository.saveActivity(newActivity)
+
+                if (newActivity.notificationSettings.isEnabled) {
+                    notificationService.scheduleNotification(newActivity)
+                }
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(
+                            isGeminiProcessing = false,
+                            geminiLastResult = command,
+                            geminiLastActivity = newActivity,
+                            geminiPreviousActivity = null,
+                            canUndoGeminiAction = true,
+                            geminiErrorMessage = null,
+                            geminiErrorDetails = null
+                        )
+                    }
+                    speakGeminiResponse(command.replyMessage)
+                }
+
+                loadActivitiesForCurrentMonth()
+                notifyWidgetsDataChanged()
+            }
+
+            GeminiAction.UPDATE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    val updated = target.copy(
+                        title = command.title ?: target.title,
+                        date = command.date ?: target.date,
+                        description = command.description ?: target.description,
+                        startTime = command.startTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.startTime } } ?: target.startTime,
+                        endTime = command.endTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.endTime } } ?: target.endTime,
+                        isAllDay = command.isAllDay,
+                        notificationSettings = if (command.notificationEnabled) {
+                            target.notificationSettings.copy(
+                                isEnabled = true,
+                                notificationType = if (command.notificationMinutesBefore > 0) NotificationType.CUSTOM else NotificationType.BEFORE_ACTIVITY,
+                                customMinutesBefore = if (command.notificationMinutesBefore > 0) command.notificationMinutesBefore else null
+                            )
+                        } else target.notificationSettings,
+                        lastModified = System.currentTimeMillis()
+                    )
+
+                    activityRepository.saveActivity(updated)
+                    if (updated.notificationSettings.isEnabled) {
+                        notificationService.cancelActivityNotifications(target)
+                        notificationService.scheduleNotification(updated)
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = updated,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei o agendamento para atualizar.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.DELETE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    notificationService.cancelActivityNotifications(target)
+                    deletedActivityRepository.addDeletedActivity(target)
+                    activityRepository.deleteActivity(target.id)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = null,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei o agendamento para excluir.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.COMPLETE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    val completed = target.copy(isCompleted = true, lastModified = System.currentTimeMillis())
+                    completedActivityRepository.addCompletedActivity(completed)
+                    activityRepository.saveActivity(completed)
+                    notificationService.cancelActivityNotifications(target)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = completed,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei a tarefa para concluir.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.QUERY, GeminiAction.NONE -> {
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(
+                            isGeminiProcessing = false,
+                            geminiLastResult = command,
+                            geminiErrorMessage = null,
+                            geminiErrorDetails = null
+                        )
+                    }
+                    speakGeminiResponse(command.replyMessage)
+                }
+            }
+        }
+    }
+
+    fun undoLastGeminiAction() {
+        val lastResult = _uiState.value.geminiLastResult ?: return
+        val lastActivity = _uiState.value.geminiLastActivity
+        val previousActivity = _uiState.value.geminiPreviousActivity
+        val notificationService = NotificationService(getApplication())
+
+        viewModelScope.launch(Dispatchers.IO) {
+            when (lastResult.action) {
+                GeminiAction.CREATE -> {
+                    if (lastActivity != null) {
+                        notificationService.cancelActivityNotifications(lastActivity)
+                        activityRepository.deleteActivity(lastActivity.id)
+                    }
+                }
+                GeminiAction.UPDATE -> {
+                    if (previousActivity != null) {
+                        activityRepository.saveActivity(previousActivity)
+                        notificationService.scheduleNotification(previousActivity)
+                    }
+                }
+                GeminiAction.DELETE -> {
+                    if (previousActivity != null) {
+                        deletedActivityRepository.removeDeletedActivity(previousActivity.id)
+                        activityRepository.saveActivity(previousActivity)
+                        if (previousActivity.notificationSettings.isEnabled) {
+                            notificationService.scheduleNotification(previousActivity)
+                        }
+                    }
+                }
+                GeminiAction.COMPLETE -> {
+                    if (previousActivity != null) {
+                        completedActivityRepository.removeCompletedActivity(previousActivity.id)
+                        val reopened = previousActivity.copy(isCompleted = false)
+                        activityRepository.saveActivity(reopened)
+                    }
+                }
+                else -> {}
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        canUndoGeminiAction = false,
+                        geminiLastActivity = null,
+                        geminiPreviousActivity = null,
+                        geminiLastResult = null,
+                        geminiErrorMessage = null,
+                        geminiErrorDetails = null
+                    )
+                }
+                val undoneMsg = getApplication<Application>().getString(R.string.gemini_action_undone)
+                speakGeminiResponse(undoneMsg)
+            }
+
+            loadActivitiesForCurrentMonth()
+            notifyWidgetsDataChanged()
+        }
+    }
 }

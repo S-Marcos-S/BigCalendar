@@ -948,4 +948,24 @@
     <string name="quick_sync_failed">Quick sync failed</string>
     <string name="backup_error_delete_file_failed">Failed to delete backup file.</string>
     <string name="backup_error_delete_permission_failed">Could not obtain permission to delete file.</string>
+    <string name="gemini_assistant_title">Gemini Assistant</string>
+    <string name="gemini_assistant_desc">AI voice and text commands to manage your schedule</string>
+    <string name="gemini_settings_title">Gemini Settings</string>
+    <string name="gemini_settings_intro">Gemini lets you create reminders, shopping lists, and appointments using voice commands.</string>
+    <string name="gemini_api_key">Gemini API Key</string>
+    <string name="gemini_api_key_hint">Paste your API key here</string>
+    <string name="gemini_get_api_key">Get key from Google AI Studio</string>
+    <string name="gemini_model">Artificial Intelligence Model</string>
+    <string name="gemini_voice_feedback">Voice response</string>
+    <string name="gemini_voice_feedback_desc">Hear aloud confirmation after completing action</string>
+    <string name="gemini_speak_now">Speak your command now...</string>
+    <string name="gemini_prompt_hint">E.g.: Remind me tomorrow to buy cheese...</string>
+    <string name="gemini_processing">Processing with Gemini...</string>
+    <string name="gemini_send">Send</string>
+    <string name="gemini_undo">Undo</string>
+    <string name="gemini_done">Done</string>
+    <string name="gemini_action_undone">Action undone successfully.</string>
+    <string name="gemini_no_api_key">Set up your Gemini API key in settings to use the assistant.</string>
+    <string name="gemini_open_settings">Configure API</string>
+    <string name="gemini_speech_not_supported">Voice recognition not supported on this device. Use typing.</string>
 </resources>

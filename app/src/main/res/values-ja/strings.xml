@@ -945,5 +945,25 @@
     <string name="quick_sync_failed">クイック同期に失敗しました</string>
     <string name="backup_error_delete_file_failed">バックアップファイルの削除に失敗しました。</string>
     <string name="backup_error_delete_permission_failed">ファイルを削除する権限を取得できませんでした。</string>
+    <string name="gemini_assistant_title">Gemini アシスタント</string>
+    <string name="gemini_assistant_desc">AI音声およびテキストコマンドでスケジュールを管理</string>
+    <string name="gemini_settings_title">Gemini 設定</string>
+    <string name="gemini_settings_intro">Geminiを使用すると、音声コマンドでリマインダー、買い物リスト、予定を作成できます。</string>
+    <string name="gemini_api_key">Gemini API キー</string>
+    <string name="gemini_api_key_hint">ここにAPIキーを貼り付け</string>
+    <string name="gemini_get_api_key">Google AI Studio でキーを取得</string>
+    <string name="gemini_model">AI モデル</string>
+    <string name="gemini_voice_feedback">音声応答</string>
+    <string name="gemini_voice_feedback_desc">アクション完了後に確認を音声で読み上げる</string>
+    <string name="gemini_speak_now">コマンドを話してください...</string>
+    <string name="gemini_prompt_hint">例: 明日チーズを買うのをリマインドして...</string>
+    <string name="gemini_processing">Gemini で処理中...</string>
+    <string name="gemini_send">送信</string>
+    <string name="gemini_undo">元に戻す</string>
+    <string name="gemini_done">完了</string>
+    <string name="gemini_action_undone">アクションを元に戻しました。</string>
+    <string name="gemini_no_api_key">アシスタントを使用するには設定でGemini APIキーを設定してください。</string>
+    <string name="gemini_open_settings">API を設定</string>
+    <string name="gemini_speech_not_supported">この端末では音声認識に対応していません。キーボードをご利用ください。</string>
 </resources>
 
