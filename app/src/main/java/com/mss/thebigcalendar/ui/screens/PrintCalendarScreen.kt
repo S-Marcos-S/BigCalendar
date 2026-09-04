@@ -452,7 +452,7 @@ fun PrintCalendarScreen(
                                             }
                                         }
                                         Text(
-                                            text = "Modelo ${printModels.indexOf(modelPath) + 1}",
+                                            text = stringResource(R.string.print_model_label, printModels.indexOf(modelPath) + 1),
                                             style = MaterialTheme.typography.labelSmall,
                                             modifier = Modifier.padding(top = 4.dp),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -1889,7 +1889,7 @@ fun PrintCalendarScreen(
                                 Text(stringResource(id = R.string.font_preview), style = MaterialTheme.typography.labelSmall)
                                 Card(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                                     Text(
-                                        text = "O céu está azul hoje.",
+                                        text = stringResource(R.string.font_preview_sample_text),
                                         fontFamily = androidx.compose.ui.text.font.FontFamily(selectedTypeface!!),
                                         fontSize = 20.sp,
                                         modifier = Modifier.padding(16.dp)

@@ -47,12 +47,12 @@ class AutoBackupWorker(
                 if (directoryUriString.isNullOrBlank()) {
                     return Result.failure()
                 }
-                backupService.createBackup(android.net.Uri.parse(directoryUriString))
+                backupService.createBackup(android.net.Uri.parse(directoryUriString), showNotification = false)
             }
             BackupType.CLOUD -> {
                 val account = googleAuthService.getLastSignedInAccount()
                 if (account != null) {
-                    backupService.createCloudBackup(account)
+                    backupService.createCloudBackup(account, showNotification = false)
                 } else {
                     // If no account is signed in, we can't do a cloud backup.
                     // We could potentially fall back to a local backup or just fail.
@@ -71,7 +71,7 @@ class AutoBackupWorker(
         } else {
             notificationService.showAutoBackupFailedNotification(
                 settings.backupType,
-                result.exceptionOrNull()?.message ?: "Unknown error"
+                result.exceptionOrNull()?.message ?: applicationContext.getString(com.mss.thebigcalendar.R.string.unknown_error)
             )
             Result.failure()
         }

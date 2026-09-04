@@ -329,7 +329,7 @@ class VisibilityService(private val context: Context) {
             .setVibrate(longArrayOf(0, 500, 200, 500))
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Finalizado",
+                context.getString(R.string.notification_action_done),
                 completePendingIntent
             )
             .build()
@@ -342,12 +342,12 @@ class VisibilityService(private val context: Context) {
      */
     private fun formatActivityTime(activity: Activity): String {
         return if (activity.isAllDay) {
-            "Dia inteiro"
+            context.getString(R.string.all_day)
         } else if (activity.startTime != null) {
             val formatter = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
-            "Às ${activity.startTime.format(formatter)}"
+            context.getString(R.string.at_time_prefix, activity.startTime.format(formatter))
         } else {
-            "Sem horário definido"
+            context.getString(R.string.no_time_set)
         }
     }
 
@@ -385,7 +385,7 @@ class VisibilityService(private val context: Context) {
                 // Criar uma notificação temporária apenas para tocar o som
                 val tempNotification = NotificationCompat.Builder(context, VISIBILITY_CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_notification_calendar)
-                    .setContentTitle("Alerta")
+                    .setContentTitle(context.getString(R.string.alert_title))
                     .setContentText(context.getString(R.string.high_visibility_notification))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_ALARM)

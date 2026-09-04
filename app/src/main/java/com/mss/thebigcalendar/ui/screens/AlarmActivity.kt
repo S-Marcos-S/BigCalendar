@@ -34,6 +34,8 @@ import com.mss.thebigcalendar.service.NotificationService
 import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.mss.thebigcalendar.R
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -485,7 +487,7 @@ private fun AlarmScreen(
             
             // Horário do alarme
             Text(
-                text = "Alarme: ${alarmSettings.time.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                text = stringResource(R.string.alarm_time_format, alarmSettings.time.format(DateTimeFormatter.ofPattern("HH:mm"))),
                 fontSize = 18.sp,
                 color = Color.Gray
             )
@@ -513,7 +515,7 @@ private fun AlarmScreen(
                             tint = Color.White
                         )
                         Text(
-                            text = "Snooze\n${alarmSettings.snoozeMinutes}min",
+                            text = stringResource(R.string.alarm_snooze_format, alarmSettings.snoozeMinutes),
                             color = Color.White,
                             fontSize = 12.sp
                         )
@@ -537,7 +539,7 @@ private fun AlarmScreen(
                             tint = Color.White
                         )
                         Text(
-                            text = "Desligar",
+                            text = stringResource(R.string.alarm_turn_off),
                             color = Color.White,
                             fontSize = 12.sp
                         )

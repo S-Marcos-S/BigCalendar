@@ -123,6 +123,7 @@ data class CalendarUiState(
     val isTrashScreenOpen: Boolean = false,
     val isBackupScreenOpen: Boolean = false,
     val backupMessage: String? = null,
+    val isBackupError: Boolean = false,
     val isRestoringBackup: Boolean = false,
     val localBackupUriBeingRestored: String? = null,
     val restoreProgress: Float = 0f,
@@ -164,6 +165,7 @@ data class CalendarUiState(
     val isBackingUp: Boolean = false,
     val isRestoring: Boolean = false,
     val restoreMessage: String? = null,
+    val isRestoreError: Boolean = false,
     val autoBackupSettings: com.mss.thebigcalendar.data.repository.AutoBackupSettings = com.mss.thebigcalendar.data.repository.AutoBackupSettings(
         enabled = false,
         frequency = com.mss.thebigcalendar.data.repository.BackupFrequency.DAILY,

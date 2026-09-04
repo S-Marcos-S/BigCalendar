@@ -466,11 +466,11 @@ fun CalendarScreen(
                     if (uiState.showDuplicateDialog) {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { viewModel.dismissDuplicateDialog() },
-                            title = { Text("Agendamentos Duplicados") },
+                            title = { Text(stringResource(R.string.duplicate_activities_title)) },
                             text = {
                                 Column {
                                     Text(
-                                        text = "Foram encontrados agendamentos com as mesmas informações. Você pode apagá-los de forma individual ou remover todas as cópias extras de uma vez, mantendo apenas um.",
+                                        text = stringResource(R.string.duplicate_activities_desc),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.padding(bottom = 16.dp)
                                     )
@@ -480,7 +480,7 @@ fun CalendarScreen(
                                             uiState.duplicateGroups.forEachIndexed { groupIndex, group ->
                                                 item {
                                                     Text(
-                                                        text = "Grupo ${groupIndex + 1} (${group.first().title})",
+                                                        text = stringResource(R.string.duplicate_group_format, groupIndex + 1, group.first().title),
                                                         style = MaterialTheme.typography.titleSmall,
                                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -511,7 +511,7 @@ fun CalendarScreen(
                                                         IconButton(onClick = { viewModel.deleteActivityDirectly(activity.id) }) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Delete,
-                                                                contentDescription = "Apagar esta cópia",
+                                                                contentDescription = stringResource(R.string.delete_this_copy),
                                                                 tint = MaterialTheme.colorScheme.error
                                                             )
                                                         }
@@ -526,14 +526,14 @@ fun CalendarScreen(
                                 androidx.compose.material3.TextButton(
                                     onClick = { viewModel.removeAllDuplicates() }
                                 ) {
-                                    Text("Manter apenas um")
+                                    Text(stringResource(R.string.keep_only_one))
                                 }
                             },
                             dismissButton = {
                                 androidx.compose.material3.TextButton(
                                     onClick = { viewModel.dismissDuplicateDialog() }
                                 ) {
-                                    Text("Fechar")
+                                    Text(stringResource(R.string.close))
                                 }
                             }
                         )

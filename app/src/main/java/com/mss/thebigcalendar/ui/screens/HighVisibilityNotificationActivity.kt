@@ -520,7 +520,7 @@ private fun HighVisibilityNotificationScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "5min",
+                                text = stringResource(R.string.high_visibility_snooze_5min),
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -550,7 +550,7 @@ private fun HighVisibilityNotificationScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "30min",
+                                text = stringResource(R.string.high_visibility_snooze_30min),
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -580,7 +580,7 @@ private fun HighVisibilityNotificationScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "1h",
+                                text = stringResource(R.string.high_visibility_snooze_1hour),
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -611,7 +611,7 @@ private fun HighVisibilityNotificationScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "FINALIZAR",
+                            text = stringResource(R.string.high_visibility_finalize),
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold

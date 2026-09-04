@@ -179,7 +179,7 @@ class HighVisibilityNotificationService : Service() {
             .setContentIntent(mainPendingIntent)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Finalizar",
+                applicationContext.getString(R.string.onboarding_finish),
                 dismissPendingIntent
             )
             .setVibrate(longArrayOf(0, 500, 200, 500, 200, 500))

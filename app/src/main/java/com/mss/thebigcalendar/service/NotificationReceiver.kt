@@ -74,235 +74,121 @@ class NotificationReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val repository = ActivityRepository(context)
-                
-                // ✅ Verificar PRIMEIRO se a atividade ainda existe
                 val activities = repository.activities.first()
-                val activityExists = activities.any { 
-                    it.id == activityId || 
-                    (activityId?.contains("_") == true && it.id == activityId.split("_")[0])
+
+                // Extrair ID base
+                val baseId = if (activityId != null && activityId.contains("_")) {
+                    activityId.split("_")[0]
+                } else {
+                    activityId ?: ""
                 }
-                
-                if (!activityExists) {
-                    Log.d(TAG, "🔔 Atividade $activityId foi deletada - cancelando notificação sem exibir")
+
+                // Verificar se a atividade base existe no repositório
+                val baseActivity = activities.find { it.id == baseId }
+                if (baseActivity == null) {
+                    Log.d(TAG, "🔔 Atividade $activityId não existe no repositório (foi deletada) - cancelando notificação sem exibir")
                     val notificationService = NotificationService(context)
                     notificationService.cancelNotification(activityId ?: "")
                     return@launch
                 }
-                
-                // ✅ Verificar se a instância específica foi excluída ou concluída
-                val isExcluded = if (activityId != null && activityId.contains("_")) {
-                    val parts = activityId.split("_")
-                    val baseId = parts[0]
-                    val instanceDate = parts.getOrNull(1)
-                    val baseActivity = activities.find { it.id == baseId }
-                    if (baseActivity != null) {
-                        if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true) {
-                            baseActivity.excludedInstances.contains(activityId)
-                        } else {
-                            instanceDate != null && baseActivity.excludedDates.contains(instanceDate)
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-                
-                if (isExcluded) {
-                    Log.d(TAG, "🔔 Instância $activityId foi marcada como concluída/excluída - cancelando notificação sem exibir")
+
+                // Verificar se as notificações estão ativadas para esta atividade
+                if (!baseActivity.notificationSettings.isEnabled ||
+                    baseActivity.notificationSettings.notificationType == com.mss.thebigcalendar.data.model.NotificationType.NONE) {
+                    Log.d(TAG, "🔔 Notificações desativadas para atividade ${baseActivity.title} - cancelando sem exibir")
                     val notificationService = NotificationService(context)
                     notificationService.cancelNotification(activityId ?: "")
                     return@launch
                 }
-                
-                Log.d(TAG, "🔔 Atividade $activityId ainda existe - processando notificação")
-                
-                Log.d(TAG, "🔔 Buscando atividade com ID: $activityId")
-                Log.d(TAG, "🔔 Total de atividades no repositório: ${activities.size}")
-                
-                // ✅ Verificar se é uma instância recorrente (ID contém data)
-                val isRecurringInstance = activityId?.contains("_") == true && activityId.split("_").size == 2
-                
-                val realActivity = if (isRecurringInstance && activityId != null) {
-                    // Para instâncias recorrentes, buscar pela atividade base
-                    val parts = activityId.split("_")
-                    val baseId = parts.getOrNull(0) ?: ""
-                    val instanceDate = parts.getOrNull(1) ?: ""
-                    val baseActivity = activities.find { it.id == baseId }
-                    
-                    Log.d(TAG, "🔔 Instância recorrente - Base ID: $baseId, Data: $instanceDate")
-                    Log.d(TAG, "🔔 Atividade base encontrada: ${baseActivity != null}")
-                    
-                    if (baseActivity != null) {
-                        // Criar uma instância específica da atividade base
-                        baseActivity.copy(
-                            id = activityId,
-                            date = instanceDate
-                        )
-                    } else {
-                        null
-                    }
+
+                val recurrenceService = RecurrenceService()
+                val isRecurring = recurrenceService.isRecurring(baseActivity)
+
+                // Extrair a data para a qual este alarme foi disparado
+                val alarmDate = if (activityId != null && activityId.contains("_")) {
+                    activityId.split("_").getOrNull(1) ?: activityDate ?: ""
                 } else {
-                    // Para atividades únicas, buscar normalmente
-                    val foundActivity = activities.find { it.id == activityId }
-                    Log.d(TAG, "🔔 Atividade única encontrada: ${foundActivity != null}")
-                    if (foundActivity != null) {
-                        Log.d(TAG, "🔔 Atividade encontrada: ${foundActivity.title} - ID: ${foundActivity.id}")
-                    }
-                    foundActivity
+                    activityDate ?: baseActivity.date
                 }
-                
-                if (realActivity != null) {
-                    Log.d(TAG, "🔔 Atividade encontrada, exibindo notificação: ${realActivity.title}")
-                    Log.d(TAG, "🔔 Visibilidade da atividade: ${realActivity.visibility}")
-                    
-                    // ✅ Verificar se é notificação de alta visibilidade
-                    if (realActivity.visibility == com.mss.thebigcalendar.data.model.VisibilityLevel.HIGH) {
-                        Log.d(TAG, "🔔 Atividade de alta visibilidade - iniciando serviço especializado")
-                        
-                        // Iniciar serviço de alta visibilidade
-                        val highVisibilityIntent = Intent(context, com.mss.thebigcalendar.service.HighVisibilityNotificationService::class.java).apply {
-                            action = com.mss.thebigcalendar.service.HighVisibilityNotificationService.ACTION_SHOW_NOTIFICATION
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_ID, realActivity.id)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TITLE, realActivity.title)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DESCRIPTION, realActivity.description)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DATE, realActivity.date)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TIME, realActivity.startTime?.toString())
-                        }
-                        
-                        context.startService(highVisibilityIntent)
-                    } else {
-                        // ✅ Mudar para Main thread para exibir overlay normal
-                        withContext(Dispatchers.Main) {
-                            val notificationService = NotificationService(context)
-                            notificationService.showNotification(realActivity)
-                        }
-                    }
 
-                    // ✅ Agendar a próxima ocorrência APENAS se for uma atividade recorrente base
-                    // e não for uma instância específica (que já foi processada)
-                    val recurrenceService = RecurrenceService()
-                    val isRecurringBase = recurrenceService.isRecurring(realActivity) && !realActivity.id.contains("_")
-                    
-                    if (isRecurringBase) {
-                        Log.d(TAG, "🔔 Agendando próxima ocorrência para atividade recorrente: ${realActivity.title}")
-                        val nextOccurrenceDate = recurrenceService.getNextOccurrence(realActivity, java.time.LocalDate.parse(realActivity.date))
-                        if (nextOccurrenceDate != null) {
-                            val nextActivity = realActivity.copy(
-                                id = "${realActivity.id}_${nextOccurrenceDate}",
-                                date = nextOccurrenceDate.toString()
-                            )
-                            val notificationService = NotificationService(context)
-                            notificationService.scheduleNotification(nextActivity)
-                        }
-                    } else {
-                        Log.d(TAG, "🔔 Não agendando próxima ocorrência - atividade não é base recorrente ou já é instância específica")
+                if (!isRecurring) {
+                    // Para atividades NÃO RECORRENTES:
+                    // Se a data do alarme for diferente da data atual da atividade no repositório,
+                    // o agendamento foi remarcado para outra data! Este alarme é obsoleto (stale).
+                    if (alarmDate.isNotBlank() && alarmDate != baseActivity.date) {
+                        Log.d(TAG, "🔔 Alarme obsoleto detectado para atividade única ${baseActivity.title}. Data do alarme: $alarmDate, data atual: ${baseActivity.date}. Cancelando sem exibir.")
+                        val notificationService = NotificationService(context)
+                        notificationService.cancelNotification(activityId ?: "")
+                        return@launch
                     }
-                    
                 } else {
-                    Log.w(TAG, "⚠️ Atividade não encontrada no repositório, usando fallback")
-                    Log.w(TAG, "⚠️ IDs disponíveis: ${activities.map { it.id }}")
-                    
-                    // Fallback: criar uma atividade temporária se não encontrar a real
-                    val visibilityString = intent.getStringExtra(NotificationService.EXTRA_VISIBILITY) ?: VisibilityLevel.LOW.name
-                    val visibility = try {
-                        VisibilityLevel.valueOf(visibilityString)
-                    } catch (e: Exception) {
-                        VisibilityLevel.LOW
+                    // Para atividades RECORRENTES:
+                    // Verificar se a instância específica foi excluída ou marcada como concluída
+                    val isExcluded = if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true) {
+                        activityId != null && baseActivity.excludedInstances.contains(activityId)
+                    } else {
+                        alarmDate.isNotBlank() && baseActivity.excludedDates.contains(alarmDate)
                     }
 
-                    val tempActivity = com.mss.thebigcalendar.data.model.Activity(
-                        id = activityId ?: "unknown",
-                        title = activityTitle ?: "Atividade",
-                        description = null,
-                        date = activityDate ?: "",
-                        startTime = activityTime?.takeIf { it.isNotEmpty() && it != "null" }?.let { java.time.LocalTime.parse(it) },
-                        endTime = null,
-                        isAllDay = false,
-                        location = null,
-                        categoryColor = "#FF0000",
-                        activityType = com.mss.thebigcalendar.data.model.ActivityType.TASK,
-                        recurrenceRule = null,
-                        notificationSettings = com.mss.thebigcalendar.data.model.NotificationSettings(
-                            isEnabled = true,
-                            notificationType = com.mss.thebigcalendar.data.model.NotificationType.BEFORE_ACTIVITY
-                        ),
-                        visibility = visibility,
-                        showInCalendar = true
+                    if (isExcluded) {
+                        Log.d(TAG, "🔔 Instância $activityId foi marcada como concluída/excluída - cancelando notificação sem exibir")
+                        val notificationService = NotificationService(context)
+                        notificationService.cancelNotification(activityId ?: "")
+                        return@launch
+                    }
+                }
+
+                val realActivity = if (isRecurring) {
+                    baseActivity.copy(
+                        id = activityId ?: "${baseActivity.id}_$alarmDate",
+                        date = alarmDate
                     )
-                    
-                    // ✅ Verificar se é notificação de alta visibilidade
-                    if (tempActivity.visibility == com.mss.thebigcalendar.data.model.VisibilityLevel.HIGH) {
-                        Log.d(TAG, "🔔 Atividade de alta visibilidade (fallback) - iniciando serviço especializado")
-                        
-                        // Iniciar serviço de alta visibilidade
-                        val highVisibilityIntent = Intent(context, com.mss.thebigcalendar.service.HighVisibilityNotificationService::class.java).apply {
-                            action = com.mss.thebigcalendar.service.HighVisibilityNotificationService.ACTION_SHOW_NOTIFICATION
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_ID, tempActivity.id)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TITLE, tempActivity.title)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DESCRIPTION, tempActivity.description)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DATE, tempActivity.date)
-                            putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TIME, tempActivity.startTime?.toString())
-                        }
-                        
-                        context.startService(highVisibilityIntent)
-                    } else {
-                        // ✅ Mudar para Main thread para exibir overlay normal
-                        withContext(Dispatchers.Main) {
-                            val notificationService = NotificationService(context)
-                            notificationService.showNotification(tempActivity)
-                        }
-                    }
-                    
+                } else {
+                    baseActivity
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Erro ao buscar atividade no repositório", e)
-                
-                // Fallback em caso de erro
-                val notificationService = NotificationService(context)
-                val tempActivity = com.mss.thebigcalendar.data.model.Activity(
-                    id = activityId ?: "unknown",
-                    title = activityTitle ?: "Atividade",
-                    description = null,
-                    date = activityDate ?: "",
-                    startTime = activityTime?.takeIf { it.isNotEmpty() && it != "null" }?.let { java.time.LocalTime.parse(it) },
-                    endTime = null,
-                    isAllDay = false,
-                    location = null,
-                    categoryColor = "#FF0000",
-                    activityType = com.mss.thebigcalendar.data.model.ActivityType.TASK,
-                    recurrenceRule = null,
-                    notificationSettings = com.mss.thebigcalendar.data.model.NotificationSettings(
-                        isEnabled = true,
-                        notificationType = com.mss.thebigcalendar.data.model.NotificationType.BEFORE_ACTIVITY
-                    ),
-                    visibility = com.mss.thebigcalendar.data.model.VisibilityLevel.LOW,
-                    showInCalendar = true
-                )
-                
+
+                Log.d(TAG, "🔔 Atividade válida encontrada, exibindo notificação: ${realActivity.title}")
+                Log.d(TAG, "🔔 Visibilidade da atividade: ${realActivity.visibility}")
+
                 // ✅ Verificar se é notificação de alta visibilidade
-                if (tempActivity.visibility == com.mss.thebigcalendar.data.model.VisibilityLevel.HIGH) {
-                    Log.d(TAG, "🔔 Atividade de alta visibilidade (fallback 2) - iniciando serviço especializado")
-                    
-                    // Iniciar serviço de alta visibilidade
+                if (realActivity.visibility == com.mss.thebigcalendar.data.model.VisibilityLevel.HIGH) {
+                    Log.d(TAG, "🔔 Atividade de alta visibilidade - iniciando serviço especializado")
                     val highVisibilityIntent = Intent(context, com.mss.thebigcalendar.service.HighVisibilityNotificationService::class.java).apply {
                         action = com.mss.thebigcalendar.service.HighVisibilityNotificationService.ACTION_SHOW_NOTIFICATION
-                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_ID, tempActivity.id)
-                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TITLE, tempActivity.title)
-                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DESCRIPTION, tempActivity.description)
-                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DATE, tempActivity.date)
-                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TIME, tempActivity.startTime?.toString())
+                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_ID, realActivity.id)
+                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TITLE, realActivity.title)
+                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DESCRIPTION, realActivity.description)
+                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_DATE, realActivity.date)
+                        putExtra(com.mss.thebigcalendar.service.HighVisibilityNotificationService.EXTRA_ACTIVITY_TIME, realActivity.startTime?.toString())
                     }
-                    
                     context.startService(highVisibilityIntent)
                 } else {
-                    // ✅ Mudar para Main thread para exibir overlay normal
                     withContext(Dispatchers.Main) {
                         val notificationService = NotificationService(context)
-                        notificationService.showNotification(tempActivity)
+                        notificationService.showNotification(realActivity)
                     }
                 }
-                
+
+                // ✅ Se for recorrente, agendar a próxima ocorrência
+                if (isRecurring) {
+                    Log.d(TAG, "🔔 Agendando próxima ocorrência para atividade recorrente: ${baseActivity.title}")
+                    val currentLocalDate = try {
+                        java.time.LocalDate.parse(alarmDate)
+                    } catch (e: Exception) {
+                        java.time.LocalDate.now()
+                    }
+                    val nextOccurrenceDate = recurrenceService.getNextOccurrence(baseActivity, currentLocalDate)
+                    if (nextOccurrenceDate != null) {
+                        val nextActivity = baseActivity.copy(
+                            id = "${baseActivity.id}_${nextOccurrenceDate}",
+                            date = nextOccurrenceDate.toString()
+                        )
+                        val notificationService = NotificationService(context)
+                        notificationService.scheduleNotification(nextActivity)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Erro ao processar notificação no repositório", e)
             }
         }
     }
@@ -889,17 +775,17 @@ class NotificationReceiver : BroadcastReceiver() {
                         BackupType.LOCAL -> {
                             val directoryUriString = settingsRepository.backupDirectoryUri.first()
                             if (!directoryUriString.isNullOrBlank()) {
-                                backupService.createBackup(android.net.Uri.parse(directoryUriString))
+                                backupService.createBackup(android.net.Uri.parse(directoryUriString), showNotification = false)
                             } else {
-                                Result.failure(Exception("Diretório de backup local não configurado"))
+                                Result.failure(Exception(context.getString(com.mss.thebigcalendar.R.string.backup_error_local_dir_not_set)))
                             }
                         }
                         BackupType.CLOUD -> {
                             val account = googleAuthService.getLastSignedInAccount()
                             if (account != null) {
-                                backupService.createCloudBackup(account)
+                                backupService.createCloudBackup(account, showNotification = false)
                             } else {
-                                Result.failure(Exception("Conta Google não conectada"))
+                                Result.failure(Exception(context.getString(com.mss.thebigcalendar.R.string.backup_error_google_account_not_connected)))
                             }
                         }
                     }
@@ -920,7 +806,7 @@ class NotificationReceiver : BroadcastReceiver() {
                         } else {
                             notificationService.showAutoBackupFailedNotification(
                                 settings.backupType,
-                                result.exceptionOrNull()?.message ?: "Erro desconhecido"
+                                result.exceptionOrNull()?.message ?: context.getString(com.mss.thebigcalendar.R.string.unknown_error)
                             )
                             Log.e(TAG, "🔄 Falha ao executar backup automático: ${result.exceptionOrNull()?.message}")
                         }

@@ -75,10 +75,10 @@ class NotificationService(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val calendarChannel = NotificationChannel(
                 CHANNEL_ID,
-                CHANNEL_NAME,
+                context.getString(R.string.channel_calendar_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = CHANNEL_DESCRIPTION
+                description = context.getString(R.string.channel_calendar_description)
                 enableVibration(true)
                 enableLights(true)
                 setShowBadge(true)
@@ -93,10 +93,10 @@ class NotificationService(
 
             val backupChannel = NotificationChannel(
                 AUTO_BACKUP_CHANNEL_ID,
-                AUTO_BACKUP_CHANNEL_NAME,
+                context.getString(R.string.channel_auto_backup_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = AUTO_BACKUP_CHANNEL_DESCRIPTION
+                description = context.getString(R.string.channel_auto_backup_description)
                 setSound(null, null)
                 enableVibration(false)
             }
@@ -104,10 +104,10 @@ class NotificationService(
 
             val manualBackupChannel = NotificationChannel(
                 MANUAL_BACKUP_CHANNEL_ID,
-                MANUAL_BACKUP_CHANNEL_NAME,
+                context.getString(R.string.channel_manual_backup_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = MANUAL_BACKUP_CHANNEL_DESCRIPTION
+                description = context.getString(R.string.channel_manual_backup_description)
             }
             notificationManager.createNotificationChannel(manualBackupChannel)
         }
@@ -116,8 +116,8 @@ class NotificationService(
     fun showBackupInProgressNotification() {
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_upload)
-            .setContentTitle("Realizando backup")
-            .setContentText("Aguarde, o backup está em andamento...")
+            .setContentTitle(context.getString(R.string.backup_in_progress_title))
+            .setContentText(context.getString(R.string.backup_in_progress_desc))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .setProgress(0, 0, true)
@@ -125,28 +125,41 @@ class NotificationService(
     }
 
     fun showBackupCompleteNotification(fileName: String) {
+        val mainIntent = Intent(context, com.mss.thebigcalendar.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            1,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_done)
-            .setContentTitle("Backup concluído")
-            .setContentText("O arquivo $fileName foi salvo com sucesso.")
+            .setContentTitle(context.getString(R.string.backup_completed_title))
+            .setContentText(context.getString(R.string.backup_completed_desc, fileName))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
         notificationManager.notify(1, builder.build())
     }
 
     fun showBackupFailedNotification(error: String) {
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_off)
-            .setContentTitle("Falha no backup")
+            .setContentTitle(context.getString(R.string.backup_failed_title))
             .setContentText(error)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
         notificationManager.notify(1, builder.build())
     }
 
     fun showAutoBackupInProgressNotification() {
         val builder = NotificationCompat.Builder(context, AUTO_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_upload)
-            .setContentTitle("Realizando Backup Automático")
-            .setContentText("O backup agendado está sendo executado...")
+            .setContentTitle(context.getString(R.string.auto_backup_in_progress_title))
+            .setContentText(context.getString(R.string.auto_backup_in_progress_desc))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setOngoing(true)
             .setProgress(0, 0, true)
@@ -160,8 +173,8 @@ class NotificationService(
     fun showRestoreInProgressNotification() {
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_download)
-            .setContentTitle("Restaurando backup")
-            .setContentText("Aguarde, a restauração está em andamento...")
+            .setContentTitle(context.getString(R.string.restore_in_progress_title))
+            .setContentText(context.getString(R.string.restore_in_progress_desc))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .setProgress(0, 0, true)
@@ -169,45 +182,90 @@ class NotificationService(
     }
 
     fun showRestoreCompleteNotification(fileName: String) {
+        val mainIntent = Intent(context, com.mss.thebigcalendar.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            2,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_done)
-            .setContentTitle("Restauração concluída")
-            .setContentText("O backup do arquivo $fileName foi restaurado com sucesso.")
+            .setContentTitle(context.getString(R.string.restore_completed_title))
+            .setContentText(context.getString(R.string.restore_completed_desc, fileName))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
         notificationManager.notify(2, builder.build())
     }
 
     fun showRestoreFailedNotification(error: String) {
         val builder = NotificationCompat.Builder(context, MANUAL_BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_cloud_off)
-            .setContentTitle("Falha na restauração")
+            .setContentTitle(context.getString(R.string.restore_failed_title))
             .setContentText(error)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
         notificationManager.notify(2, builder.build())
     }
 
     fun showAutoBackupSuccessNotification(backupType: com.mss.thebigcalendar.data.repository.BackupType, backupPath: String) {
+        val contentText = when (backupType) {
+            com.mss.thebigcalendar.data.repository.BackupType.CLOUD -> context.getString(R.string.backup_cloud_success)
+            com.mss.thebigcalendar.data.repository.BackupType.LOCAL -> context.getString(R.string.backup_local_success)
+        }
+
+        val mainIntent = Intent(context, com.mss.thebigcalendar.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            AUTO_BACKUP_NOTIFICATION_ID,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, AUTO_BACKUP_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Backup Automático Concluído")
-            .setContentText(context.getString(R.string.backup_success_notification, backupType.name.lowercase()))
+            .setSmallIcon(R.drawable.ic_cloud_done)
+            .setContentTitle(context.getString(R.string.auto_backup_completed_title))
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        notificationManager.notify(AUTO_BACKUP_NOTIFICATION_ID, notification)
     }
 
     fun showAutoBackupFailedNotification(backupType: com.mss.thebigcalendar.data.repository.BackupType, errorMessage: String) {
+        val contentText = when (backupType) {
+            com.mss.thebigcalendar.data.repository.BackupType.CLOUD -> context.getString(R.string.backup_cloud_failed, errorMessage)
+            com.mss.thebigcalendar.data.repository.BackupType.LOCAL -> context.getString(R.string.backup_local_failed, errorMessage)
+        }
+
+        val mainIntent = Intent(context, com.mss.thebigcalendar.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            AUTO_BACKUP_NOTIFICATION_ID,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, AUTO_BACKUP_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("Falha no Backup Automático")
-            .setContentText(context.getString(R.string.backup_failed_notification, backupType.name.lowercase(), errorMessage))
+            .setSmallIcon(R.drawable.ic_cloud_off)
+            .setContentTitle(context.getString(R.string.auto_backup_failed_title))
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
             .build()
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        notificationManager.notify(AUTO_BACKUP_NOTIFICATION_ID, notification)
     }
 
     /**
@@ -216,6 +274,7 @@ class NotificationService(
     fun scheduleNotification(activity: Activity) {
         if (!activity.notificationSettings.isEnabled || 
             activity.notificationSettings.notificationType == com.mss.thebigcalendar.data.model.NotificationType.NONE) {
+            cancelActivityNotifications(activity)
             return
         }
         
@@ -237,7 +296,7 @@ class NotificationService(
             !activity.id.contains("_")
         ) {
             // Cancelar notificação anterior se existir
-            cancelNotification(activity.id)
+            cancelActivityNotifications(activity)
 
             val recurrenceService = com.mss.thebigcalendar.service.RecurrenceService()
             val baseDate = try {
@@ -270,7 +329,7 @@ class NotificationService(
         }
         
         // Cancelar notificação anterior se existir
-        cancelNotification(activity.id)
+        cancelActivityNotifications(activity)
         
         // ✅ Criar intent para exibir a notificação visual
         // Para atividades recorrentes, usar o ID da instância específica
@@ -377,35 +436,63 @@ class NotificationService(
         Log.d(TAG, "🔔 Cancelando notificação para atividade: $activityId")
         Log.d(TAG, "🔔 CANCELAMENTO DE NOTIFICAÇÃO INICIADO!")
         
-        // Cancelar o alarme agendado
-        val intent = Intent(context, NotificationReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
+        // Cancelar no AlarmManager:
+        // 1. Com ACTION_VIEW_ACTIVITY (ação usada ao agendar no scheduleNotification)
+        val intentWithAction = Intent(context, NotificationReceiver::class.java).apply {
+            action = ACTION_VIEW_ACTIVITY
+        }
+        val pendingIntentWithAction = PendingIntent.getBroadcast(
             context,
             activityId.hashCode(),
-            intent,
+            intentWithAction,
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.cancel(pendingIntent)
+        alarmManager.cancel(pendingIntentWithAction)
+
+        // 2. Sem action (fallback de compatibilidade com alarmes legados)
+        val intentWithoutAction = Intent(context, NotificationReceiver::class.java)
+        val pendingIntentWithoutAction = PendingIntent.getBroadcast(
+            context,
+            activityId.hashCode(),
+            intentWithoutAction,
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntentWithoutAction)
         
-        // Tentar cancelar também o alarme base (para casos de instâncias recorrentes)
+        // Se activityId contiver '_', cancelar também para o baseId
         if (activityId.contains("_")) {
             val baseId = activityId.split("_")[0]
-            val baseIntent = Intent(context, NotificationReceiver::class.java)
-            val basePendingIntent = PendingIntent.getBroadcast(
+            val baseIntentWithAction = Intent(context, NotificationReceiver::class.java).apply {
+                action = ACTION_VIEW_ACTIVITY
+            }
+            val basePendingIntentWithAction = PendingIntent.getBroadcast(
                 context,
                 baseId.hashCode(),
-                baseIntent,
+                baseIntentWithAction,
                 PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
             )
-            alarmManager.cancel(basePendingIntent)
-            Log.d(TAG, "🔔 Alarmes base e instância cancelados")
+            alarmManager.cancel(basePendingIntentWithAction)
+
+            val baseIntentWithoutAction = Intent(context, NotificationReceiver::class.java)
+            val basePendingIntentWithoutAction = PendingIntent.getBroadcast(
+                context,
+                baseId.hashCode(),
+                baseIntentWithoutAction,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(basePendingIntentWithoutAction)
+            Log.d(TAG, "🔔 Alarmes base e instância cancelados para: $activityId e $baseId")
         } else {
-            Log.d(TAG, "🔔 Alarme cancelado")
+            Log.d(TAG, "🔔 Alarme cancelado para: $activityId")
         }
         
         // ✅ CANCELAR WORKMANAGER BACKUP
         try {
             androidx.work.WorkManager.getInstance(context).cancelUniqueWork("notification_${activityId}")
+            if (activityId.contains("_")) {
+                val baseId = activityId.split("_")[0]
+                androidx.work.WorkManager.getInstance(context).cancelUniqueWork("notification_${baseId}")
+            }
             Log.d(TAG, "🔔 WorkManager backup cancelado para: $activityId")
         } catch (e: Exception) {
             Log.e(TAG, "🔔 Erro ao cancelar WorkManager backup", e)
@@ -432,6 +519,35 @@ class NotificationService(
     }
 
     /**
+     * Cancela todas as notificações de uma atividade específica, incluindo
+     * variações com data e horário no ID, além de instâncias recorrentes.
+     */
+    fun cancelActivityNotifications(activity: Activity) {
+        Log.d(TAG, "🔔 Cancelando todas as notificações da atividade: ${activity.title} (ID: ${activity.id}, Data: ${activity.date})")
+        
+        // 1. Cancelar usando o ID direto da atividade
+        cancelNotification(activity.id)
+        
+        // 2. Cancelar o ID formatado com a data: "${activity.id}_${activity.date}"
+        if (!activity.id.contains("_")) {
+            cancelNotification("${activity.id}_${activity.date}")
+            if (activity.startTime != null) {
+                val timeString = activity.startTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                cancelNotification("${activity.id}_${activity.date}_${timeString}")
+            }
+        } else {
+            val baseId = activity.id.split("_")[0]
+            cancelNotification(baseId)
+        }
+        
+        // 3. Se for atividade recorrente, cancelar todas as instâncias recorrentes
+        val recurrenceService = com.mss.thebigcalendar.service.RecurrenceService()
+        if (recurrenceService.isRecurring(activity)) {
+            cancelAllRecurringNotifications(activity)
+        }
+    }
+
+    /**
      * Cancela todas as notificações de uma atividade recorrente
      * Inclui todas as instâncias futuras que podem ter sido agendadas
      */
@@ -445,38 +561,40 @@ class NotificationService(
             // ✅ Cancelar WorkManager backups relacionados
             androidx.work.WorkManager.getInstance(context).cancelUniqueWork("notification_${baseActivity.id}")
             
-            // ✅ Para atividades HOURLY, cancelar apenas instâncias próximas (7 dias)
-            if (baseActivity.recurrenceRule?.startsWith("FREQ=HOURLY") == true && baseActivity.startTime != null) {
-                val timeString = baseActivity.startTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                val today = java.time.LocalDate.now()
-                
-                // ✅ Reduzir para apenas 7 dias para evitar loop infinito
-                for (i in -1..7) {
-                    val futureDate = today.plusDays(i.toLong())
-                    val instanceId = "${baseActivity.id}_${futureDate}_${timeString}"
-                    cancelNotification(instanceId)
-                }
-            } else {
-                // ✅ Para outras recorrências, cancelar apenas instâncias próximas (30 dias)
-                val today = java.time.LocalDate.now()
-                for (i in -1..30) {
-                    val futureDate = today.plusDays(i.toLong())
-                    val instanceId = "${baseActivity.id}_${futureDate}"
-                    cancelNotification(instanceId)
+            // ✅ Cancelar para a data base da atividade
+            cancelNotification("${baseActivity.id}_${baseActivity.date}")
+            val baseTimeString = baseActivity.startTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            if (baseTimeString != null) {
+                cancelNotification("${baseActivity.id}_${baseActivity.date}_${baseTimeString}")
+            }
+            
+            val today = java.time.LocalDate.now()
+            val timeString = baseActivity.startTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            
+            // ✅ Para atividades recorrentes, cancelar instâncias próximas (-7 a +60 dias)
+            for (i in -7..60) {
+                val futureDate = today.plusDays(i.toLong())
+                val instanceId = "${baseActivity.id}_${futureDate}"
+                cancelNotification(instanceId)
+                if (timeString != null) {
+                    cancelNotification("${baseActivity.id}_${futureDate}_${timeString}")
                 }
             }
             
-            // ✅ Cancelar alarmes por título (mais eficiente)
-            val titleHash = baseActivity.title.hashCode()
+            // Se a baseActivity tiver data distante no futuro (> 60 dias), cancelar na vizinhança da data base
             try {
-                alarmManager.cancel(PendingIntent.getBroadcast(
-                    context,
-                    titleHash,
-                    Intent(context, NotificationReceiver::class.java),
-                    PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-                ))
+                val baseDate = java.time.LocalDate.parse(baseActivity.date)
+                if (baseDate.isAfter(today.plusDays(60))) {
+                    for (i in -5..5) {
+                        val nearDate = baseDate.plusDays(i.toLong())
+                        cancelNotification("${baseActivity.id}_${nearDate}")
+                        if (timeString != null) {
+                            cancelNotification("${baseActivity.id}_${nearDate}_${timeString}")
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "⚠️ Erro ao cancelar alarme por título", e)
+                // Ignorar erro de parsing
             }
             
             Log.d(TAG, "🔔 Cancelamento de notificações recorrentes concluído")
@@ -606,7 +724,7 @@ class NotificationService(
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_calendar)
-            .setContentTitle("🔔 Lembrete: ${activity.title}")
+            .setContentTitle("🔔 " + context.getString(R.string.reminder_label, activity.title))
             .setContentText(getNotificationText(activity))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -615,22 +733,22 @@ class NotificationService(
             .setSound(soundUri)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Finalizado",
+                context.getString(R.string.notification_action_done),
                 dismissPendingIntent
             )
             .addAction(
                 android.R.drawable.ic_menu_revert,
-                "Adiar 5 min",
+                context.getString(R.string.notification_action_snooze_5min),
                 snooze5minPendingIntent
             )
             .addAction(
                 android.R.drawable.ic_menu_revert,
-                "Adiar 30 min",
+                context.getString(R.string.notification_action_snooze_30min),
                 snooze30minPendingIntent
             )
             .addAction(
                 android.R.drawable.ic_menu_revert,
-                "Adiar 1 hora",
+                context.getString(R.string.notification_action_snooze_1hour),
                 snooze1hourPendingIntent
             )
             .setVibrate(longArrayOf(0, 500, 200, 500)) // ✅ Adicionar vibração
@@ -648,12 +766,12 @@ class NotificationService(
      */
     private fun getNotificationText(activity: Activity): String {
         val timeText = if (activity.startTime != null) {
-            " às ${String.format("%02d:%02d", activity.startTime.hour, activity.startTime.minute)}"
+            "${context.getString(R.string.at_time_conjunction)}${String.format("%02d:%02d", activity.startTime.hour, activity.startTime.minute)}"
         } else {
             ""
         }
         
-        return "Atividade programada para hoje$timeText"
+        return context.getString(R.string.notification_activity_today, timeText)
     }
 
     /**

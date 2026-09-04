@@ -186,7 +186,7 @@ fun CalendarVisualizationSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = "Tamanho do calendário", style = MaterialTheme.typography.bodyLarge)
+                Text(text = stringResource(id = R.string.calendar_size), style = MaterialTheme.typography.bodyLarge)
                 Text(text = "%.2fx".format(sliderValue.floatValue), style = MaterialTheme.typography.bodyMedium)
             }
             Slider(
@@ -441,12 +441,12 @@ fun CalendarVisualizationSettingsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Language,
-                    contentDescription = "Idioma",
+                    contentDescription = stringResource(id = R.string.language_label),
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Idioma",
+                    text = stringResource(id = R.string.language_label),
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Spacer(modifier = Modifier.weight(1f))

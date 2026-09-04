@@ -130,7 +130,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     _uiState.update { it.copy(cloudBackupFiles = files, isListingCloudBackups = false) }
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isListingCloudBackups = false, cloudBackupError = "Failed to list cloud backups: ${error.message}") }
+                    _uiState.update { it.copy(
+                        isListingCloudBackups = false, 
+                        cloudBackupError = getApplication<Application>().getString(R.string.list_cloud_backups_failed, error.message ?: "")
+                    ) }
                 }
         }
     }
@@ -138,14 +141,22 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun createCloudBackup() {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isBackingUp = true, backupMessage = null) }
+            _uiState.update { it.copy(isBackingUp = true, backupMessage = null, isBackupError = false) }
             backupService.createCloudBackup(account)
                 .onSuccess {
-                    _uiState.update { it.copy(isBackingUp = false, backupMessage = "Cloud backup created successfully.") }
+                    _uiState.update { it.copy(
+                        isBackingUp = false, 
+                        backupMessage = getApplication<Application>().getString(R.string.cloud_backup_success),
+                        isBackupError = false
+                    ) }
                     listCloudBackups() // Refresh the list
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isBackingUp = false, backupMessage = "Cloud backup failed: ${error.message}") }
+                    _uiState.update { it.copy(
+                        isBackingUp = false, 
+                        backupMessage = getApplication<Application>().getString(R.string.cloud_backup_failed, error.message ?: ""),
+                        isBackupError = true
+                    ) }
                 }
         }
     }
@@ -153,7 +164,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun restoreFromCloudBackup(fileId: String, fileName: String, password: String? = null) {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isRestoring = true, restoreMessage = null) }
+            _uiState.update { it.copy(isRestoring = true, restoreMessage = null, isRestoreError = false) }
             backupService.restoreFromCloudBackup(account, fileId, fileName, password)
                 .onSuccess { restoreResult ->
                     // Cancelar alarmes existentes e limpar o repositório de alarmes
@@ -195,7 +206,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
                     _uiState.update { it.copy(
                         isRestoring = false, 
-                        restoreMessage = "Restored from ${restoreResult.backupFileName}",
+                        restoreMessage = getApplication<Application>().getString(R.string.restore_success, restoreResult.backupFileName),
+                        isRestoreError = false,
                         showDecryptionDialog = false,
                         decryptionCloudFileId = null,
                         decryptionCloudFileName = null,
@@ -213,7 +225,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             isRestoring = false
                         ) }
                     } else {
-                        _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restore failed: ${error.message}") }
+                        _uiState.update { it.copy(
+                            isRestoring = false, 
+                            restoreMessage = getApplication<Application>().getString(R.string.restore_failed, error.message ?: ""),
+                            isRestoreError = true
+                        ) }
                     }
                 }
         }
@@ -227,7 +243,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     listCloudBackups() // Refresh the list
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(cloudBackupError = "Failed to delete backup: ${error.message}") }
+                    _uiState.update { it.copy(
+                        cloudBackupError = getApplication<Application>().getString(R.string.delete_cloud_backup_failed, error.message ?: "")
+                    ) }
                 }
         }
     }
@@ -363,7 +381,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     Log.e("CalendarViewModel", "❌ Erro ao desativar criptografia", exception)
                     _uiState.update { it.copy(
                         isSyncing = false,
-                        syncErrorMessage = "Falha ao desativar criptografia: ${exception.message}"
+                        syncErrorMessage = getApplication<Application>().getString(R.string.disable_encryption_failed, exception.message ?: "")
                     ) }
                 }
         }
@@ -1610,6 +1628,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val activity = activityRepository.activities.first().find { it.id == activityId }
             if (activity != null) {
+                val notificationService = NotificationService(getApplication())
+                notificationService.cancelActivityNotifications(activity)
                 deletedActivityRepository.addDeletedActivity(activity)
             }
             activityRepository.deleteActivity(activityId)
@@ -1623,9 +1643,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val duplicates = getDuplicateGroups(allActs)
             if (duplicates.isEmpty()) return@launch
 
+            val notificationService = NotificationService(getApplication())
             duplicates.forEach { group ->
                 val toDelete = group.drop(1)
                 toDelete.forEach { act ->
+                    notificationService.cancelActivityNotifications(act)
                     deletedActivityRepository.addDeletedActivity(act)
                     activityRepository.deleteActivity(act.id)
                 }
@@ -1694,7 +1716,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
                         getApplication(),
-                        "Já existe um agendamento idêntico!",
+                        getApplication<Application>().getString(R.string.duplicate_activity_exists),
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                 }
@@ -1731,16 +1753,24 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Salvar a atividade base atualizada
                     activityRepository.saveActivity(updatedBaseActivity)
                     
-                    // Agendar notificação se configurada - usar a instância específica com data correta
+                    val notificationService = NotificationService(getApplication())
+                    // Cancelar notificação da instância anterior
+                    notificationService.cancelNotification(activityData.id)
+                    val originalInstanceDate = activityData.id.split("_").getOrNull(1)
+                    if (originalInstanceDate != null) {
+                        notificationService.cancelNotification("${baseId}_$originalInstanceDate")
+                    }
+
+                    // Agendar notificação se configurada - usar a instância com a data atualizada
                     if (activityData.notificationSettings.isEnabled &&
                         activityData.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE) {
                         
-                        // Extrair a data da instância específica do ID
-                        val instanceDate = activityData.id.split("_").getOrNull(1)
-                        if (instanceDate != null) {
-                            // Criar uma cópia da atividade com a data correta da instância
-                            val instanceActivity = activityData.copy(date = instanceDate)
-                            val notificationService = NotificationService(getApplication())
+                        val targetDate = activityData.date.takeIf { it.isNotBlank() } ?: originalInstanceDate
+                        if (targetDate != null) {
+                            val instanceActivity = activityData.copy(
+                                id = "${baseId}_$targetDate",
+                                date = targetDate
+                            )
                             notificationService.scheduleNotification(instanceActivity)
                         }
                     }
@@ -1773,6 +1803,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val existingActivity = if (activityToSave.id != "new") {
                 _uiState.value.activities.find { it.id == activityToSave.id }
             } else null
+
+            // Cancelar notificações da atividade anterior (cobrindo alteração de data, horário, recorrência ou desativação de notificações)
+            val notificationService = NotificationService(getApplication())
+            if (existingActivity != null) {
+                notificationService.cancelActivityNotifications(existingActivity)
+            }
 
             val repetitionChanged = existingActivity?.let { existing ->
                 existing.recurrenceRule != activityToSave.recurrenceRule
@@ -1808,25 +1844,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             activityRepository.saveActivity(activityToSave)
 
             // ✅ Agendar notificação se configurada
-            
             if (activityToSave.notificationSettings.isEnabled &&
                 activityToSave.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE) {
-
-                
-                // Para atividades repetitivas, agendar notificação para a data selecionada
-                val activityForNotification = if (activityToSave.recurrenceRule?.isNotEmpty() == true) {
-                    // Se é uma atividade repetitiva, usar a data selecionada no calendário
-                    activityToSave.copy(date = _uiState.value.selectedDate.toString())
-                } else {
-                    // Se não é repetitiva, usar a data original
-                    activityToSave
-                }
-
-                
-                val notificationService = NotificationService(getApplication())
-                notificationService.scheduleNotification(activityForNotification)
-
-            } else {
+                notificationService.scheduleNotification(activityToSave)
             }
 
             // NOTA: Não geramos mais instâncias repetitivas automaticamente
@@ -2320,6 +2340,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
                         
                     } else {
+                        // Cancelar notificações da atividade única
+                        notificationService.cancelActivityNotifications(activityToDelete)
+
                         // Mover para a lixeira
                         deletedActivityRepository.addDeletedActivity(activityToDelete)
                         
@@ -2359,17 +2382,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 val result = backupService.createBackup(Uri.parse(directoryUri))
                 result.fold(
                     onSuccess = { backupFileName ->
-                        _uiState.update { it.copy(backupMessage = "Backup criado com sucesso: $backupFileName") }
+                        _uiState.update { it.copy(
+                            backupMessage = getApplication<Application>().getString(R.string.backup_created_success, backupFileName),
+                            isBackupError = false
+                        ) }
                         loadBackupFiles()
                     },
                     onFailure = { exception ->
                         Log.e("CalendarViewModel", "❌ Erro ao criar backup", exception)
-                        _uiState.update { it.copy(backupMessage = "Erro ao criar backup: ${exception.message}") }
+                        _uiState.update { it.copy(
+                            backupMessage = getApplication<Application>().getString(R.string.backup_create_failed, exception.message ?: ""),
+                            isBackupError = true
+                        ) }
                     }
                 )
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro inesperado durante backup", e)
-                _uiState.update { it.copy(backupMessage = "Erro inesperado: ${e.message}") }
+                _uiState.update { it.copy(
+                    backupMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: ""),
+                    isBackupError = true
+                ) }
             }
         }
     }
@@ -2387,13 +2419,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(needsBackupDirectorySelection = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Falha ao salvar o diretório de backup", e)
-                _uiState.update { it.copy(backupMessage = "Falha ao definir o diretório de backup.") }
+                _uiState.update { it.copy(
+                    backupMessage = getApplication<Application>().getString(R.string.backup_dir_set_failed),
+                    isBackupError = true
+                ) }
             }
         }
     }
 
     fun clearBackupMessage() {
-        _uiState.update { it.copy(backupMessage = null, needsBackupDirectorySelection = false) }
+        _uiState.update { it.copy(backupMessage = null, isBackupError = false, needsBackupDirectorySelection = false) }
     }
 
     fun onRestoreRequest() { println("ViewModel: Pedido de restauração recebido.") }
@@ -3075,7 +3110,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         } else {
                             _uiState.update { it.copy(
                                 isSyncing = false,
-                                syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                                syncErrorMessage = getApplication<Application>().getString(R.string.sync_failed, exception.message ?: "")
                             ) }
                         }
                     }
@@ -3083,7 +3118,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização com o Drive", e)
                 _uiState.update { it.copy(
                     isSyncing = false,
-                    syncErrorMessage = "Erro inesperado: ${e.message}"
+                    syncErrorMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: "")
                 ) }
             }
         }
@@ -3128,7 +3163,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         Log.e("CalendarViewModel", "❌ Erro na sincronização progressiva", exception)
                         _uiState.update { it.copy(
                             isSyncing = false,
-                            syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                            syncErrorMessage = getApplication<Application>().getString(R.string.sync_failed, exception.message ?: "")
                         ) }
                     }
                 )
@@ -3137,7 +3172,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização", e)
                 _uiState.update { it.copy(
                     isSyncing = false,
-                    syncErrorMessage = "Erro inesperado: ${e.message}"
+                    syncErrorMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: "")
                 ) }
             }
         }
@@ -3368,7 +3403,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(backupFiles = backupInfos, isListingLocalBackups = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro ao carregar arquivos de backup via SAF", e)
-                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.", isListingLocalBackups = false) }
+                _uiState.update { it.copy(
+                    backupFiles = emptyList(), 
+                    backupMessage = getApplication<Application>().getString(R.string.backup_load_failed), 
+                    isBackupError = true,
+                    isListingLocalBackups = false
+                ) }
             }
         }
     }
@@ -3378,11 +3418,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val result = backupService.deleteBackupFile(Uri.parse(backupUri))
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(backupMessage = "Backup deletado com sucesso") }
+                    _uiState.update { it.copy(
+                        backupMessage = getApplication<Application>().getString(R.string.backup_deleted_success),
+                        isBackupError = false
+                    ) }
                     loadBackupFiles()
                 },
                 onFailure = { exception ->
-                    _uiState.update { it.copy(backupMessage = "Erro ao deletar backup: ${exception.message}") }
+                    _uiState.update { it.copy(
+                        backupMessage = getApplication<Application>().getString(R.string.backup_delete_failed, exception.message ?: ""),
+                        isBackupError = true
+                    ) }
                 }
             )
         }
@@ -3393,6 +3439,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             try {
                 _uiState.update { it.copy(
                     backupMessage = null,
+                    isBackupError = false,
                     isRestoringBackup = true,
                     localBackupUriBeingRestored = backupUri,
                     restoreProgress = 0f
@@ -3428,7 +3475,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
 
                         _uiState.update { it.copy(
-                            backupMessage = "Backup restaurado com sucesso!",
+                            backupMessage = getApplication<Application>().getString(R.string.backup_restored_success),
+                            isBackupError = false,
                             showDecryptionDialog = false,
                             decryptionBackupUri = null,
                             decryptionErrorMessage = null
@@ -3460,7 +3508,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             ) }
                         } else {
                             _uiState.update { it.copy(
-                                backupMessage = "Erro ao restaurar backup: ${exception.message}",
+                                backupMessage = getApplication<Application>().getString(R.string.backup_restore_failed, exception.message ?: ""),
+                                isBackupError = true,
                                 isRestoringBackup = false,
                                 localBackupUriBeingRestored = null
                             ) }
@@ -3470,7 +3519,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
             } catch (e: Exception) {
                 _uiState.update { it.copy(
-                    backupMessage = "Erro inesperado: ${e.message}",
+                    backupMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: ""),
+                    isBackupError = true,
                     isRestoringBackup = false,
                     localBackupUriBeingRestored = null
                 ) }
