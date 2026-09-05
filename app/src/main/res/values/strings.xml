@@ -749,6 +749,7 @@
     <string name="custom_repetition_days">Dias</string>
     <string name="custom_repetition_weeks">Semanas</string>
     <string name="custom_repetition_months">Meses</string>
+    <string name="custom_repetition_years">Anos</string>
     <string name="custom_repetition_date_placeholder">DD/MM/AAAA</string>
     <string name="custom_repetition_quantity">Quantidade</string>
     <string name="custom_repetition_save_configuration">Salvar Configuração</string>

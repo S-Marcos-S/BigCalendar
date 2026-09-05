@@ -2,6 +2,7 @@ package com.mss.thebigcalendar.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -149,7 +150,9 @@ fun CustomRepetitionScreen(
                     )
                     
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
@@ -171,6 +174,11 @@ fun CustomRepetitionScreen(
                             onClick = { repetitionType = "months" },
                             label = { Text(stringResource(id = R.string.custom_repetition_months)) },
                             selected = repetitionType == "months"
+                        )
+                        FilterChip(
+                            onClick = { repetitionType = "years" },
+                            label = { Text(stringResource(id = R.string.custom_repetition_years)) },
+                            selected = repetitionType == "years"
                         )
                     }
                 }
@@ -219,6 +227,7 @@ fun CustomRepetitionScreen(
                                 "days" -> if (interval == 1) "dia" else "dias"
                                 "weeks" -> if (interval == 1) "semana" else "semanas"
                                 "months" -> if (interval == 1) "mês" else "meses"
+                                "years" -> if (interval == 1) "ano" else "anos"
                                 else -> "horas"
                             }
                         )
@@ -391,6 +400,7 @@ private fun buildCustomRecurrenceRule(
         "days" -> "DAILY"
         "weeks" -> "WEEKLY"
         "months" -> "MONTHLY"
+        "years" -> "YEARLY"
         else -> "DAILY"
     }
     
@@ -461,6 +471,7 @@ private fun parseExistingRule(rule: String): ParsedRule {
             "DAILY" -> "days"
             "WEEKLY" -> "weeks"
             "MONTHLY" -> "months"
+            "YEARLY" -> "years"
             else -> "days"
         }
         

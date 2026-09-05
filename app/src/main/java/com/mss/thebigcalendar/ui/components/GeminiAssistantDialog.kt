@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Note
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
@@ -79,6 +80,7 @@ import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity as CalendarActivity
 import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.model.GeminiCommandResult
+import com.mss.thebigcalendar.service.RecurrenceService
 import java.util.Locale
 
 @Composable
@@ -503,6 +505,33 @@ fun GeminiAssistantDialog(
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(16.dp)
                                         )
+                                    }
+                                }
+
+                                // Informações de Repetição / Recorrência
+                                if (!lastActivity.recurrenceRule.isNullOrEmpty() && lastActivity.recurrenceRule != "NONE") {
+                                    val recurrenceService = remember { RecurrenceService() }
+                                    val recurrenceText = remember(lastActivity.recurrenceRule) {
+                                        recurrenceService.formatRecurrenceRuleForDisplay(lastActivity.recurrenceRule)
+                                    }
+                                    if (recurrenceText.isNotBlank()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = stringResource(id = R.string.repeat),
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = recurrenceText,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 }
 

@@ -2059,11 +2059,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Verificar se a data alvo é um múltiplo de anos a partir da data base
                     val yearsDiff = ChronoUnit.YEARS.between(baseDate, targetDate)
                     if (yearsDiff > 0) {
-                        val instance = baseActivity.copy(
-                            id = "${baseActivity.id}_${targetDate}",
-                            date = targetDate.toString()
-                        )
-                        instances.add(instance)
+                        val targetDay = minOf(baseDate.dayOfMonth, targetDate.lengthOfMonth())
+                        val adjustedDate = targetDate.withDayOfMonth(targetDay)
+                        if (baseDate.month == targetDate.month && adjustedDate.isEqual(targetDate)) {
+                            val instance = baseActivity.copy(
+                                id = "${baseActivity.id}_${targetDate}",
+                                date = targetDate.toString()
+                            )
+                            instances.add(instance)
+                        }
                     }
                 }
                 else -> {
@@ -4456,6 +4460,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     ActivityType.COMMEMORATIVE -> "#8B5CF6"
                 }
 
+                val recurrenceRule = recurrenceService.normalizeRecurrenceRule(command.recurrenceRule)
+
                 val newActivity = Activity(
                     id = UUID.randomUUID().toString(),
                     title = command.title?.ifBlank { "Nova atividade" } ?: "Nova atividade",
@@ -4467,7 +4473,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     location = null,
                     categoryColor = categoryColor,
                     activityType = actType,
-                    recurrenceRule = null,
+                    recurrenceRule = recurrenceRule,
                     notificationSettings = NotificationSettings(
                         isEnabled = command.notificationEnabled,
                         notificationType = if (command.notificationEnabled) {
@@ -4518,6 +4524,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
 
                 if (target != null) {
+                    val updatedRecurrenceRule = if (command.recurrenceRule != null) {
+                        recurrenceService.normalizeRecurrenceRule(command.recurrenceRule)
+                    } else {
+                        target.recurrenceRule
+                    }
+
                     val updated = target.copy(
                         title = command.title ?: target.title,
                         date = command.date ?: target.date,
@@ -4525,6 +4537,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         startTime = command.startTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.startTime } } ?: target.startTime,
                         endTime = command.endTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.endTime } } ?: target.endTime,
                         isAllDay = command.isAllDay,
+                        recurrenceRule = updatedRecurrenceRule,
                         notificationSettings = if (command.notificationEnabled) {
                             target.notificationSettings.copy(
                                 isEnabled = true,
@@ -4534,6 +4547,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         } else target.notificationSettings,
                         lastModified = System.currentTimeMillis()
                     )
+
+                    // Se a repetição mudou e foi removida, remover instâncias antigas
+                    if (target.recurrenceRule != updated.recurrenceRule &&
+                        (updated.recurrenceRule.isNullOrEmpty() || updated.recurrenceRule == "NONE")) {
+                        removeRecurringInstances(target)
+                    }
 
                     activityRepository.saveActivity(updated)
                     if (updated.notificationSettings.isEnabled) {
@@ -4695,6 +4714,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 GeminiAction.CREATE -> {
                     if (lastActivity != null) {
                         notificationService.cancelActivityNotifications(lastActivity)
+                        if (!lastActivity.recurrenceRule.isNullOrEmpty() && lastActivity.recurrenceRule != "NONE") {
+                            removeRecurringInstances(lastActivity)
+                        }
                         activityRepository.deleteActivity(lastActivity.id)
                     }
                 }

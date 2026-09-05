@@ -733,6 +733,7 @@
     <string name="custom_repetition_days">Дни</string>
     <string name="custom_repetition_weeks">Недели</string>
     <string name="custom_repetition_months">Месяцы</string>
+    <string name="custom_repetition_years">Лет</string>
     <string name="custom_repetition_date_placeholder">ДД.ММ.ГГГГ</string>
     <string name="custom_repetition_quantity">Количество</string>
     <string name="custom_repetition_save_configuration">Сохранить настройки</string>

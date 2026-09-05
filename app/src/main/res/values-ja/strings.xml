@@ -733,6 +733,7 @@
     <string name="custom_repetition_days">日</string>
     <string name="custom_repetition_weeks">週間</string>
     <string name="custom_repetition_months">ヶ月</string>
+    <string name="custom_repetition_years">年</string>
     <string name="custom_repetition_date_placeholder">YYYY/MM/DD</string>
     <string name="custom_repetition_quantity">数量</string>
     <string name="custom_repetition_save_configuration">設定を保存</string>

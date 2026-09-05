@@ -30,7 +30,7 @@ class RecurrenceService {
         
         // Gerar instâncias recorrentes
         when (recurrenceRule) {
-            "HOURLY" -> generateHourlyInstances(baseActivity, baseDate, startDate, endDate, instances)
+            "HOURLY" -> generateCustomHourlyInstancesWithCount(baseActivity, baseDate, startDate, endDate, 1, null, instances)
             "DAILY" -> generateDailyInstances(baseActivity, baseDate, startDate, endDate, instances)
             "WEEKLY" -> generateWeeklyInstances(baseActivity, baseDate, startDate, endDate, instances)
             "MONTHLY" -> generateMonthlyInstances(baseActivity, baseDate, startDate, endDate, instances)
@@ -547,5 +547,160 @@ class RecurrenceService {
         }
         
         return occurrences
+    }
+
+    /**
+     * Normaliza qualquer formato de regra de repetição para o padrão suportado pelo app.
+     * Suporta:
+     * - Horas: "FREQ=HOURLY;INTERVAL=N"
+     * - Dias: "DAILY" ou "FREQ=DAILY;INTERVAL=N"
+     * - Semanas: "WEEKLY" ou "FREQ=WEEKLY;INTERVAL=N"
+     * - Meses: "MONTHLY" ou "FREQ=MONTHLY;INTERVAL=N"
+     * - Anos: "YEARLY" ou "FREQ=YEARLY;INTERVAL=N"
+     * Retorna null se não houver repetição.
+     */
+    fun normalizeRecurrenceRule(rule: String?): String? {
+        if (rule.isNullOrBlank()) return null
+        val clean = rule.trim()
+        if (clean.equals("NONE", ignoreCase = true) || clean.equals("null", ignoreCase = true)) return null
+
+        val upper = clean.uppercase()
+        if (upper == "DAILY" || upper == "WEEKLY" || upper == "MONTHLY" || upper == "YEARLY") {
+            return upper
+        }
+        if (upper == "HOURLY") {
+            return "FREQ=HOURLY;INTERVAL=1"
+        }
+
+        // Formato padrão iCal / RRULE: FREQ=...
+        if (upper.contains("FREQ=")) {
+            val parts = clean.split(";").map { it.trim() }
+            val freqPart = parts.find { it.startsWith("FREQ=", ignoreCase = true) }?.substringAfter("=")?.uppercase() ?: "DAILY"
+            val intervalPart = parts.find { it.startsWith("INTERVAL=", ignoreCase = true) }?.substringAfter("=")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+            val byDayPart = parts.find { it.startsWith("BYDAY=", ignoreCase = true) }?.substringAfter("=")?.uppercase()
+            val untilPart = parts.find { it.startsWith("UNTIL=", ignoreCase = true) }?.substringAfter("=")
+            val countPart = parts.find { it.startsWith("COUNT=", ignoreCase = true) }?.substringAfter("=")?.toIntOrNull()
+
+            val freq = when (freqPart) {
+                "HOURLY" -> "HOURLY"
+                "DAILY" -> "DAILY"
+                "WEEKLY" -> "WEEKLY"
+                "MONTHLY" -> "MONTHLY"
+                "YEARLY" -> "YEARLY"
+                else -> "DAILY"
+            }
+
+            // Se for intervalo 1 e sem filtros extras, simplificar para o formato padrão do app
+            if (intervalPart == 1 && byDayPart.isNullOrEmpty() && untilPart.isNullOrEmpty() && countPart == null) {
+                return if (freq == "HOURLY") "FREQ=HOURLY;INTERVAL=1" else freq
+            }
+
+            val sb = StringBuilder("FREQ=$freq;INTERVAL=$intervalPart")
+            if (!byDayPart.isNullOrEmpty()) {
+                sb.append(";BYDAY=$byDayPart")
+            }
+            if (!untilPart.isNullOrEmpty()) {
+                sb.append(";UNTIL=$untilPart")
+            }
+            if (countPart != null && countPart > 0) {
+                sb.append(";COUNT=$countPart")
+            }
+            return sb.toString()
+        }
+
+        // Reconhecimento de linguagem natural (caso o Gemini ou o usuário passe texto informal)
+        val hourMatch = Regex("""(?:a cada|every|de)\s*(\d+)\s*(?:horas?|hours?|h)""", RegexOption.IGNORE_CASE).find(clean)
+            ?: Regex("""(\d+)\s*(?:horas?|hours?|h)""", RegexOption.IGNORE_CASE).find(clean)
+        if (hourMatch != null) {
+            val n = hourMatch.groupValues[1].toIntOrNull() ?: 1
+            return "FREQ=HOURLY;INTERVAL=$n"
+        }
+
+        val dayMatch = Regex("""(?:a cada|every|de)\s*(\d+)\s*(?:dias?|days?|d)""", RegexOption.IGNORE_CASE).find(clean)
+        if (dayMatch != null) {
+            val n = dayMatch.groupValues[1].toIntOrNull() ?: 1
+            return if (n <= 1) "DAILY" else "FREQ=DAILY;INTERVAL=$n"
+        }
+
+        val weekMatch = Regex("""(?:a cada|every|de)\s*(\d+)\s*(?:semanas?|weeks?|sem)""", RegexOption.IGNORE_CASE).find(clean)
+        if (weekMatch != null) {
+            val n = weekMatch.groupValues[1].toIntOrNull() ?: 1
+            return if (n <= 1) "WEEKLY" else "FREQ=WEEKLY;INTERVAL=$n"
+        }
+
+        val monthMatch = Regex("""(?:a cada|every|de)\s*(\d+)\s*(?:meses?|months?|mês)""", RegexOption.IGNORE_CASE).find(clean)
+        if (monthMatch != null) {
+            val n = monthMatch.groupValues[1].toIntOrNull() ?: 1
+            return if (n <= 1) "MONTHLY" else "FREQ=MONTHLY;INTERVAL=$n"
+        }
+
+        val yearMatch = Regex("""(?:a cada|every|de)\s*(\d+)\s*(?:anos?|years?|a)""", RegexOption.IGNORE_CASE).find(clean)
+        if (yearMatch != null) {
+            val n = yearMatch.groupValues[1].toIntOrNull() ?: 1
+            return if (n <= 1) "YEARLY" else "FREQ=YEARLY;INTERVAL=$n"
+        }
+
+        if (Regex("""(?:hora em hora|de hora em hora)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "FREQ=HOURLY;INTERVAL=1"
+        }
+        if (Regex("""(?:dia sim dia n[aã]o|dia sim, dia n[aã]o)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "FREQ=DAILY;INTERVAL=2"
+        }
+        if (Regex("""(?:todo dia|todos os dias|diari[aá]ri?o|daily)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "DAILY"
+        }
+        if (Regex("""(?:toda semana|todas as semanas|semanal|weekly)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "WEEKLY"
+        }
+        if (Regex("""(?:todo m[eê]s|todos os meses|mensal|monthly)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "MONTHLY"
+        }
+        if (Regex("""(?:todo ano|todos os anos|anual|yearly|annual)""", RegexOption.IGNORE_CASE).containsMatchIn(clean)) {
+            return "YEARLY"
+        }
+
+        return null
+    }
+
+    /**
+     * Retorna uma descrição amigável da regra de repetição para exibição
+     */
+    fun formatRecurrenceRuleForDisplay(rule: String?): String {
+        if (rule.isNullOrBlank() || rule == "NONE") return ""
+        val clean = rule.trim()
+        return when (clean) {
+            "DAILY" -> "Repete todos os dias"
+            "WEEKLY" -> "Repete toda semana"
+            "MONTHLY" -> "Repete todo mês"
+            "YEARLY" -> "Repete todo ano"
+            else -> {
+                if (clean.startsWith("FREQ=")) {
+                    val parts = clean.split(";")
+                    val freq = parts.find { it.startsWith("FREQ=") }?.substringAfter("=") ?: "DAILY"
+                    val interval = parts.find { it.startsWith("INTERVAL=") }?.substringAfter("=")?.toIntOrNull() ?: 1
+                    val until = parts.find { it.startsWith("UNTIL=") }?.substringAfter("=")
+                    val count = parts.find { it.startsWith("COUNT=") }?.substringAfter("=")?.toIntOrNull()
+
+                    val baseText = when (freq) {
+                        "HOURLY" -> if (interval == 1) "Repete a cada hora" else "Repete a cada $interval horas"
+                        "DAILY" -> if (interval == 1) "Repete todos os dias" else "Repete a cada $interval dias"
+                        "WEEKLY" -> if (interval == 1) "Repete toda semana" else "Repete a cada $interval semanas"
+                        "MONTHLY" -> if (interval == 1) "Repete todo mês" else "Repete a cada $interval meses"
+                        "YEARLY" -> if (interval == 1) "Repete todo ano" else "Repete a cada $interval anos"
+                        else -> "Repete a cada $interval dias"
+                    }
+
+                    val suffix = when {
+                        !until.isNullOrEmpty() -> " (até $until)"
+                        count != null && count > 0 -> " ($count vezes)"
+                        else -> ""
+                    }
+
+                    "$baseText$suffix"
+                } else {
+                    clean
+                }
+            }
+        }
     }
 }

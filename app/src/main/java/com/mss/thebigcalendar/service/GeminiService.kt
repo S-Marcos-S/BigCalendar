@@ -426,6 +426,7 @@ class GeminiService {
                 "date" to act.date,
                 "startTime" to act.startTime?.toString(),
                 "activityType" to act.activityType.name,
+                "recurrenceRule" to act.recurrenceRule,
                 "isCompleted" to act.isCompleted
             )
         }
@@ -477,6 +478,32 @@ RESOLUÇÃO DE HORÁRIOS:
   "startTime": null
   "endTime": null
 
+RECORRÊNCIA E REPETIÇÃO (recurrenceRule):
+Se o usuário solicitar que a atividade se repita ou seja recorrente, preencha o campo "recurrenceRule" estritamente de acordo com estes formatos:
+1. A cada N horas (ex: "a cada 8 horas", "de 4 em 4 horas", "a cada 6h", "a cada 2 horas"):
+   "recurrenceRule": "FREQ=HOURLY;INTERVAL=N" (ex: "FREQ=HOURLY;INTERVAL=8", "FREQ=HOURLY;INTERVAL=4")
+   * Para repetição por horas, se o usuário não especificar horário inicial, defina "isAllDay": false e "startTime": "$currentTime".
+2. A cada N dias (ex: "a cada 2 dias", "dia sim dia não", "a cada 3 dias"):
+   "recurrenceRule": "FREQ=DAILY;INTERVAL=N" (ex: "FREQ=DAILY;INTERVAL=2", "FREQ=DAILY;INTERVAL=3")
+3. Todos os dias / Diariamente (ex: "todo dia", "todos os dias", "diariamente"):
+   "recurrenceRule": "DAILY"
+4. Toda semana / Semanalmente (ex: "toda semana", "todas as semanas", "semanalmente", "toda terça", "toda segunda e quarta"):
+   - Semanal geral ou no mesmo dia da data: "recurrenceRule": "WEEKLY"
+   - A cada N semanas (ex: "a cada 2 semanas"): "recurrenceRule": "FREQ=WEEKLY;INTERVAL=N"
+   - Dias específicos da semana: "recurrenceRule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE" (onde SU=Dom, MO=Seg, TU=Ter, WE=Qua, TH=Qui, FR=Sex, SA=Sáb)
+5. Todo mês / Mensalmente (ex: "todo mês", "mensalmente", "todo dia 10", "mensal"):
+   - "recurrenceRule": "MONTHLY"
+   - A cada N meses (ex: "a cada 2 meses", "a cada 3 meses"): "recurrenceRule": "FREQ=MONTHLY;INTERVAL=N"
+6. Todo ano / Anualmente (ex: "todo ano", "anualmente", "todo ano nesse dia", "anual"):
+   "recurrenceRule": "YEARLY"
+7. A cada N anos (ex: "a cada 2 anos", "a cada 3 anos", "a cada 5 anos", "de 10 em 10 anos"):
+   "recurrenceRule": "FREQ=YEARLY;INTERVAL=N" (ex: "FREQ=YEARLY;INTERVAL=2", "FREQ=YEARLY;INTERVAL=5")
+8. Sem repetição / Evento único:
+   "recurrenceRule": null
+9. Data limite ou quantidade (se especificado pelo usuário):
+   - "até [data]": adicione ";UNTIL=yyyy-MM-dd" (ex: "FREQ=DAILY;INTERVAL=2;UNTIL=2026-12-31")
+   - "por N vezes": adicione ";COUNT=N" (ex: "FREQ=HOURLY;INTERVAL=8;COUNT=10")
+
 TIPOS DE ATIVIDADE:
 - "TASK": Tarefas diárias, lembretes, listas de compras, afazeres. (Padrão para lembretes).
 - "EVENT": Compromissos, reuniões, viagens, eventos com hora marcada.
@@ -498,6 +525,7 @@ AÇÕES SUPORTADAS:
 
 MENSAGEM DE RESPOSTA (replyMessage):
 - Sempre retorne uma frase amigável, clara e concisa no idioma do usuário (${locale.displayLanguage}) resumindo a ação feita ou respondendo à dúvida.
+- Se a atividade possuir repetição, confirme a frequência na replyMessage (ex: "Lembrete 'Tomar remédio' agendado a cada 8 horas.", "Reunião de equipe agendada para toda semana às 14:00.", "Renovação agendada para repetir a cada 5 anos.").
 - Essa mensagem poderá ser lida em voz alta para o usuário.
 
 FORMATO DE RESPOSTA OBRIGATÓRIO (JSON PURO):
@@ -512,6 +540,7 @@ Retorne única e exclusivamente um objeto JSON com esta estrutura:
   "description": "descrição formatada conforme as regras acima",
   "activityType": "TASK" | "EVENT" | "NOTE" | "BIRTHDAY",
   "visibility": "LOW" | "MEDIUM" | "HIGH",
+  "recurrenceRule": "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "FREQ=HOURLY;INTERVAL=N" | "FREQ=DAILY;INTERVAL=N" | "FREQ=YEARLY;INTERVAL=N" | null,
   "notificationEnabled": true | false,
   "notificationMinutesBefore": 0,
   "targetActivityId": "ID caso seja UPDATE ou DELETE ou null",

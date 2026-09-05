@@ -733,6 +733,7 @@
     <string name="custom_repetition_days">Tage</string>
     <string name="custom_repetition_weeks">Wochen</string>
     <string name="custom_repetition_months">Monate</string>
+    <string name="custom_repetition_years">Jahre</string>
     <string name="custom_repetition_date_placeholder">TT/MM/JJJJ</string>
     <string name="custom_repetition_quantity">Menge</string>
     <string name="custom_repetition_save_configuration">Konfiguration speichern</string>

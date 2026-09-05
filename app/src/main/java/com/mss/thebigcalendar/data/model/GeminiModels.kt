@@ -45,6 +45,9 @@ data class GeminiCommandResult(
     @SerializedName("visibility")
     val visibility: String? = "LOW", // "LOW", "MEDIUM", "HIGH"
 
+    @SerializedName("recurrenceRule")
+    val recurrenceRule: String? = null, // "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "FREQ=HOURLY;INTERVAL=N", "FREQ=DAILY;INTERVAL=N", "FREQ=YEARLY;INTERVAL=N", etc.
+
     @SerializedName("notificationEnabled")
     val notificationEnabled: Boolean = false,
 
