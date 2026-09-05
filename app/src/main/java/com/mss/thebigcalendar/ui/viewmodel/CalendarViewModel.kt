@@ -841,12 +841,31 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
 
     
+    /**
+     * Verifica e executa o rollover de tarefas não concluídas de dias anteriores para hoje.
+     * Atualiza o cache, a UI e os widgets caso alguma tarefa tenha sido movida.
+     */
+    fun checkAndPerformRollover() {
+        viewModelScope.launch {
+            val rolledCount = com.mss.thebigcalendar.service.RolloverManager.performRollover(getApplication())
+            if (rolledCount > 0) {
+                clearCalendarCache()
+                clearActivityCache()
+                updateAllDateDependentUI()
+                notifyWidgetsDataChanged()
+            }
+        }
+    }
+
     private fun loadData() {
         // Primeiro limpar atividades JSON antigas
         viewModelScope.launch {
             cleanupOldJsonActivities()
         }
         
+        // Executar rollover de tarefas não concluídas de dias anteriores
+        checkAndPerformRollover()
+
         // Carregar apenas as atividades do mês atual
         loadActivitiesForCurrentMonth()
         

@@ -51,6 +51,14 @@ class NotificationReceiver : BroadcastReceiver() {
                     // Reagendar todas as notificações após reinicialização
                     scheduleAllNotificationsAfterBoot(context)
                 }
+                RolloverManager.ACTION_MIDNIGHT_ROLLOVER -> {
+                    handleMidnightRollover(context)
+                }
+                Intent.ACTION_DATE_CHANGED,
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED -> {
+                    handleDateOrTimeChanged(context)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "🔔 Erro no NotificationReceiver", e)
@@ -694,6 +702,11 @@ class NotificationReceiver : BroadcastReceiver() {
                 
                 Log.d(TAG, "🔔 Todas as notificações foram reagendadas após reinicialização")
 
+                // Executar rollover de tarefas pendentes e agendar rollover de meia-noite
+                RolloverManager.performRollover(context)
+                RolloverManager.scheduleMidnightRollover(context)
+                Log.d(TAG, "🔄 Rollover e agendamento de meia-noite executados após reinicialização")
+
                 // Reagendar o backup automático
                 val settingsRepository = SettingsRepository(context)
                 val settings = settingsRepository.autoBackupSettings.first()
@@ -704,6 +717,42 @@ class NotificationReceiver : BroadcastReceiver() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "🔔 Erro ao reagendar notificações após reinicialização", e)
+            }
+        }
+    }
+
+    /**
+     * Trata o disparo do alarme exato de meia-noite para executar o rollover
+     */
+    private fun handleMidnightRollover(context: Context) {
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "🌙 Recebido ACTION_MIDNIGHT_ROLLOVER - executando rollover")
+                RolloverManager.performRollover(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Erro ao executar rollover de meia-noite", e)
+            } finally {
+                RolloverManager.scheduleMidnightRollover(context)
+                pendingResult.finish()
+            }
+        }
+    }
+
+    /**
+     * Trata a alteração de data, hora ou fuso horário pelo sistema
+     */
+    private fun handleDateOrTimeChanged(context: Context) {
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "📅 Mudança de data/hora detectada - executando rollover")
+                RolloverManager.performRollover(context)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Erro ao processar mudança de data/hora no rollover", e)
+            } finally {
+                RolloverManager.scheduleMidnightRollover(context)
+                pendingResult.finish()
             }
         }
     }

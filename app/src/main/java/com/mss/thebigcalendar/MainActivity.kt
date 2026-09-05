@@ -540,6 +540,11 @@ class MainActivity : ComponentActivity() {
         isActivityResumed = true
         // ✅ Marcar que a atividade já foi resumida pelo menos uma vez
         wasActivityResumedBefore = true
+        
+        // ✅ Verificar e executar rollover caso o app estivesse em segundo plano durante a virada do dia
+        if (::viewModel.isInitialized) {
+            viewModel.checkAndPerformRollover()
+        }
     }
     
     override fun onPause() {

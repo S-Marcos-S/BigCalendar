@@ -652,6 +652,14 @@ class NotificationService(
     }
 
     /**
+     * Calcula o timestamp exato em milissegundos para o disparo da notificação
+     */
+    fun getNotificationTriggerTime(activity: Activity): Long {
+        val notificationTime = calculateNotificationTime(activity)
+        return getTriggerTime(activity.date, notificationTime)
+    }
+
+    /**
      * Mostra uma notificação imediatamente (para testes)
      */
     fun showNotification(activity: Activity) {
