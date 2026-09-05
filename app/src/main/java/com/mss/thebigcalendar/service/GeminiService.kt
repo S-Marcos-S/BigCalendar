@@ -49,193 +49,199 @@ class GeminiService {
             )
         }
 
-        var cleanModel = (if (model.isBlank() || model.contains("2.5") || model.contains("1.5")) {
-            DEFAULT_MODEL
-        } else {
-            model.trim()
-        }).removePrefix("models/")
-
+        val primaryModel = (if (model.isBlank()) DEFAULT_MODEL else model.trim()).removePrefix("models/")
         val attemptsLog = mutableListOf<String>()
 
         try {
             val systemInstruction = buildSystemInstruction(existingActivities, userLocale)
-            var requestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = true)
+            val jsonRequestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = true)
+            val textRequestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = false)
 
-            // 1. Tentar com versão v1beta e o modelo configurado
-            attemptsLog.add("POST v1beta/models/$cleanModel")
-            var (code, body) = tryPostGenerateContent(
-                "https://generativelanguage.googleapis.com/v1beta/models/$cleanModel:generateContent?key=$cleanApiKey",
-                requestBody
-            )
+            // Fila de modelos prioritários para contingência automática (Geração Gemini 3.x)
+            val candidateModels = linkedSetOf<String>()
+            candidateModels.add(primaryModel)
+            listOf(
+                "gemini-3.8-flash",
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.6-pro"
+            ).forEach { candidateModels.add(it) }
 
-            // Se der erro 400 (ex: formato de resposta não suportado pelo modelo), retentar com payload simplificado sem response_mime_type
-            val isExplicitKeyError = code == 403 ||
-                    body.contains("API_KEY_INVALID", ignoreCase = true) ||
-                    body.contains("key not valid", ignoreCase = true) ||
-                    body.contains("API key not valid", ignoreCase = true) ||
-                    body.contains("PERMISSION_DENIED", ignoreCase = true)
+            val modelQueue = java.util.ArrayDeque(candidateModels)
+            val triedModels = mutableSetOf<String>()
 
-            if (code == 400 && !isExplicitKeyError) {
-                Log.w(TAG, "Tentando payload simplificado para $cleanModel...")
-                attemptsLog.add("POST v1beta/models/$cleanModel (sem response_mime_type)")
-                requestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = false)
-                val retry = tryPostGenerateContent(
-                    "https://generativelanguage.googleapis.com/v1beta/models/$cleanModel:generateContent?key=$cleanApiKey",
-                    requestBody
+            var lastCode = -1
+            var lastBody = ""
+
+            while (modelQueue.isNotEmpty()) {
+                val currentModel = modelQueue.removeFirst()
+                if (currentModel in triedModels) continue
+                triedModels.add(currentModel)
+
+                val isFallback = currentModel != primaryModel
+                val fallbackSuffix = if (isFallback) " (fallback automático)" else ""
+
+                // 1. Tentar com v1beta e formato JSON estrito
+                attemptsLog.add("POST v1beta/models/$currentModel$fallbackSuffix")
+                val (code, body) = tryPostGenerateContent(
+                    "https://generativelanguage.googleapis.com/v1beta/models/$currentModel:generateContent?key=$cleanApiKey",
+                    jsonRequestBody
                 )
-                if (retry.first == HttpURLConnection.HTTP_OK) {
-                    code = retry.first
-                    body = retry.second
+                lastCode = code
+                lastBody = body
+
+                // Se não há conexão com a internet, interrompe de imediato para não demorar
+                if (code == -1 && body.startsWith("NO_INTERNET")) {
+                    return@withContext GeminiExecutionResult.Error(
+                        message = "Sem conexão com a internet para contatar o Gemini.",
+                        details = buildTechnicalDetails(
+                            model = primaryModel,
+                            httpCode = -1,
+                            responseBody = "Falha de conexão com a internet / DNS indisponível.\n$body",
+                            attempts = attemptsLog
+                        )
+                    )
                 }
-            }
 
-            var isModelError = code == 404 ||
-                    body.contains("no longer available", ignoreCase = true) ||
-                    body.contains("not found for API version", ignoreCase = true) ||
-                    body.contains("not supported for generateContent", ignoreCase = true) ||
-                    (code == 400 && !isExplicitKeyError)
+                // Se a chave de API for explicitamente inválida, interrompe de imediato
+                val isExplicitKeyError = code == 403 ||
+                        body.contains("API_KEY_INVALID", ignoreCase = true) ||
+                        body.contains("key not valid", ignoreCase = true) ||
+                        body.contains("API key not valid", ignoreCase = true)
 
-            // 2. Se for erro de modelo no v1beta, tentar v1
-            if (isModelError && code != 400) {
-                Log.w(TAG, "Tentando v1 para $cleanModel...")
-                attemptsLog.add("POST v1/models/$cleanModel")
-                val v1Result = tryPostGenerateContent(
-                    "https://generativelanguage.googleapis.com/v1/models/$cleanModel:generateContent?key=$cleanApiKey",
-                    requestBody
-                )
-                if (v1Result.first == HttpURLConnection.HTTP_OK) {
-                    code = v1Result.first
-                    body = v1Result.second
-                    isModelError = false
+                if (isExplicitKeyError) {
+                    return@withContext GeminiExecutionResult.Error(
+                        message = "Chave da API Gemini inválida ou sem permissão.",
+                        details = buildTechnicalDetails(
+                            model = primaryModel,
+                            httpCode = code,
+                            responseBody = body,
+                            attempts = attemptsLog
+                        ),
+                        isApiKeyError = true
+                    )
                 }
-            }
 
-            // 3. Se o Google sugeriu um modelo específico no erro (ex: "Please update your code to use models/gemini-3.6-flash")
-            if (isModelError) {
+                // Sucesso: tentar interpretar JSON
+                if (code == HttpURLConnection.HTTP_OK) {
+                    val parsedResult = parseGeminiResponse(body)
+                    if (parsedResult != null) {
+                        if (isFallback) {
+                            Log.i(TAG, "Comando concluído com sucesso via modelo fallback: $currentModel (modelo original: $primaryModel)")
+                        }
+                        return@withContext GeminiExecutionResult.Success(parsedResult)
+                    } else {
+                        Log.w(TAG, "HTTP 200 para $currentModel, mas parsing de JSON falhou.")
+                        attemptsLog.add("Resposta recebida de $currentModel não continha JSON de comando esperado.")
+                    }
+                }
+
+                // Se for erro 400 (ex: modelo não suporta response_mime_type)
+                if (code == 400) {
+                    Log.w(TAG, "Tentando payload sem response_mime_type para $currentModel...")
+                    attemptsLog.add("POST v1beta/models/$currentModel (sem response_mime_type)")
+                    val retry = tryPostGenerateContent(
+                        "https://generativelanguage.googleapis.com/v1beta/models/$currentModel:generateContent?key=$cleanApiKey",
+                        textRequestBody
+                    )
+                    lastCode = retry.first
+                    lastBody = retry.second
+                    if (retry.first == HttpURLConnection.HTTP_OK) {
+                        val parsedResult = parseGeminiResponse(retry.second)
+                        if (parsedResult != null) {
+                            if (isFallback) {
+                                Log.i(TAG, "Sucesso via fallback $currentModel (sem json mime)")
+                            }
+                            return@withContext GeminiExecutionResult.Success(parsedResult)
+                        }
+                    }
+                }
+
+                // Se for 404 no v1beta, tentar no endpoint v1
+                if (code == 404) {
+                    Log.w(TAG, "Tentando endpoint v1 para $currentModel...")
+                    attemptsLog.add("POST v1/models/$currentModel")
+                    val v1Result = tryPostGenerateContent(
+                        "https://generativelanguage.googleapis.com/v1/models/$currentModel:generateContent?key=$cleanApiKey",
+                        jsonRequestBody
+                    )
+                    lastCode = v1Result.first
+                    lastBody = v1Result.second
+                    if (v1Result.first == HttpURLConnection.HTTP_OK) {
+                        val parsedResult = parseGeminiResponse(v1Result.second)
+                        if (parsedResult != null) {
+                            if (isFallback) {
+                                Log.i(TAG, "Sucesso via fallback $currentModel (v1)")
+                            }
+                            return@withContext GeminiExecutionResult.Success(parsedResult)
+                        }
+                    }
+                }
+
+                // Se a resposta sugerir algum modelo específico no erro (ex: "Please update your code to use models/...")
                 val suggestedModel = """use models/([a-zA-Z0-9._-]+)""".toRegex(RegexOption.IGNORE_CASE)
                     .find(body)?.groupValues?.get(1)
                     ?: """models/([a-zA-Z0-9._-]+)""".toRegex(RegexOption.IGNORE_CASE)
                         .findAll(body)
                         .map { it.groupValues[1] }
-                        .firstOrNull { it != cleanModel && !body.contains("This model models/$it is no longer available", ignoreCase = true) }
+                        .firstOrNull { it != currentModel && !body.contains("is no longer available", ignoreCase = true) }
 
-                if (!suggestedModel.isNullOrBlank()) {
-                    Log.i(TAG, "Google sugeriu modelo alternativo: $suggestedModel. Retentando...")
-                    attemptsLog.add("POST v1beta/models/$suggestedModel (sugerido pelo Google)")
-                    val retryResult = tryPostGenerateContent(
-                        "https://generativelanguage.googleapis.com/v1beta/models/$suggestedModel:generateContent?key=$cleanApiKey",
-                        requestBody
-                    )
-                    code = retryResult.first
-                    body = retryResult.second
-                    if (code == HttpURLConnection.HTTP_OK) {
-                        isModelError = false
+                if (!suggestedModel.isNullOrBlank() && suggestedModel !in triedModels) {
+                    Log.i(TAG, "Google sugeriu modelo alternativo: $suggestedModel. Enfileirando...")
+                    modelQueue.addFirst(suggestedModel)
+                }
+
+                // Anotar motivo da falha para histórico técnico
+                when (code) {
+                    503 -> attemptsLog.add("HTTP 503 em $currentModel: Alta demanda temporária.")
+                    429 -> attemptsLog.add("HTTP 429 em $currentModel: Cota ou limite de requisições excedido.")
+                    -1 -> attemptsLog.add("Timeout/falha de conexão em $currentModel.")
+                    else -> attemptsLog.add("Status $code em $currentModel.")
+                }
+            }
+
+            // Se todos os modelos da lista estática falharam, consulta ListModels dinamicamente
+            Log.w(TAG, "Todos os modelos candidatos falharam. Consultando ListModels dinamicamente...")
+            attemptsLog.add("ListModels (consulta dinâmica de modelos disponíveis)")
+            val dynamicModels = fetchAvailableModels(cleanApiKey, triedModels)
+            for ((ver, dynModel) in dynamicModels) {
+                Log.i(TAG, "Tentando modelo dinâmico: $dynModel ($ver)...")
+                attemptsLog.add("POST $ver/models/$dynModel (descoberto dinamicamente)")
+                val retry = tryPostGenerateContent(
+                    "https://generativelanguage.googleapis.com/$ver/models/$dynModel:generateContent?key=$cleanApiKey",
+                    jsonRequestBody
+                )
+                lastCode = retry.first
+                lastBody = retry.second
+                if (retry.first == HttpURLConnection.HTTP_OK) {
+                    val parsedResult = parseGeminiResponse(retry.second)
+                    if (parsedResult != null) {
+                        Log.i(TAG, "Sucesso via modelo dinâmico: $dynModel")
+                        return@withContext GeminiExecutionResult.Success(parsedResult)
                     }
                 }
             }
 
-            // 4. Se deu erro de modelo e não usamos gemini-3.6-flash, tentar gemini-3.6-flash diretamente
-            if (isModelError && cleanModel != DEFAULT_MODEL) {
-                Log.i(TAG, "Tentando modelo padrão $DEFAULT_MODEL...")
-                attemptsLog.add("POST v1beta/models/$DEFAULT_MODEL (fallback padrão)")
-                val retryResult = tryPostGenerateContent(
-                    "https://generativelanguage.googleapis.com/v1beta/models/$DEFAULT_MODEL:generateContent?key=$cleanApiKey",
-                    requestBody
-                )
-                code = retryResult.first
-                body = retryResult.second
-                if (code == HttpURLConnection.HTTP_OK) {
-                    isModelError = false
-                }
-            }
+            // Falha definitiva após esgotar todas as alternativas
+            Log.e(TAG, "Todas as alternativas de modelos falharam ($lastCode): $lastBody")
+            val userMessage = extractErrorMessage(lastBody, lastCode)
 
-            // 5. Se deu TIMEOUT ou erro de modelo e não usamos gemini-2.0-flash, tentar gemini-2.0-flash (respostas quase instantâneas)
-            val isTimeout = code == -1 && body.startsWith("TIMEOUT")
-            if ((isModelError || isTimeout) && cleanModel != "gemini-2.0-flash") {
-                Log.i(TAG, "Tentando fallback rápido para gemini-2.0-flash...")
-                attemptsLog.add("POST v1beta/models/gemini-2.0-flash (fallback ultra rápido)")
-                val fastFallback = tryPostGenerateContent(
-                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$cleanApiKey",
-                    requestBody
-                )
-                if (fastFallback.first == HttpURLConnection.HTTP_OK) {
-                    code = fastFallback.first
-                    body = fastFallback.second
-                    isModelError = false
-                }
-            }
-
-            // 6. Se ainda persistir erro de modelo, consultar dinamicamente os modelos habilitados para esta chave
-            if (isModelError) {
-                Log.w(TAG, "Consultando modelos disponíveis da chave via ListModels...")
-                attemptsLog.add("ListModels (consulta dinâmica de modelos disponíveis)")
-                val available = fetchAvailableModel(cleanApiKey)
-                if (available != null) {
-                    val (ver, availableModel) = available
-                    Log.i(TAG, "Modelo compatível encontrado: $availableModel (versão $ver). Retentando requisição...")
-                    attemptsLog.add("POST $ver/models/$availableModel")
-                    val retryResult = tryPostGenerateContent(
-                        "https://generativelanguage.googleapis.com/$ver/models/$availableModel:generateContent?key=$cleanApiKey",
-                        requestBody
-                    )
-                    code = retryResult.first
-                    body = retryResult.second
-                }
-            }
-
-            Log.d(TAG, "Gemini final response code: $code")
-
-            if (code == HttpURLConnection.HTTP_OK) {
-                val parsedResult = parseGeminiResponse(body)
-                if (parsedResult != null) {
-                    GeminiExecutionResult.Success(parsedResult)
-                } else {
-                    GeminiExecutionResult.Error(
-                        message = "Não foi possível interpretar a resposta gerada pelo Gemini.",
-                        details = buildTechnicalDetails(
-                            model = cleanModel,
-                            httpCode = code,
-                            responseBody = "O modelo respondeu com sucesso (HTTP 200), mas o conteúdo não pôde ser convertido no JSON de comando esperado.\n\nResposta recebida do Gemini:\n$body",
-                            attempts = attemptsLog
-                        )
-                    )
-                }
-            } else {
-                Log.e(TAG, "Gemini API error ($code): $body")
-
-                val isKeyError = code == 403 ||
-                        body.contains("API_KEY_INVALID", ignoreCase = true) ||
-                        body.contains("key not valid", ignoreCase = true) ||
-                        body.contains("API key not valid", ignoreCase = true) ||
-                        body.contains("PERMISSION_DENIED", ignoreCase = true)
-
-                val detailedMsg = extractErrorMessage(body, code)
-                val userMessage = when {
-                    isKeyError -> "Chave da API Gemini inválida ou sem permissão."
-                    code == 429 -> "Limite de requisições excedido na API Gemini. Tente novamente em instantes."
-                    code == -1 -> detailedMsg
-                    else -> detailedMsg
-                }
-
-                val technicalDetails = buildTechnicalDetails(
-                    model = cleanModel,
-                    httpCode = code,
-                    responseBody = body,
+            GeminiExecutionResult.Error(
+                message = userMessage,
+                details = buildTechnicalDetails(
+                    model = primaryModel,
+                    httpCode = lastCode,
+                    responseBody = lastBody,
                     attempts = attemptsLog
-                )
-
-                GeminiExecutionResult.Error(
-                    message = userMessage,
-                    details = technicalDetails,
-                    isApiKeyError = isKeyError
-                )
-            }
+                ),
+                isApiKeyError = false
+            )
         } catch (e: java.net.UnknownHostException) {
             Log.e(TAG, "Sem conexão com a internet", e)
             GeminiExecutionResult.Error(
                 message = "Sem conexão com a internet para contatar o Gemini.",
                 details = buildTechnicalDetails(
-                    model = cleanModel,
+                    model = primaryModel,
                     httpCode = -1,
                     responseBody = "Falha de DNS ao tentar resolver 'generativelanguage.googleapis.com'.\nExceção: ${e.javaClass.simpleName}: ${e.message}\nVerifique sua conexão de rede (Wi-Fi ou dados móveis).",
                     attempts = attemptsLog
@@ -246,9 +252,9 @@ class GeminiService {
             GeminiExecutionResult.Error(
                 message = "Tempo limite esgotado ao aguardar o Gemini.",
                 details = buildTechnicalDetails(
-                    model = cleanModel,
+                    model = primaryModel,
                     httpCode = -1,
-                    responseBody = "O servidor do Google demorou mais que o esperado (> 60 segundos) para responder à requisição.\nExceção: ${e.javaClass.simpleName}: ${e.message}",
+                    responseBody = "O servidor do Google demorou mais que o esperado (> 30 segundos) para responder à requisição.\nExceção: ${e.javaClass.simpleName}: ${e.message}",
                     attempts = attemptsLog
                 )
             )
@@ -257,7 +263,7 @@ class GeminiService {
             GeminiExecutionResult.Error(
                 message = "Erro ao processar comando: ${e.localizedMessage ?: e.message}",
                 details = buildTechnicalDetails(
-                    model = cleanModel,
+                    model = primaryModel,
                     httpCode = -1,
                     responseBody = "Exceção inesperada: ${e.javaClass.name}: ${e.message}\n${e.stackTraceToString().take(600)}",
                     attempts = attemptsLog
@@ -277,8 +283,8 @@ class GeminiService {
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
                 doOutput = true
-                connectTimeout = 25000
-                readTimeout = 60000
+                connectTimeout = 15000
+                readTimeout = 30000
             }
 
             OutputStreamWriter(connection.outputStream, "UTF-8").use { writer ->
@@ -308,7 +314,8 @@ class GeminiService {
         }
     }
 
-    private fun fetchAvailableModel(apiKey: String): Pair<String, String>? {
+    private fun fetchAvailableModels(apiKey: String, excludedModels: Set<String> = emptySet()): List<Pair<String, String>> {
+        val results = mutableListOf<Pair<String, String>>()
         val versions = listOf("v1beta", "v1")
         for (ver in versions) {
             try {
@@ -323,33 +330,34 @@ class GeminiService {
                     val body = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     val root = gson.fromJson(body, JsonObject::class.java)
                     val models = root.getAsJsonArray("models") ?: continue
-                    val candidates = mutableListOf<String>()
                     for (i in 0 until models.size()) {
                         val m = models.get(i).asJsonObject
                         val name = m.get("name")?.asString ?: continue
                         val cleanName = name.removePrefix("models/")
+                        if (cleanName in excludedModels) continue
                         val methods = m.getAsJsonArray("supportedGenerationMethods")?.map { it.asString } ?: emptyList()
                         if (methods.contains("generateContent")) {
-                            candidates.add(cleanName)
+                            if (results.none { it.second == cleanName }) {
+                                results.add(Pair(ver, cleanName))
+                            }
                         }
-                    }
-                    val selected = candidates.firstOrNull { it == "gemini-3.6-flash" }
-                        ?: candidates.firstOrNull { it.contains("3.6-flash") }
-                        ?: candidates.firstOrNull { it.contains("3.") && it.contains("flash") }
-                        ?: candidates.firstOrNull { it == "gemini-2.0-flash" }
-                        ?: candidates.firstOrNull { it.contains("flash") && !it.contains("2.5") && !it.contains("1.5") }
-                        ?: candidates.firstOrNull { it.contains("flash") }
-                        ?: candidates.firstOrNull { it.contains("pro") }
-                        ?: candidates.firstOrNull()
-                    if (selected != null) {
-                        return Pair(ver, selected)
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Erro ao listar modelos em $ver", e)
             }
         }
-        return null
+        return results.sortedByDescending { (_, name) ->
+            when {
+                name.contains("3.8") && name.contains("flash") -> 6
+                name.contains("3.7") && name.contains("flash") -> 5
+                name.contains("3.6") && name.contains("flash") -> 4
+                name.contains("flash") -> 3
+                name.contains("3.") && name.contains("pro") -> 2
+                name.contains("pro") -> 1
+                else -> 0
+            }
+        }
     }
 
     private fun extractErrorMessage(errorBody: String, defaultCode: Int): String {
@@ -365,6 +373,12 @@ class GeminiService {
                 else ->
                     "Falha na comunicação de rede com o Gemini (${errorBody.removePrefix("NETWORK_ERROR:").trim().take(80)})."
             }
+        }
+        if (defaultCode == 503 || errorBody.contains("high demand", ignoreCase = true)) {
+            return "O Gemini está enfrentando alta demanda temporária. Tentamos modelos de contingência, mas os servidores continuam sobrecarregados. Tente novamente em instantes."
+        }
+        if (defaultCode == 429 || errorBody.contains("RESOURCE_EXHAUSTED", ignoreCase = true)) {
+            return "Limite de requisições excedido na API Gemini. Tente novamente em instantes."
         }
         try {
             val root = gson.fromJson(errorBody, JsonObject::class.java)

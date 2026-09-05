@@ -61,7 +61,7 @@ fun GeminiSettingsDialog(
     var voiceFeedback by remember(currentVoiceFeedback) { mutableStateOf(currentVoiceFeedback) }
     var selectedModel by remember(currentModel) {
         mutableStateOf(
-            if (currentModel.isBlank() || currentModel.contains("1.5") || currentModel.contains("2.5")) {
+            if (currentModel.isBlank()) {
                 "gemini-3.6-flash"
             } else {
                 currentModel
@@ -70,9 +70,10 @@ fun GeminiSettingsDialog(
     }
 
     val availableModels = listOf(
-        "gemini-3.6-flash" to "Gemini 3.6 Flash (Recomendado)",
-        "gemini-2.0-flash" to "Gemini 2.0 Flash (Resposta Instantânea)",
-        "gemini-3.6-pro" to "Gemini 3.6 Pro (Avançado)"
+        "gemini-3.8-flash" to "Gemini 3.8 Flash (Mais Recente e Rápido)",
+        "gemini-3.7-flash" to "Gemini 3.7 Flash (Estável)",
+        "gemini-3.6-flash" to "Gemini 3.6 Flash (Padrão)",
+        "gemini-3.6-pro" to "Gemini 3.6 Pro (Raciocínio Avançado)"
     )
 
     AlertDialog(
@@ -198,7 +199,13 @@ fun GeminiSettingsDialog(
                     Text(
                         text = stringResource(id = R.string.gemini_model),
                         style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                    Text(
+                        text = "Se o modelo configurado sofrer alta demanda temporária no Google (HTTP 503), o assistente alternará automaticamente para modelos de contingência (ex: Gemini 3.8 Flash ou 3.7 Flash) para não falhar a criação da tarefa.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                     availableModels.forEach { (modelId, label) ->
                         Row(
