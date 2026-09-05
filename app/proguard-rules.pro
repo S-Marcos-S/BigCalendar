@@ -23,8 +23,7 @@
 -keep class androidx.datastore.** { *; }
 -dontwarn com.google.protobuf.**
 
-# 4. Preservar Jetpack Compose
--keep class androidx.compose.** { *; }
+# 4. Jetpack Compose (as regras necessarias ja estao inclusas no AAR do Compose)
 
 # 5. Preservar Serviços, Receivers, Tile e Widgets do Aplicativo
 -keep class com.mss.thebigcalendar.service.** { *; }

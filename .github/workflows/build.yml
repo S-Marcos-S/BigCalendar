@@ -86,6 +86,7 @@ jobs:
         run: |
           sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
           sed -i '/org.gradle.java.home/d' gradle.properties
+          sed -i 's/-Xmx2048m/-Xmx6144m/' gradle.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
