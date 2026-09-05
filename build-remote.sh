@@ -17,6 +17,7 @@ FINAL_APK="$OUTPUT_DIR/app-release.apk"
 DOWNLOAD_DIR="$HOME/storage/downloads"
 WORKFLOW_FILE="build.yml"
 ARTIFACT_NAME="BigCalendar-Release-APK"
+REPO_PATH="$(git remote get-url origin 2>/dev/null | sed -E 's/.*github\.com[:\/](.+)\.git/\1/' || echo "S-Marcos-S/BigCalendar")"
 
 echo "=========================================================="
 echo "      Big Calendar - Build Remota (GitHub Actions)"
@@ -142,13 +143,44 @@ if [ $WATCH_EXIT_CODE -eq 0 ]; then
     mkdir -p "$OUTPUT_DIR"
     
     TMP_DIR="$(mktemp -d)"
-    if gh run download "$RUN_ID" -n "$ARTIFACT_NAME" -D "$TMP_DIR"; then
+    DOWNLOAD_SUCCESS=false
+
+    # 1. Tentar download com barra de progresso visual via curl
+    TOKEN="$(gh auth token 2>/dev/null || echo "")"
+    ARTIFACT_ID="$(gh api "repos/$REPO_PATH/actions/runs/$RUN_ID/artifacts" --jq ".artifacts[] | select(.name==\"$ARTIFACT_NAME\") | .id" 2>/dev/null || true)"
+
+    if [ -n "$TOKEN" ] && [ -n "$ARTIFACT_ID" ]; then
+        PRE_SIGNED_URL="$(curl -s -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -w "%{redirect_url}" \
+            "https://api.github.com/repos/$REPO_PATH/actions/artifacts/$ARTIFACT_ID/zip" 2>/dev/null || true)"
+
+        if [ -n "$PRE_SIGNED_URL" ]; then
+            echo "📊 Progresso do download do APK:"
+            if curl -# -L -o "$TMP_DIR/artifact.zip" "$PRE_SIGNED_URL"; then
+                if unzip -q -o "$TMP_DIR/artifact.zip" -d "$TMP_DIR" 2>/dev/null; then
+                    DOWNLOAD_SUCCESS=true
+                fi
+            fi
+            echo
+        fi
+    fi
+
+    # 2. Fallback via gh run download se o curl não tiver sido usado
+    if [ "$DOWNLOAD_SUCCESS" != "true" ]; then
+        echo "ℹ️  Baixando via GitHub CLI..."
+        if gh run download "$RUN_ID" -n "$ARTIFACT_NAME" -D "$TMP_DIR"; then
+            DOWNLOAD_SUCCESS=true
+        fi
+    fi
+
+    if [ "$DOWNLOAD_SUCCESS" = "true" ]; then
         DOWNLOADED_APK="$(find "$TMP_DIR" -type f -name "*.apk" | head -n 1)"
         if [ -n "$DOWNLOADED_APK" ] && [ -f "$DOWNLOADED_APK" ]; then
             cp -f "$DOWNLOADED_APK" "$FINAL_APK"
             rm -rf "$TMP_DIR"
             
-            echo
             echo "=========================================================="
             echo "                     APK PRONTO!"
             echo "=========================================================="
@@ -170,6 +202,7 @@ if [ $WATCH_EXIT_CODE -eq 0 ]; then
         fi
     else
         echo "❌ Falha ao baixar o artefato com o gh."
+        rm -rf "$TMP_DIR"
     fi
 else
     echo "❌ FALHA NA BUILD DO GITHUB ACTIONS!"
