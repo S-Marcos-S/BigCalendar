@@ -966,5 +966,7 @@
     <string name="gemini_no_api_key">请在设置中配置您的 Gemini API 密钥以使用助手。</string>
     <string name="gemini_open_settings">配置 API</string>
     <string name="gemini_speech_not_supported">此设备不支持语音识别，请使用键盘输入。</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">日历助手</string>
 </resources>
 

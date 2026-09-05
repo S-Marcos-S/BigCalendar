@@ -969,4 +969,6 @@
     <string name="gemini_no_api_key">Set up your Gemini API key in settings to use the assistant.</string>
     <string name="gemini_open_settings">Configure API</string>
     <string name="gemini_speech_not_supported">Voice recognition not supported on this device. Use typing.</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">Calendar Assistant</string>
 </resources>

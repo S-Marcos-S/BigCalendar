@@ -68,6 +68,9 @@ class MainActivity : ComponentActivity() {
     
     // ✅ Flag para detectar se o app já estava em execução
     companion object {
+        const val ACTION_OPEN_GEMINI = "com.mss.thebigcalendar.action.OPEN_GEMINI"
+        const val EXTRA_OPEN_GEMINI = "extra_open_gemini"
+
         private var isAppAlreadyRunning = false
         private var isActivityResumed = false
         private var wasActivityResumedBefore = false
@@ -170,6 +173,8 @@ class MainActivity : ComponentActivity() {
 
         viewModel = ViewModelProvider(this).get(CalendarViewModel::class.java)
         
+        handleIntent(intent)
+
         // ✅ Verificar se é um retorno via widget ou ícone do app
         val isAppAlreadyRunning = isAppAlreadyRunning()
         if (isAppAlreadyRunning) {
@@ -442,7 +447,6 @@ class MainActivity : ComponentActivity() {
                                 onOpenCalendarVisualization = { viewModel.openCalendarVisualizationSettings() },
                                 onOpenSyncSettings = { viewModel.openSyncSettings() },
                                 onOpenBackupSettings = { viewModel.onBackupIconClick() },
-                                onOpenGeminiSettings = { viewModel.openGeminiSettings() },
                                 unfixHeadersOnScroll = uiState.unfixHeadersOnScroll
                             )
                         }
@@ -532,8 +536,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
     }
-    
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        val openGemini = intent.action == ACTION_OPEN_GEMINI || intent.getBooleanExtra(EXTRA_OPEN_GEMINI, false)
+        if (openGemini) {
+            intent.action = null
+            intent.removeExtra(EXTRA_OPEN_GEMINI)
+            if (::viewModel.isInitialized) {
+                viewModel.skipLoadingAnimation()
+                viewModel.openGeminiAssistantFromOutside()
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         // ✅ Marcar que a atividade está ativa

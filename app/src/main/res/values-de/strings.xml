@@ -974,5 +974,7 @@
     <string name="gemini_no_api_key">Richten Sie Ihren Gemini-API-Schlüssel in den Einstellungen ein.</string>
     <string name="gemini_open_settings">API konfigurieren</string>
     <string name="gemini_speech_not_supported">Spracherkennung auf diesem Gerät nicht unterstützt. Bitte tippen.</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">Kalenderassistent</string>
 </resources>
 

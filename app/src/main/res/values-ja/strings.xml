@@ -966,5 +966,7 @@
     <string name="gemini_no_api_key">アシスタントを使用するには設定でGemini APIキーを設定してください。</string>
     <string name="gemini_open_settings">API を設定</string>
     <string name="gemini_speech_not_supported">この端末では音声認識に対応していません。キーボードをご利用ください。</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">カレンダーアシスタント</string>
 </resources>
 

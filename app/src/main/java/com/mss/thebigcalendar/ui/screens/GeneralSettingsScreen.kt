@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.FileOpen
@@ -50,7 +49,6 @@ fun GeneralSettingsScreen(
     onOpenCalendarVisualization: () -> Unit = {},
     onOpenSyncSettings: () -> Unit = {},
     onOpenBackupSettings: () -> Unit = {},
-    onOpenGeminiSettings: () -> Unit = {},
     unfixHeadersOnScroll: Boolean = false
 ) {
     Log.d("GeneralSettingsScreen", "📱 GeneralSettingsScreen iniciada")
@@ -197,35 +195,6 @@ fun GeneralSettingsScreen(
                     )
                     Text(
                         text = stringResource(id = R.string.backup_settings_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Gemini Assistant entry
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp)
-                    .clickable { onOpenGeminiSettings() }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(id = R.string.gemini_assistant_title),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = stringResource(id = R.string.gemini_assistant_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

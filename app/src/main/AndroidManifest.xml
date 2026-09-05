@@ -75,6 +75,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.TheBigCalendar">
         </activity>
 
@@ -150,6 +151,17 @@
             android:name=".service.AlarmVerificationService"
             android:exported="false"
             android:enabled="true" />
+
+        <service
+            android:name=".service.GeminiTileService"
+            android:label="@string/gemini_tile_label"
+            android:icon="@drawable/ic_gemini_qs_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".service.NotificationReceiver"

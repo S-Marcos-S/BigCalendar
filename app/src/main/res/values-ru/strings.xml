@@ -966,5 +966,7 @@
     <string name="gemini_no_api_key">Настройте ключ API Gemini в настройках, чтобы использовать ассистента.</string>
     <string name="gemini_open_settings">Настроить API</string>
     <string name="gemini_speech_not_supported">Распознавание речи не поддерживается на этом устройстве. Используйте клавиатуру.</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">Ассистент Календаря</string>
 </resources>
 

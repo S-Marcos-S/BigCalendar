@@ -974,4 +974,6 @@
     <string name="gemini_no_api_key">Configurez votre clé API Gemini dans les paramètres pour utiliser l\'assistant.</string>
     <string name="gemini_open_settings">Configurer l\'API</string>
     <string name="gemini_speech_not_supported">Reconnaissance vocale non prise en charge sur cet appareil. Utilisez le clavier.</string>
+    <string name="gemini_tile_label">Gemini</string>
+    <string name="gemini_tile_subtitle">Assistant du Calendrier</string>
 </resources>
