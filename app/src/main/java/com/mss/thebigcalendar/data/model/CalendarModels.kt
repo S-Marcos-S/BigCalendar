@@ -97,6 +97,7 @@ data class CalendarUiState(
     val currentSettingsScreen: String? = null,
     val calendarDays: List<CalendarDay> = emptyList(),
     val tasksForSelectedDate: List<Activity> = emptyList(), // NOVO: Lista de tarefas para o dia selecionado
+    val recentlyCompletedTaskId: String? = null, // ID da tarefa recém finalizada para animar descendo
     val birthdaysForSelectedDate: List<Activity> = emptyList(), // Lista de aniversários para o dia selecionado
     val notesForSelectedDate: List<Activity> = emptyList(), // Lista de notas para o dia selecionado
     val animationType: AnimationType = AnimationType.SLIDE, // Tipo de animação selecionado

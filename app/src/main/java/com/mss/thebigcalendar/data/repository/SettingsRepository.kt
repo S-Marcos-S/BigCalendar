@@ -184,7 +184,7 @@ class SettingsRepository(private val context: Context) {
 
     val showCompletedActivities: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.SHOW_COMPLETED_ACTIVITIES] ?: false
+            preferences[PreferencesKeys.SHOW_COMPLETED_ACTIVITIES] ?: true
         }
 
     val animationType: Flow<AnimationType> = context.dataStore.data

@@ -1257,36 +1257,34 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         
-        // Adicionar tarefas finalizadas se a opção estiver ativada
-        if (state.showCompletedActivities) {
-            state.completedActivities.forEach { completedActivity ->
-                try {
-                    val activityDate = LocalDate.parse(completedActivity.date)
-                    val dateMatches = activityDate.isEqual(state.selectedDate)
-                    
-                    if (dateMatches) {
+        // Adicionar tarefas finalizadas para o dia selecionado
+        state.completedActivities.forEach { completedActivity ->
+            try {
+                val activityDate = LocalDate.parse(completedActivity.date)
+                val dateMatches = activityDate.isEqual(state.selectedDate)
+                
+                if (dateMatches) {
+                    if (allTasksForSelectedDate.none { it.id == completedActivity.id }) {
                         allTasksForSelectedDate.add(completedActivity)
                     }
-                } catch (e: Exception) {
-                    // Erro ao processar tarefa finalizada - continuar com outras
                 }
+            } catch (e: Exception) {
+                // Erro ao processar tarefa finalizada - continuar com outras
             }
         }
 
-
-        
         // Filtrar atividades JSON importadas da seção "Agendamentos para..."
         val otherTasks = allTasksForSelectedDate
             .filter { activity -> 
                 // Excluir atividades JSON importadas (marcadas com location começando com "JSON_IMPORTED_")
                 val isJsonImported = activity.location?.startsWith("JSON_IMPORTED_") == true
-                if (isJsonImported) {
-                }
                 !isJsonImported
             }
             .sortedWith(
-                compareByDescending<Activity> { it.categoryColor?.toIntOrNull() ?: 0 }
-                .thenBy { it.startTime ?: LocalTime.MIN }
+                compareBy<Activity> { it.isCompleted }
+                    .thenBy { if (it.isCompleted) it.lastModified else 0L }
+                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
+                    .thenBy { it.startTime ?: LocalTime.MIN }
             )
         
         // Atualizar todas as listas
@@ -2362,7 +2360,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 
+                // Se ainda não encontrou, buscar nas atividades finalizadas
+                if (activityToDelete == null) {
+                    activityToDelete = _uiState.value.completedActivities.find { it.id == activityId }
+                }
+                
                 if (activityToDelete != null) {
+                    if (activityToDelete.isCompleted) {
+                        deletedActivityRepository.addDeletedActivity(activityToDelete)
+                        completedActivityRepository.removeCompletedActivity(activityId)
+                        updateAllDateDependentUI()
+                        notifyWidgetsDataChanged()
+                        _uiState.update { it.copy(activityIdToDelete = null) }
+                        return@launch
+                    }
+
                     // ✅ Cancelar notificação antes de deletar
                     val notificationService = NotificationService(getApplication())
                     
@@ -2604,6 +2616,35 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
     
     fun markActivityAsCompleted(activityId: String) {
+        val now = System.currentTimeMillis()
+        // Atualização imediata na UI para iniciar a animação de descida instantaneamente
+        _uiState.update { currentState ->
+            val updatedTasks = currentState.tasksForSelectedDate.map { task ->
+                if (task.id == activityId) {
+                    task.copy(isCompleted = true, lastModified = now)
+                } else {
+                    task
+                }
+            }.sortedWith(
+                compareBy<Activity> { it.isCompleted }
+                    .thenBy { if (it.isCompleted) it.lastModified else 0L }
+                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
+                    .thenBy { it.startTime ?: java.time.LocalTime.MIN }
+            )
+            currentState.copy(
+                tasksForSelectedDate = updatedTasks,
+                activityIdWithDeleteButtonVisible = null,
+                recentlyCompletedTaskId = activityId
+            )
+        }
+
+        viewModelScope.launch {
+            delay(750)
+            if (_uiState.value.recentlyCompletedTaskId == activityId) {
+                _uiState.update { it.copy(recentlyCompletedTaskId = null) }
+            }
+        }
+
         viewModelScope.launch {
             markActivityAsCompletedInternal(activityId)
         }

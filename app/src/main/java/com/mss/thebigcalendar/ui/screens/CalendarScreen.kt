@@ -90,6 +90,7 @@ import com.mss.thebigcalendar.ui.components.SaintInfoDialog
 import com.mss.thebigcalendar.ui.components.Sidebar
 import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
 import com.mss.thebigcalendar.ui.components.TasksForSelectedDaySection
+import com.mss.thebigcalendar.ui.components.tasksForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.YearlyCalendarView
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -818,39 +819,34 @@ fun MainCalendarView(
                         )
                     }
                     
-                    item(
-                        key = "tasks-${uiState.selectedDate}",
-                        contentType = "tasks"
-                    ) {
-                        TasksForSelectedDaySection(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                            tasks = uiState.tasksForSelectedDate,
-                            selectedDate = uiState.selectedDate,
-                            displayedYearMonth = uiState.displayedYearMonth,
-                            activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
-                            onTaskClick = {
-                                if (uiState.activityIdWithDeleteButtonVisible != null) {
-                                    viewModel.hideDeleteButton()
-                                } else {
-                                    viewModel.openCreateActivityModal(it, it.activityType)
-                                }
-                            },
-                            onTaskLongClick = { viewModel.onTaskLongPressed(it) },
-                            onDeleteClick = { viewModel.requestDeleteActivity(it) },
-                            onCompleteClick = { viewModel.markActivityAsCompleted(it) },
-                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
-                            onCommemorativeClick = { task ->
-                                val date = java.time.LocalDate.parse(task.date)
-                                val commemorativeHoliday = uiState.commemorativeDates[date]
-                                if (commemorativeHoliday != null) {
-                                    viewModel.onSaintDayClick(commemorativeHoliday)
-                                }
-                            },
-                            onUpdateTaskDescription = { activity, newDesc ->
-                                viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                    tasksForSelectedDaySection(
+                        tasks = uiState.tasksForSelectedDate,
+                        selectedDate = uiState.selectedDate,
+                        displayedYearMonth = uiState.displayedYearMonth,
+                        activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
+                        recentlyCompletedTaskId = uiState.recentlyCompletedTaskId,
+                        onTaskClick = {
+                            if (uiState.activityIdWithDeleteButtonVisible != null) {
+                                viewModel.hideDeleteButton()
+                            } else {
+                                viewModel.openCreateActivityModal(it, it.activityType)
                             }
-                        )
-                    }
+                        },
+                        onTaskLongClick = { viewModel.onTaskLongPressed(it) },
+                        onDeleteClick = { viewModel.requestDeleteActivity(it) },
+                        onCompleteClick = { viewModel.markActivityAsCompleted(it) },
+                        onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
+                        onCommemorativeClick = { task ->
+                            val date = java.time.LocalDate.parse(task.date)
+                            val commemorativeHoliday = uiState.commemorativeDates[date]
+                            if (commemorativeHoliday != null) {
+                                viewModel.onSaintDayClick(commemorativeHoliday)
+                            }
+                        },
+                        onUpdateTaskDescription = { activity, newDesc ->
+                            viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                        }
+                    )
                     
                     // Seções dos calendários JSON importados
                     uiState.jsonCalendarActivitiesForSelectedDate.forEach { (calendarId, activities) ->
