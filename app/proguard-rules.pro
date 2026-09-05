@@ -5,56 +5,62 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Keep data classes
--keep class com.mss.thebigcalendar.data.model.** { *; }
+# 1. Atributos essenciais para depuração, reflexão e anotações
+-keepattributes SourceFile,LineNumberTable,Signature,*Annotation*,InnerClasses,EnclosingMethod
+-renamesourcefileattribute SourceFile
 
-# Keep Compose classes
+# 2. Preservar modelos do aplicativo, repositórios e serialização
+-keep class com.mss.thebigcalendar.data.model.** { *; }
+-keep class com.mss.thebigcalendar.data.repository.** { *; }
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-keep class com.google.gson.** { *; }
+
+# 3. Preservar Protobuf e Proto DataStore
+-keep class com.google.protobuf.** { *; }
+-keep class * extends com.google.protobuf.GeneratedMessageLite { *; }
+-keep class androidx.datastore.** { *; }
+-dontwarn com.google.protobuf.**
+
+# 4. Preservar Jetpack Compose
 -keep class androidx.compose.** { *; }
 
-# Keep Google API classes
+# 5. Preservar Serviços, Receivers, Tile e Widgets do Aplicativo
+-keep class com.mss.thebigcalendar.service.** { *; }
+-keep class com.mss.thebigcalendar.widget.** { *; }
+-keep class com.mss.thebigcalendar.ui.screens.AlarmActivity { *; }
+-keep class com.mss.thebigcalendar.ui.screens.HighVisibilityNotificationActivity { *; }
+-keep class androidx.work.** { *; }
+
+# 6. Preservar iText 7 (Geração de PDF do Calendário)
+-dontwarn com.itextpdf.**
+-keep class com.itextpdf.** { *; }
+-keepclassmembers class com.itextpdf.** { *; }
+-dontwarn org.bouncycastle.**
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.slf4j.**
+
+# 7. Preservar Google APIs, OAuth e HTTP Client
 -keep class com.google.api.** { *; }
 -keep class com.google.android.gms.** { *; }
-
-# Handle HTTP client conflicts
+-dontwarn com.google.api.client.**
+-keep class com.google.api.client.** { *; }
 -dontwarn org.apache.http.**
 -dontwarn android.net.http.AndroidHttpClient
 -keep class org.apache.http.** { *; }
 -keep class android.net.http.AndroidHttpClient { *; }
 
-# Keep Protobuf classes
--keep class com.google.protobuf.** { *; }
+# 8. Gráficos (MPAndroidChart)
+-keep class com.github.mikephil.charting.** { *; }
+-dontwarn com.github.mikephil.charting.**
 
-# Keep DataStore classes
--keep class androidx.datastore.** { *; }
-
-# Remove ICU data (reduz ~25MB)
+# 9. Suprimir avisos de bibliotecas opcionais/não utilizadas para permitir stripping pelo R8
 -dontwarn com.ibm.icu.**
--keep class com.ibm.icu.** { *; }
-
-# Remove Apache Commons (reduz ~1.5MB)
 -dontwarn org.apache.commons.**
--keep class org.apache.commons.** { *; }
-
-# Remove JUnit from release (reduz ~0.01MB)
 -dontwarn junit.**
--keep class junit.** { *; }
-
-# Remove testing libraries from release
 -dontwarn androidx.test.**
--keep class androidx.test.** { *; }
-
-# Remove XR/OpenXR libraries (reduz ~5MB)
 -dontwarn androidx.xr.**
--keep class androidx.xr.** { *; }
-
-# Remove graphics path library (reduz ~0.01MB)
 -dontwarn androidx.graphics.**
--keep class androidx.graphics.** { *; }
-
-# Remove impress API (reduz ~20MB)
 -dontwarn libimpress_api_jni.**
--keep class libimpress_api_jni.** { *; }
-
-# Keep line numbers for debugging
--keepattributes SourceFile,LineNumberTable
--renamesourcefileattribute SourceFile
+-dontwarn kotlinx.coroutines.**
