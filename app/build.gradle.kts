@@ -35,16 +35,12 @@ android {
     }
 
     // Adicione este bloco para carregar as propriedades da sua keystore
-<<<<<<< HEAD
     val keystorePropertiesFile = when {
         rootProject.file("keystore.properties").exists() -> rootProject.file("keystore.properties")
         file("keystore.properties").exists() -> file("keystore.properties")
         rootProject.file("app/keystore.properties").exists() -> rootProject.file("app/keystore.properties")
         else -> rootProject.file("keystore.properties")
     }
-=======
-    val keystorePropertiesFile = rootProject.file("app/keystore.properties")
->>>>>>> parent of 501dfd8 (Configure Termux Android build environment)
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
         keystoreProperties.load(keystorePropertiesFile.inputStream())
