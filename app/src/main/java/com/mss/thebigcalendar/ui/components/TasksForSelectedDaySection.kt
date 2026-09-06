@@ -45,6 +45,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity
 import com.mss.thebigcalendar.data.model.ActivityType
@@ -53,6 +60,131 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
+fun LazyListScope.tasksForSelectedDaySection(
+    tasks: List<Activity>,
+    selectedDate: LocalDate,
+    displayedYearMonth: java.time.YearMonth,
+    activityIdWithDeleteVisible: String?,
+    recentlyCompletedTaskId: String? = null,
+    onTaskClick: (Activity) -> Unit,
+    onTaskLongClick: (String) -> Unit,
+    onDeleteClick: (String) -> Unit,
+    onCompleteClick: (String) -> Unit,
+    onAddTaskClick: () -> Unit,
+    onCommemorativeClick: (Activity) -> Unit,
+    onUpdateTaskDescription: (Activity, String) -> Unit = { _, _ -> }
+) {
+    val isDifferentMonth = selectedDate.month != displayedYearMonth.month ||
+            selectedDate.year != displayedYearMonth.year
+
+    item(
+        key = "tasks-header-${selectedDate}",
+        contentType = "tasks-header"
+    ) {
+        val dateFormat = stringResource(id = R.string.date_format_day_month)
+        val dateFormatter = remember(dateFormat) { DateTimeFormatter.ofPattern(dateFormat, Locale.getDefault()) }
+        val headerText = if (isDifferentMonth) {
+            val monthName = displayedYearMonth.month
+                .getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault())
+                .replaceFirstChar { it.titlecase(Locale.getDefault()) }
+            stringResource(id = R.string.appointments_for_month, monthName)
+        } else {
+            stringResource(id = R.string.appointments_for, selectedDate.format(dateFormatter))
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .padding(top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = headerText,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            IconButton(
+                onClick = onAddTaskClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(id = R.string.add_task_or_event),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+
+    if (isDifferentMonth) {
+        item(
+            key = "tasks-diff-month-${selectedDate}",
+            contentType = "tasks-status"
+        ) {
+            Text(
+                text = stringResource(id = R.string.select_a_day),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 16.dp)
+            )
+        }
+    } else if (tasks.isEmpty()) {
+        item(
+            key = "tasks-empty-${selectedDate}",
+            contentType = "tasks-status"
+        ) {
+            Text(
+                text = stringResource(id = R.string.no_appointments),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 16.dp)
+            )
+        }
+    } else {
+        items(
+            items = tasks,
+            key = { task -> "task-${task.id}" },
+            contentType = { "task-item" }
+        ) { task ->
+            val isRecentlyCompleted = recentlyCompletedTaskId == task.id
+            val elevation by animateDpAsState(
+                targetValue = if (isRecentlyCompleted) 6.dp else 0.dp,
+                animationSpec = tween(durationMillis = 300),
+                label = "task_elevation_${task.id}"
+            )
+
+            TaskItem(
+                modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .zIndex(if (isRecentlyCompleted) 10f else if (task.isCompleted) 0f else 1f)
+                    .shadow(
+                        elevation = elevation,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .animateItem(
+                        fadeInSpec = null,
+                        fadeOutSpec = null,
+                        placementSpec = tween(
+                            durationMillis = 700,
+                            easing = FastOutSlowInEasing
+                        )
+                    ),
+                task = task,
+                deleteButtonVisible = activityIdWithDeleteVisible == task.id,
+                onTaskClick = onTaskClick,
+                onTaskLongClick = onTaskLongClick,
+                onDeleteClick = onDeleteClick,
+                onCompleteClick = onCompleteClick,
+                onCommemorativeClick = onCommemorativeClick,
+                onUpdateTaskDescription = onUpdateTaskDescription
+            )
+        }
+    }
+}
+
 @Composable
 fun TasksForSelectedDaySection(
     modifier: Modifier = Modifier,
@@ -60,6 +192,7 @@ fun TasksForSelectedDaySection(
     selectedDate: LocalDate,
     displayedYearMonth: java.time.YearMonth,
     activityIdWithDeleteVisible: String?,
+    recentlyCompletedTaskId: String? = null,
     onTaskClick: (Activity) -> Unit,
     onTaskLongClick: (String) -> Unit,
     onDeleteClick: (String) -> Unit,
@@ -273,11 +406,11 @@ fun TaskItem(
                     )
                 }
                 
-                if (!task.isCompleted) {
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (!task.isCompleted) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primary,
@@ -306,26 +439,26 @@ fun TaskItem(
                         }
                         
                         Spacer(modifier = Modifier.width(8.dp))
-                        
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier
-                                .height(40.dp)
-                                .width(80.dp)
-                                .clickable { onDeleteClick(task.id) }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .width(80.dp)
+                            .clickable { onDeleteClick(task.id) }
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "DEL",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onError,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = "DEL",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onError,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

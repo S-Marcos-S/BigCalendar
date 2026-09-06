@@ -33,6 +33,9 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.AutoAwesome
+import com.mss.thebigcalendar.ui.components.GeminiAssistantDialog
+import com.mss.thebigcalendar.ui.components.GeminiSettingsDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -87,6 +90,7 @@ import com.mss.thebigcalendar.ui.components.SaintInfoDialog
 import com.mss.thebigcalendar.ui.components.Sidebar
 import com.mss.thebigcalendar.ui.components.StoragePermissionDialog
 import com.mss.thebigcalendar.ui.components.TasksForSelectedDaySection
+import com.mss.thebigcalendar.ui.components.tasksForSelectedDaySection
 import com.mss.thebigcalendar.ui.components.YearlyCalendarView
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -320,6 +324,19 @@ fun CalendarScreen(
                                             )
                                         }
                                     }
+                                    IconButton(onClick = {
+                                        if (uiState.geminiApiKey.isBlank()) {
+                                            viewModel.openGeminiSettings()
+                                        } else {
+                                            viewModel.openGeminiAssistant()
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = stringResource(id = R.string.gemini_assistant_title),
+                                            tint = appBarContentColor
+                                        )
+                                    }
                                     IconButton(onClick = { viewModel.onSearchIconClick() }) {
                                         Icon(
                                             Icons.Default.Search,
@@ -466,11 +483,11 @@ fun CalendarScreen(
                     if (uiState.showDuplicateDialog) {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { viewModel.dismissDuplicateDialog() },
-                            title = { Text("Agendamentos Duplicados") },
+                            title = { Text(stringResource(R.string.duplicate_activities_title)) },
                             text = {
                                 Column {
                                     Text(
-                                        text = "Foram encontrados agendamentos com as mesmas informações. Você pode apagá-los de forma individual ou remover todas as cópias extras de uma vez, mantendo apenas um.",
+                                        text = stringResource(R.string.duplicate_activities_desc),
                                         style = MaterialTheme.typography.bodyMedium,
                                         modifier = Modifier.padding(bottom = 16.dp)
                                     )
@@ -480,7 +497,7 @@ fun CalendarScreen(
                                             uiState.duplicateGroups.forEachIndexed { groupIndex, group ->
                                                 item {
                                                     Text(
-                                                        text = "Grupo ${groupIndex + 1} (${group.first().title})",
+                                                        text = stringResource(R.string.duplicate_group_format, groupIndex + 1, group.first().title),
                                                         style = MaterialTheme.typography.titleSmall,
                                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
@@ -511,7 +528,7 @@ fun CalendarScreen(
                                                         IconButton(onClick = { viewModel.deleteActivityDirectly(activity.id) }) {
                                                             Icon(
                                                                 imageVector = Icons.Default.Delete,
-                                                                contentDescription = "Apagar esta cópia",
+                                                                contentDescription = stringResource(R.string.delete_this_copy),
                                                                 tint = MaterialTheme.colorScheme.error
                                                             )
                                                         }
@@ -526,16 +543,46 @@ fun CalendarScreen(
                                 androidx.compose.material3.TextButton(
                                     onClick = { viewModel.removeAllDuplicates() }
                                 ) {
-                                    Text("Manter apenas um")
+                                    Text(stringResource(R.string.keep_only_one))
                                 }
                             },
                             dismissButton = {
                                 androidx.compose.material3.TextButton(
                                     onClick = { viewModel.dismissDuplicateDialog() }
                                 ) {
-                                    Text("Fechar")
+                                    Text(stringResource(R.string.close))
                                 }
                             }
+                        )
+                    }
+
+                    if (uiState.isGeminiAssistantOpen) {
+                        GeminiAssistantDialog(
+                            isOpen = uiState.isGeminiAssistantOpen,
+                            isProcessing = uiState.isGeminiProcessing,
+                            apiKey = uiState.geminiApiKey,
+                            lastResult = uiState.geminiLastResult,
+                            lastActivity = uiState.geminiLastActivity,
+                            errorMessage = uiState.geminiErrorMessage,
+                            errorDetails = uiState.geminiErrorDetails,
+                            canUndo = uiState.canUndoGeminiAction,
+                            onSendCommand = { prompt -> viewModel.processGeminiCommand(prompt) },
+                            onUndoAction = { viewModel.undoLastGeminiAction() },
+                            onUpdateDescription = { newDesc -> viewModel.updateGeminiActivityDescription(newDesc) },
+                            onOpenSettings = { viewModel.openGeminiSettings() },
+                            onDismissRequest = { viewModel.closeGeminiAssistant() }
+                        )
+                    }
+
+                    if (uiState.isGeminiSettingsOpen) {
+                        GeminiSettingsDialog(
+                            currentApiKey = uiState.geminiApiKey,
+                            currentVoiceFeedback = uiState.geminiVoiceFeedback,
+                            currentModel = uiState.geminiModel,
+                            onSaveSettings = { apiKey, voiceFeedback, model ->
+                                viewModel.saveGeminiSettings(apiKey, voiceFeedback, model)
+                            },
+                            onDismissRequest = { viewModel.closeGeminiSettings() }
                         )
                     }
                 }
@@ -772,39 +819,34 @@ fun MainCalendarView(
                         )
                     }
                     
-                    item(
-                        key = "tasks-${uiState.selectedDate}",
-                        contentType = "tasks"
-                    ) {
-                        TasksForSelectedDaySection(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                            tasks = uiState.tasksForSelectedDate,
-                            selectedDate = uiState.selectedDate,
-                            displayedYearMonth = uiState.displayedYearMonth,
-                            activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
-                            onTaskClick = {
-                                if (uiState.activityIdWithDeleteButtonVisible != null) {
-                                    viewModel.hideDeleteButton()
-                                } else {
-                                    viewModel.openCreateActivityModal(it, it.activityType)
-                                }
-                            },
-                            onTaskLongClick = { viewModel.onTaskLongPressed(it) },
-                            onDeleteClick = { viewModel.requestDeleteActivity(it) },
-                            onCompleteClick = { viewModel.markActivityAsCompleted(it) },
-                            onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
-                            onCommemorativeClick = { task ->
-                                val date = java.time.LocalDate.parse(task.date)
-                                val commemorativeHoliday = uiState.commemorativeDates[date]
-                                if (commemorativeHoliday != null) {
-                                    viewModel.onSaintDayClick(commemorativeHoliday)
-                                }
-                            },
-                            onUpdateTaskDescription = { activity, newDesc ->
-                                viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                    tasksForSelectedDaySection(
+                        tasks = uiState.tasksForSelectedDate,
+                        selectedDate = uiState.selectedDate,
+                        displayedYearMonth = uiState.displayedYearMonth,
+                        activityIdWithDeleteVisible = uiState.activityIdWithDeleteButtonVisible,
+                        recentlyCompletedTaskId = uiState.recentlyCompletedTaskId,
+                        onTaskClick = {
+                            if (uiState.activityIdWithDeleteButtonVisible != null) {
+                                viewModel.hideDeleteButton()
+                            } else {
+                                viewModel.openCreateActivityModal(it, it.activityType)
                             }
-                        )
-                    }
+                        },
+                        onTaskLongClick = { viewModel.onTaskLongPressed(it) },
+                        onDeleteClick = { viewModel.requestDeleteActivity(it) },
+                        onCompleteClick = { viewModel.markActivityAsCompleted(it) },
+                        onAddTaskClick = { viewModel.openCreateActivityModal(activityType = ActivityType.TASK) },
+                        onCommemorativeClick = { task ->
+                            val date = java.time.LocalDate.parse(task.date)
+                            val commemorativeHoliday = uiState.commemorativeDates[date]
+                            if (commemorativeHoliday != null) {
+                                viewModel.onSaintDayClick(commemorativeHoliday)
+                            }
+                        },
+                        onUpdateTaskDescription = { activity, newDesc ->
+                            viewModel.onSaveActivity(activity.copy(description = newDesc), activity.isFromGoogle)
+                        }
+                    )
                     
                     // Seções dos calendários JSON importados
                     uiState.jsonCalendarActivitiesForSelectedDate.forEach { (calendarId, activities) ->

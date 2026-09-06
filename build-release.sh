@@ -3,6 +3,11 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$1" = "--remote" ] || [ "$1" = "-r" ]; then
+    exec "$PROJECT_DIR/build-remote.sh" "${@:2}"
+fi
+
 APK="$PROJECT_DIR/app/build/outputs/apk/release/app-release.apk"
 DOWNLOAD_DIR="$HOME/storage/downloads"
 

@@ -10,6 +10,7 @@ import com.mss.thebigcalendar.data.model.SyncPhase
 import com.mss.thebigcalendar.data.model.SyncProgress
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.data.repository.SyncRepository
+import com.mss.thebigcalendar.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -45,7 +46,7 @@ class ProgressiveSyncService(
             // Fase 1: Sincronização rápida (mês atual + próximo mês)
             val quickSyncResult = performQuickSync(account, forceFullSync, onProgressUpdate)
             if (quickSyncResult.isFailure) {
-                return@withContext Result.failure(quickSyncResult.exceptionOrNull() ?: Exception("Falha na sincronização rápida"))
+                return@withContext Result.failure(quickSyncResult.exceptionOrNull() ?: Exception(context.getString(R.string.quick_sync_failed)))
             }
             
             // Fase 2: Sincronização em background (resto do ano)

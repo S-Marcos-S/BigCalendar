@@ -59,10 +59,29 @@ class TheBigCalendarApplication : Application(), Configuration.Provider {
 
     private fun scheduleRolloverWorker() {
         val workManager = WorkManager.getInstance(this)
-        val rolloverRequest =
+
+        // 1. OneTimeWorkRequest imediato com política REPLACE para garantir execução ao iniciar
+        val immediateRequest =
             androidx.work.OneTimeWorkRequestBuilder<com.mss.thebigcalendar.worker.RolloverWorker>()
                 .build()
+        workManager.enqueueUniqueWork(
+            "rollover_worker_immediate",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            immediateRequest
+        )
 
-        workManager.enqueue(rolloverRequest)
+        // 2. PeriodicWorkRequest a cada 12 horas como camada de garantia em segundo plano
+        val periodicRequest =
+            androidx.work.PeriodicWorkRequestBuilder<com.mss.thebigcalendar.worker.RolloverWorker>(
+                12, java.util.concurrent.TimeUnit.HOURS
+            ).build()
+        workManager.enqueueUniquePeriodicWork(
+            "rollover_worker_periodic",
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            periodicRequest
+        )
+
+        // 3. Agendar alarme exato de meia-noite via AlarmManager para virada do dia
+        com.mss.thebigcalendar.service.RolloverManager.scheduleMidnightRollover(this)
     }
 }

@@ -242,7 +242,7 @@ fun SyncSettingsScreen(
 
             // Seção de Dispositivos Sincronizados
             Text(
-                text = "Dispositivos Sincronizados",
+                text = stringResource(id = R.string.synced_devices_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -297,13 +297,13 @@ fun SyncSettingsScreen(
                             val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                                 .format(java.util.Date(activeDevice.lastSyncTime))
                             Text(
-                                text = "Última sincronização: $dateStr",
+                                text = stringResource(R.string.last_sync_format, dateStr),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             Text(
-                                text = "Não conectado",
+                                text = stringResource(R.string.status_not_connected),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                             )
@@ -377,25 +377,25 @@ fun SyncSettingsScreen(
             if (showInfoDialog) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showInfoDialog = false },
-                    title = { Text("Sobre a Criptografia de Dados") },
+                    title = { Text(stringResource(id = R.string.about_data_encryption_title)) },
                     text = {
                         Text(
-                            text = "A criptografia de dados protege seus compromissos e tarefas contra acessos não autorizados.\n\n" +
-                                    "• Privacidade Absoluta (Zero-Knowledge): Seus dados são criptografados diretamente no seu dispositivo antes de serem enviados para a nuvem. Isso significa que apenas você, com a sua senha, pode descriptografá-los.\n\n" +
-                                    "• Algoritmo de Alta Segurança: Utilizamos o padrão AES com chaves de 256 bits geradas a partir de sua senha usando derivação robusta (PBKDF2). Nem mesmo o Google ou os desenvolvedores do app podem acessar suas informações.\n\n" +
-                                    "• Proteção de Backups: Seus arquivos de backup locais salvos no armazenamento do aparelho também ficam totalmente protegidos contra leituras por outros aplicativos.",
+                            text = stringResource(id = R.string.about_data_encryption_desc),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     confirmButton = {
                         Button(onClick = { showInfoDialog = false }) {
-                            Text("Entendi")
+                            Text(stringResource(id = R.string.got_it))
                         }
                     }
                 )
             }
 
             if (showPasswordDialog) {
+                val emptyPasswordErrorMsg = stringResource(id = R.string.encryption_password_empty)
+                val mismatchPasswordErrorMsg = stringResource(id = R.string.encryption_passwords_mismatch)
+
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showPasswordDialog = false },
                     title = { Text(stringResource(id = R.string.encryption_dialog_title)) },
@@ -442,9 +442,9 @@ fun SyncSettingsScreen(
                         Button(
                             onClick = {
                                 if (password.isEmpty()) {
-                                    passwordError = "A senha não pode ser vazia!"
+                                    passwordError = emptyPasswordErrorMsg
                                 } else if (password != confirmPassword) {
-                                    passwordError = "As senhas não coincidem!"
+                                    passwordError = mismatchPasswordErrorMsg
                                 } else {
                                     onEncryptionToggle(true, password)
                                     showPasswordDialog = false
@@ -551,7 +551,7 @@ fun SyncSettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Info,
-                                contentDescription = "Mais informações sobre relatórios de erros",
+                                contentDescription = stringResource(id = R.string.more_info_crash_reports),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -573,19 +573,16 @@ fun SyncSettingsScreen(
             if (showCrashlyticsInfoDialog) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { showCrashlyticsInfoDialog = false },
-                    title = { Text("Sobre os Relatórios de Erros") },
+                    title = { Text(stringResource(id = R.string.about_crash_reports_title)) },
                     text = {
                         Text(
-                            text = "Os relatórios de erros nos ajudam a identificar e corrigir travamentos no aplicativo de forma automática e rápida.\n\n" +
-                                    "• Anonimato Completo: Não coletamos nenhuma informação pessoal identificável, como seu nome, e-mail, tarefas ou compromissos. Apenas dados de diagnóstico do sistema são enviados.\n\n" +
-                                    "• Informações Técnicas: São enviados detalhes de hardware (modelo do aparelho, versão do Android) e rastreamento de pilha (stack trace) da falha ocorrida.\n\n" +
-                                    "• Melhoria Contínua: Com esses dados, podemos corrigir bugs e instabilidades antes mesmo que afetem outros usuários.",
+                            text = stringResource(id = R.string.about_crash_reports_desc),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     confirmButton = {
                         Button(onClick = { showCrashlyticsInfoDialog = false }) {
-                            Text("Entendi")
+                            Text(stringResource(id = R.string.got_it))
                         }
                     }
                 )

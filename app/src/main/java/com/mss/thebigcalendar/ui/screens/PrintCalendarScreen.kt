@@ -25,10 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -98,7 +101,14 @@ private fun isDarkColor(color: androidx.compose.ui.graphics.Color): Boolean {
 fun PrintCalendarScreen(
     uiState: CalendarUiState,
     onNavigateBack: () -> Unit,
-    onGeneratePdf: (PrintOptions, (String) -> Unit) -> Unit
+    onGeneratePdf: (PrintOptions, (String) -> Unit) -> Unit,
+    onOpenAiPrintAssistant: () -> Unit = {},
+    onCloseAiPrintAssistant: () -> Unit = {},
+    onGenerateOrModifyAiTemplate: (prompt: String, images: List<android.graphics.Bitmap>, currentTemplate: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?) -> Unit = { _, _, _ -> },
+    onSaveAiTemplate: (com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec) -> Unit = {},
+    onDeleteAiTemplate: (String) -> Unit = {},
+    onSetActiveAiTemplate: (com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?) -> Unit = {},
+    onOpenGeminiSettings: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val typefaceMap = remember {
@@ -169,6 +179,7 @@ fun PrintCalendarScreen(
         }
     }
     var selectedModel by remember { mutableStateOf<String?>(printModels.firstOrNull()) }
+    var activeAiTemplate by remember(uiState.activeAiPrintTemplate) { mutableStateOf(uiState.activeAiPrintTemplate) }
 
     var isGeneratingPdf by remember { mutableStateOf(false) }
     var generatedPdfPath by remember { mutableStateOf<String?>(null) }
@@ -264,6 +275,13 @@ fun PrintCalendarScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenAiPrintAssistant) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Design com IA",
+                            tint = appBarContentColor
+                        )
+                    }
                     Box {
                         IconButton(onClick = { isMenuExpanded = true }) {
                             Icon(
@@ -354,25 +372,84 @@ fun PrintCalendarScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = if (selectedModel != null) Icons.Default.Check else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = if (selectedModel != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = stringResource(id = R.string.design_model),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (selectedModel != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (selectedModel != null || activeAiTemplate != null) Icons.Default.Check else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = if (selectedModel != null || activeAiTemplate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(id = R.string.design_model),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selectedModel != null || activeAiTemplate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+
+                                Button(
+                                    onClick = onOpenAiPrintAssistant,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Criar com IA", fontSize = 12.sp)
+                                }
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            // Banner de Modelo IA Ativo
+                            if (activeAiTemplate != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = activeAiTemplate!!.name,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            if (activeAiTemplate!!.description.isNotBlank()) {
+                                                Text(
+                                                    text = activeAiTemplate!!.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+
+                                        Row {
+                                            IconButton(onClick = onOpenAiPrintAssistant, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = "Editar com IA", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            }
+                                            IconButton(onClick = { activeAiTemplate = null; onSetActiveAiTemplate(null) }, modifier = Modifier.size(32.dp)) {
+                                                Icon(Icons.Default.Close, contentDescription = "Remover modelo", modifier = Modifier.size(18.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             // Galeria de Modelos (Lado a Lado)
                             FlowRow(
@@ -385,18 +462,23 @@ fun PrintCalendarScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.padding(4.dp)
                                 ) {
+                                    val isNoneSelected = selectedModel == null && activeAiTemplate == null
                                     Card(
                                         modifier = Modifier
                                             .height(100.dp)
                                             .width(70.dp)
                                             .clip(RoundedCornerShape(8.dp))
                                             .border(
-                                                width = if (selectedModel == null) 3.dp else 1.dp,
-                                                color = if (selectedModel == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                width = if (isNoneSelected) 3.dp else 1.dp,
+                                                color = if (isNoneSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                                 shape = RoundedCornerShape(8.dp)
                                             )
-                                            .clickable { selectedModel = null },
-                                        elevation = CardDefaults.cardElevation(defaultElevation = if (selectedModel == null) 6.dp else 1.dp)
+                                            .clickable {
+                                                selectedModel = null
+                                                activeAiTemplate = null
+                                                onSetActiveAiTemplate(null)
+                                            },
+                                        elevation = CardDefaults.cardElevation(defaultElevation = if (isNoneSelected) 6.dp else 1.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
@@ -412,9 +494,107 @@ fun PrintCalendarScreen(
                                     )
                                 }
 
-                                // Lista de Modelos Disponíveis
+                                // Botão Criar com IA na Galeria
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(4.dp)
+                                ) {
+                                    Card(
+                                        modifier = Modifier
+                                            .height(100.dp)
+                                            .width(70.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .border(
+                                                width = 1.dp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { onOpenAiPrintAssistant() },
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("+ Novo IA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = "Criar IA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(top = 4.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // Lista de Modelos da IA Salvos / Presets
+                                uiState.aiPrintTemplates.forEach { aiSpec ->
+                                    val isAiSelected = activeAiTemplate?.id == aiSpec.id
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(4.dp)
+                                    ) {
+                                        Card(
+                                            modifier = Modifier
+                                                .height(100.dp)
+                                                .width(70.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .border(
+                                                    width = if (isAiSelected) 3.dp else 1.dp,
+                                                    color = if (isAiSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable {
+                                                    activeAiTemplate = aiSpec
+                                                    selectedModel = null
+                                                    onSetActiveAiTemplate(aiSpec)
+                                                },
+                                            elevation = CardDefaults.cardElevation(defaultElevation = if (isAiSelected) 6.dp else 1.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(CalendarAiTemplateSpec.parseHexColor(aiSpec.pageBackgroundColor, androidx.compose.ui.graphics.Color.White))
+                                                    .padding(4.dp)
+                                            ) {
+                                                Column(modifier = Modifier.fillMaxSize()) {
+                                                    Text(
+                                                        text = aiSpec.name,
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = CalendarAiTemplateSpec.parseHexColor(aiSpec.primaryColor, androidx.compose.ui.graphics.Color.Black),
+                                                        maxLines = 2
+                                                    )
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                    Text(
+                                                        text = aiSpec.layoutType.name.replace("_", " "),
+                                                        fontSize = 6.sp,
+                                                        color = CalendarAiTemplateSpec.parseHexColor(aiSpec.secondaryColor, androidx.compose.ui.graphics.Color.DarkGray),
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            text = aiSpec.name,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(top = 4.dp).width(70.dp),
+                                            fontWeight = if (isAiSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isAiSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                    }
+                                }
+
+                                // Lista de Modelos Padrão Legados
                                 printModels.forEach { modelPath ->
-                                    val isSelected = selectedModel == modelPath
+                                    val isSelected = selectedModel == modelPath && activeAiTemplate == null
                                     val bitmap = remember(modelPath) {
                                         try {
                                             context.assets.open("print_models/$modelPath").use {
@@ -439,7 +619,11 @@ fun PrintCalendarScreen(
                                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                                     shape = RoundedCornerShape(8.dp)
                                                 )
-                                                .clickable { selectedModel = modelPath },
+                                                .clickable {
+                                                    selectedModel = modelPath
+                                                    activeAiTemplate = null
+                                                    onSetActiveAiTemplate(null)
+                                                },
                                             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 1.dp)
                                         ) {
                                             bitmap?.let {
@@ -452,7 +636,7 @@ fun PrintCalendarScreen(
                                             }
                                         }
                                         Text(
-                                            text = "Modelo ${printModels.indexOf(modelPath) + 1}",
+                                            text = stringResource(R.string.print_model_label, printModels.indexOf(modelPath) + 1),
                                             style = MaterialTheme.typography.labelSmall,
                                             modifier = Modifier.padding(top = 4.dp),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -462,13 +646,17 @@ fun PrintCalendarScreen(
                                 }
                             }
 
-                            // Opção de desativar modelo (Botão único abaixo da galeria)
+                            // Opção de desativar modelo
                             Spacer(modifier = Modifier.height(8.dp))
                             FilterChip(
-                                selected = selectedModel == null,
-                                onClick = { selectedModel = null },
+                                selected = selectedModel == null && activeAiTemplate == null,
+                                onClick = {
+                                    selectedModel = null
+                                    activeAiTemplate = null
+                                    onSetActiveAiTemplate(null)
+                                },
                                 label = { Text(stringResource(id = R.string.no_design_model)) },
-                                leadingIcon = if (selectedModel == null) {
+                                leadingIcon = if (selectedModel == null && activeAiTemplate == null) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                 } else null,
                                 colors = FilterChipDefaults.filterChipColors(
@@ -482,7 +670,7 @@ fun PrintCalendarScreen(
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = selectedModel == null,
+                    visible = selectedModel == null && activeAiTemplate == null,
                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                 ) {
@@ -1889,7 +2077,7 @@ fun PrintCalendarScreen(
                                 Text(stringResource(id = R.string.font_preview), style = MaterialTheme.typography.labelSmall)
                                 Card(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
                                     Text(
-                                        text = "O céu está azul hoje.",
+                                        text = stringResource(R.string.font_preview_sample_text),
                                         fontFamily = androidx.compose.ui.text.font.FontFamily(selectedTypeface!!),
                                         fontSize = 20.sp,
                                         modifier = Modifier.padding(16.dp)
@@ -2095,6 +2283,16 @@ fun PrintCalendarScreen(
                                                     }
                                                 }
                                             }
+                                        } else if (activeAiTemplate != null) {
+                                            // Preview dinâmico do modelo gerado pela IA
+                                            com.mss.thebigcalendar.ui.components.AiTemplateComposePreview(
+                                                template = activeAiTemplate!!,
+                                                selectedMonth = selectedMonth,
+                                                activities = uiState.activities,
+                                                holidays = uiState.nationalHolidays.values.toList(),
+                                                moonPhases = emptyList(),
+                                                modifier = Modifier.fillMaxSize().padding(8.dp)
+                                            )
                                         } else {
                                             // Mostrar mensagem quando não há PDF
                                             Text(
@@ -2163,7 +2361,8 @@ fun PrintCalendarScreen(
                             showNotesSection = showNotesSection,
                             includeNotesPage = includeNotesPage,
                             fontFamily = fontFamily,
-                            selectedModel = selectedModel
+                            selectedModel = selectedModel,
+                            aiTemplateSpec = activeAiTemplate
                         )
                         Log.d("PrintCalendar", "📋 Opções do PDF: $options")
                         onGeneratePdf(options, { pdfPath: String ->
@@ -2200,6 +2399,52 @@ fun PrintCalendarScreen(
                     .padding(end = 4.dp)
             )
         }
+    }
+
+    if (uiState.isAiPrintAssistantOpen) {
+        val monthActivities = remember(uiState.activities, selectedMonth) {
+            uiState.activities.filter {
+                try {
+                    val date = java.time.LocalDate.parse(it.date)
+                    date.year == selectedMonth.year && date.month == selectedMonth.month
+                } catch (_: Exception) { false }
+            }
+        }
+        val monthHolidays = remember(uiState.nationalHolidays, selectedMonth) {
+            uiState.nationalHolidays.values.filter {
+                try {
+                    val date = java.time.LocalDate.parse(it.date)
+                    date.year == selectedMonth.year && date.month == selectedMonth.month
+                } catch (_: Exception) { false }
+            }
+        }
+
+        com.mss.thebigcalendar.ui.components.AiPrintAssistantDialog(
+            isOpen = uiState.isAiPrintAssistantOpen,
+            isProcessing = uiState.isAiPrintProcessing,
+            apiKey = uiState.geminiApiKey,
+            currentTemplate = activeAiTemplate ?: uiState.activeAiPrintTemplate,
+            selectedMonth = selectedMonth,
+            activities = monthActivities,
+            holidays = monthHolidays,
+            moonPhases = emptyList(),
+            lastReplyMessage = uiState.aiPrintLastReplyMessage,
+            errorMessage = uiState.aiPrintErrorMessage,
+            errorDetails = uiState.aiPrintErrorDetails,
+            onGenerateOrModify = { prompt, images, current ->
+                onGenerateOrModifyAiTemplate(prompt, images, current)
+            },
+            onSaveTemplate = { template ->
+                onSaveAiTemplate(template)
+                activeAiTemplate = template
+            },
+            onApplyTemplate = { template ->
+                activeAiTemplate = template
+                onSetActiveAiTemplate(template)
+            },
+            onOpenSettings = onOpenGeminiSettings,
+            onDismissRequest = onCloseAiPrintAssistant
+        )
     }
 }
 
@@ -2248,7 +2493,8 @@ data class PrintOptions(
     val showNotesSection: Boolean,
     val includeNotesPage: Boolean,
     val fontFamily: String,
-    val selectedModel: String? = null
+    val selectedModel: String? = null,
+    val aiTemplateSpec: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec? = null
 )
 
 enum class PageOrientation { PORTRAIT, LANDSCAPE }

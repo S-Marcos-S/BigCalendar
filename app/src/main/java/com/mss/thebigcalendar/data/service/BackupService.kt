@@ -36,6 +36,7 @@ import com.mss.thebigcalendar.data.repository.BackupFrequency
 import com.mss.thebigcalendar.data.repository.BackupType
 import com.mss.thebigcalendar.data.model.AlarmSettings
 import com.mss.thebigcalendar.data.repository.AlarmRepository
+import com.mss.thebigcalendar.R
 
 
 class BackupService(
@@ -54,8 +55,10 @@ class BackupService(
         return GoogleDriveService(context, account)
     }
 
-    suspend fun createCloudBackup(account: GoogleSignInAccount): Result<String> = withContext(Dispatchers.IO) {
-        notificationService.showBackupInProgressNotification()
+    suspend fun createCloudBackup(account: GoogleSignInAccount, showNotification: Boolean = true): Result<String> = withContext(Dispatchers.IO) {
+        if (showNotification) {
+            notificationService.showBackupInProgressNotification()
+        }
         val tempFile = File.createTempFile(BACKUP_FILE_PREFIX, BACKUP_FILE_EXTENSION, context.cacheDir)
         try {
             val activities = activityRepository.activities.first()
@@ -87,14 +90,22 @@ class BackupService(
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-                notificationService.showBackupCompleteNotification(uploadedFile.name)
+                if (showNotification) {
+                    notificationService.showBackupCompleteNotification(uploadedFile.name)
+                }
                 Result.success(uploadedFile.id)
             } else {
-                notificationService.showBackupFailedNotification("Falha ao fazer upload do arquivo de backup para o Google Drive")
-                Result.failure(Exception("Falha ao fazer upload do arquivo de backup para o Google Drive"))
+                val errorMsg = context.getString(com.mss.thebigcalendar.R.string.backup_error_upload_drive)
+                if (showNotification) {
+                    notificationService.showBackupFailedNotification(errorMsg)
+                }
+                Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            notificationService.showBackupFailedNotification(e.message ?: "Erro desconhecido")
+            val errorMsg = e.message ?: context.getString(com.mss.thebigcalendar.R.string.unknown_error)
+            if (showNotification) {
+                notificationService.showBackupFailedNotification(errorMsg)
+            }
             Result.failure(e)
         } finally {
             if (tempFile.exists()) {
@@ -165,13 +176,17 @@ class BackupService(
     /**
      * Gera um backup completo de todas as atividades e itens da lixeira usando SAF.
      */
-    suspend fun createBackup(directoryUri: Uri): Result<String> = withContext(Dispatchers.IO) {
-        notificationService.showBackupInProgressNotification()
+    suspend fun createBackup(directoryUri: Uri, showNotification: Boolean = true): Result<String> = withContext(Dispatchers.IO) {
+        if (showNotification) {
+            notificationService.showBackupInProgressNotification()
+        }
         try {
             val directory = DocumentFile.fromTreeUri(context, directoryUri)
             if (directory == null || !directory.canWrite()) {
-                val errorMessage = "Permissão negada para escrever no diretório selecionado."
-                notificationService.showBackupFailedNotification(errorMessage)
+                val errorMessage = context.getString(com.mss.thebigcalendar.R.string.backup_error_permission_denied)
+                if (showNotification) {
+                    notificationService.showBackupFailedNotification(errorMessage)
+                }
                 return@withContext Result.failure(Exception(errorMessage))
             }
 
@@ -198,8 +213,10 @@ class BackupService(
             // Criar arquivo de backup usando SAF
             val backupFile = directory.createFile("application/json", backupFileName)
             if (backupFile == null) {
-                val errorMessage = "Falha ao criar arquivo de backup no diretório selecionado."
-                notificationService.showBackupFailedNotification(errorMessage)
+                val errorMessage = context.getString(com.mss.thebigcalendar.R.string.backup_error_create_file_failed)
+                if (showNotification) {
+                    notificationService.showBackupFailedNotification(errorMessage)
+                }
                 return@withContext Result.failure(Exception(errorMessage))
             }
 
@@ -216,10 +233,16 @@ class BackupService(
                 e.printStackTrace()
             }
 
-            notificationService.showBackupCompleteNotification(backupFile.name ?: backupFileName)
-            Result.success(backupFile.name ?: backupFileName)
+            val finalFileName = backupFile.name ?: backupFileName
+            if (showNotification) {
+                notificationService.showBackupCompleteNotification(finalFileName)
+            }
+            Result.success(finalFileName)
         } catch (e: Exception) {
-            notificationService.showBackupFailedNotification(e.message ?: "Erro desconhecido")
+            val errorMsg = e.message ?: context.getString(com.mss.thebigcalendar.R.string.unknown_error)
+            if (showNotification) {
+                notificationService.showBackupFailedNotification(errorMsg)
+            }
             Result.failure(e)
         }
     }
@@ -517,7 +540,7 @@ class BackupService(
         try {
             val content = context.contentResolver.openInputStream(backupFile.uri)?.use { inputStream ->
                 inputStream.bufferedReader().use { it.readText() }
-            } ?: return@withContext Result.failure(Exception("Não foi possível ler o arquivo de backup."))
+            } ?: return@withContext Result.failure(Exception(context.getString(com.mss.thebigcalendar.R.string.backup_error_read_failed)))
 
             val isEncrypted = com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)
             val json = if (isEncrypted) {
@@ -564,7 +587,7 @@ class BackupService(
             val content = context.contentResolver.openInputStream(backupUri)?.use { inputStream ->
                 inputStream.bufferedReader().use { it.readText() }
             } ?: run {
-                val errorMessage = "Não foi possível ler o arquivo de backup para restauração."
+                val errorMessage = context.getString(com.mss.thebigcalendar.R.string.backup_error_read_restore_failed)
                 notificationService.showRestoreFailedNotification(errorMessage)
                 return@withContext Result.failure(Exception(errorMessage))
             }
@@ -572,15 +595,15 @@ class BackupService(
             val finalContent = if (com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
                 val passwordToUse = providedPassword ?: settingsRepository.encryptionPassword.first()
                 if (passwordToUse.isEmpty()) {
-                    val error = com.mss.thebigcalendar.crypto.DecryptionRequiredException("Este arquivo de backup está criptografado. Uma senha é necessária.")
-                    notificationService.showRestoreFailedNotification("Backup criptografado. Senha necessária.")
+                    val error = com.mss.thebigcalendar.crypto.DecryptionRequiredException(context.getString(com.mss.thebigcalendar.R.string.backup_error_encrypted_password_required))
+                    notificationService.showRestoreFailedNotification(context.getString(com.mss.thebigcalendar.R.string.backup_error_encrypted_password_required))
                     return@withContext Result.failure(error)
                 }
                 try {
                     com.mss.thebigcalendar.crypto.CryptoHelper.decrypt(content, passwordToUse)
                 } catch (e: Exception) {
-                    val error = com.mss.thebigcalendar.crypto.DecryptionFailedException("Senha incorreta ou erro ao descriptografar.")
-                    notificationService.showRestoreFailedNotification("Senha do backup incorreta.")
+                    val error = com.mss.thebigcalendar.crypto.DecryptionFailedException(context.getString(com.mss.thebigcalendar.R.string.decryption_failed))
+                    notificationService.showRestoreFailedNotification(context.getString(com.mss.thebigcalendar.R.string.decryption_failed))
                     return@withContext Result.failure(error)
                 }
             } else {
@@ -592,7 +615,7 @@ class BackupService(
             // Verificar versão do backup
             val backupVersion = json.optString("backupVersion", "1.0")
             if (backupVersion != "1.0" && backupVersion != "1.1") {
-                val errorMessage = "Versão de backup não suportada: $backupVersion"
+                val errorMessage = context.getString(com.mss.thebigcalendar.R.string.backup_error_unsupported_version, backupVersion)
                 notificationService.showRestoreFailedNotification(errorMessage)
                 return@withContext Result.failure(Exception(errorMessage))
             }
@@ -791,7 +814,8 @@ class BackupService(
             Result.success(result)
 
         } catch (e: Exception) {
-            notificationService.showRestoreFailedNotification(e.message ?: "Erro desconhecido")
+            val errorMsg = e.message ?: context.getString(com.mss.thebigcalendar.R.string.unknown_error)
+            notificationService.showRestoreFailedNotification(errorMsg)
             Result.failure(e)
         }
     }
@@ -806,10 +830,10 @@ class BackupService(
                 if (documentFile.delete()) {
                     Result.success(Unit)
                 } else {
-                    Result.failure(Exception("Falha ao deletar o arquivo de backup."))
+                    Result.failure(Exception(context.getString(R.string.backup_error_delete_file_failed)))
                 }
             } else {
-                Result.failure(Exception("Não foi possível obter permissão para deletar o arquivo."))
+                Result.failure(Exception(context.getString(R.string.backup_error_delete_permission_failed)))
             }
         } catch (e: Exception) {
             Result.failure(e)

@@ -26,10 +26,12 @@ android {
         applicationId = "com.mss.thebigcalendar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 53
-        versionName = "1.8.8"
+        versionCode = 54
+        versionName = "1.8.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        resourceConfigurations += listOf("pt", "en", "es", "fr", "de", "it", "ja", "ru", "zh-rCN")
     }
 
     // Adicione este bloco para carregar as propriedades da sua keystore
@@ -68,7 +70,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -97,6 +100,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1,DEPENDENCIES}"
+            excludes += "/META-INF/LICENSE*"
+            excludes += "/META-INF/NOTICE*"
+            excludes += "/META-INF/*.version"
         }
     }
 

@@ -97,6 +97,7 @@ data class CalendarUiState(
     val currentSettingsScreen: String? = null,
     val calendarDays: List<CalendarDay> = emptyList(),
     val tasksForSelectedDate: List<Activity> = emptyList(), // NOVO: Lista de tarefas para o dia selecionado
+    val recentlyCompletedTaskId: String? = null, // ID da tarefa recém finalizada para animar descendo
     val birthdaysForSelectedDate: List<Activity> = emptyList(), // Lista de aniversários para o dia selecionado
     val notesForSelectedDate: List<Activity> = emptyList(), // Lista de notas para o dia selecionado
     val animationType: AnimationType = AnimationType.SLIDE, // Tipo de animação selecionado
@@ -123,6 +124,7 @@ data class CalendarUiState(
     val isTrashScreenOpen: Boolean = false,
     val isBackupScreenOpen: Boolean = false,
     val backupMessage: String? = null,
+    val isBackupError: Boolean = false,
     val isRestoringBackup: Boolean = false,
     val localBackupUriBeingRestored: String? = null,
     val restoreProgress: Float = 0f,
@@ -164,6 +166,7 @@ data class CalendarUiState(
     val isBackingUp: Boolean = false,
     val isRestoring: Boolean = false,
     val restoreMessage: String? = null,
+    val isRestoreError: Boolean = false,
     val autoBackupSettings: com.mss.thebigcalendar.data.repository.AutoBackupSettings = com.mss.thebigcalendar.data.repository.AutoBackupSettings(
         enabled = false,
         frequency = com.mss.thebigcalendar.data.repository.BackupFrequency.DAILY,
@@ -184,7 +187,29 @@ data class CalendarUiState(
     val duplicateGroups: List<List<Activity>> = emptyList(),
     val showDuplicateDialog: Boolean = false,
     val maxLocalBackups: Int = 10,
-    val maxCloudBackups: Int = 10
+    val maxCloudBackups: Int = 10,
+    val isGeminiAssistantOpen: Boolean = false,
+    val isGeminiSettingsOpen: Boolean = false,
+    val isGeminiProcessing: Boolean = false,
+    val geminiApiKey: String = "",
+    val geminiVoiceFeedback: Boolean = true,
+    val geminiModel: String = "gemini-3.6-flash",
+    val geminiLastPrompt: String = "",
+    val geminiLastResult: GeminiCommandResult? = null,
+    val geminiLastActivity: Activity? = null,
+    val geminiPreviousActivity: Activity? = null,
+    val geminiErrorMessage: String? = null,
+    val geminiErrorDetails: String? = null,
+    val canUndoGeminiAction: Boolean = false,
+
+    // AI Print Assistant State
+    val isAiPrintAssistantOpen: Boolean = false,
+    val isAiPrintProcessing: Boolean = false,
+    val aiPrintTemplates: List<CalendarAiTemplateSpec> = emptyList(),
+    val activeAiPrintTemplate: CalendarAiTemplateSpec? = null,
+    val aiPrintLastReplyMessage: String? = null,
+    val aiPrintErrorMessage: String? = null,
+    val aiPrintErrorDetails: String? = null
 )
 
 data class SyncedDevice(

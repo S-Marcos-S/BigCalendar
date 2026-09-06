@@ -374,10 +374,10 @@ fun BackupScreen(
                     }
                 }
                 uiState.backupMessage?.let { message ->
-                    InfoMessageBox(message = message, isError = false)
+                    InfoMessageBox(message = message, isError = uiState.isBackupError)
                 }
                 uiState.restoreMessage?.let { message ->
-                    InfoMessageBox(message = message, isError = message.contains("failed", ignoreCase = true))
+                    InfoMessageBox(message = message, isError = uiState.isRestoreError)
                 }
                 uiState.cloudBackupError?.let { error ->
                     InfoMessageBox(message = error, isError = true)
@@ -631,19 +631,19 @@ fun RequestBackupDirectoryDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Selecionar Pasta de Backup") },
-        text = { Text("Para salvar seus backups locais de forma segura e compatível com as novas políticas do Android, por favor, escolha uma pasta. O aplicativo terá acesso apenas à pasta que você selecionar.") },
+        title = { Text(stringResource(R.string.select_backup_folder_dialog_title)) },
+        text = { Text(stringResource(R.string.select_backup_folder_dialog_desc)) },
         confirmButton = {
             TextButton(onClick = {
                 onConfirm()
                 onDismiss()
             }) {
-                Text("Escolher Pasta")
+                Text(stringResource(R.string.choose_folder_button))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

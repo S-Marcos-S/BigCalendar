@@ -39,6 +39,15 @@ import com.mss.thebigcalendar.data.repository.SyncRepository
 import com.mss.thebigcalendar.data.service.BackupService
 import com.mss.thebigcalendar.data.service.BackupInfo
 import com.mss.thebigcalendar.service.VisibilityService
+import com.mss.thebigcalendar.data.model.GeminiAction
+import com.mss.thebigcalendar.data.model.GeminiCommandResult
+import com.mss.thebigcalendar.data.model.NotificationSettings
+import com.mss.thebigcalendar.data.model.NotificationType
+import com.mss.thebigcalendar.data.model.VisibilityLevel
+import com.mss.thebigcalendar.service.GeminiService
+import com.mss.thebigcalendar.service.GeminiExecutionResult
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +114,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val visibilityService = VisibilityService(application)
     private val pdfGenerationService = com.mss.thebigcalendar.data.service.PdfGenerationService(application)
     private val backupScheduler = com.mss.thebigcalendar.service.BackupScheduler(application)
+    private val geminiService = GeminiService()
+    private val geminiPrintService = com.mss.thebigcalendar.service.GeminiPrintService()
+    private val aiTemplateRepository = com.mss.thebigcalendar.data.repository.CalendarAiTemplateRepository(application)
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsReady: Boolean = false
 
     // State Management
     private val _uiState = MutableStateFlow(CalendarUiState())
@@ -130,7 +144,10 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     _uiState.update { it.copy(cloudBackupFiles = files, isListingCloudBackups = false) }
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isListingCloudBackups = false, cloudBackupError = "Failed to list cloud backups: ${error.message}") }
+                    _uiState.update { it.copy(
+                        isListingCloudBackups = false, 
+                        cloudBackupError = getApplication<Application>().getString(R.string.list_cloud_backups_failed, error.message ?: "")
+                    ) }
                 }
         }
     }
@@ -138,14 +155,22 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun createCloudBackup() {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isBackingUp = true, backupMessage = null) }
+            _uiState.update { it.copy(isBackingUp = true, backupMessage = null, isBackupError = false) }
             backupService.createCloudBackup(account)
                 .onSuccess {
-                    _uiState.update { it.copy(isBackingUp = false, backupMessage = "Cloud backup created successfully.") }
+                    _uiState.update { it.copy(
+                        isBackingUp = false, 
+                        backupMessage = getApplication<Application>().getString(R.string.cloud_backup_success),
+                        isBackupError = false
+                    ) }
                     listCloudBackups() // Refresh the list
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(isBackingUp = false, backupMessage = "Cloud backup failed: ${error.message}") }
+                    _uiState.update { it.copy(
+                        isBackingUp = false, 
+                        backupMessage = getApplication<Application>().getString(R.string.cloud_backup_failed, error.message ?: ""),
+                        isBackupError = true
+                    ) }
                 }
         }
     }
@@ -153,7 +178,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun restoreFromCloudBackup(fileId: String, fileName: String, password: String? = null) {
         val account = _uiState.value.googleSignInAccount ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isRestoring = true, restoreMessage = null) }
+            _uiState.update { it.copy(isRestoring = true, restoreMessage = null, isRestoreError = false) }
             backupService.restoreFromCloudBackup(account, fileId, fileName, password)
                 .onSuccess { restoreResult ->
                     // Cancelar alarmes existentes e limpar o repositório de alarmes
@@ -195,7 +220,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
                     _uiState.update { it.copy(
                         isRestoring = false, 
-                        restoreMessage = "Restored from ${restoreResult.backupFileName}",
+                        restoreMessage = getApplication<Application>().getString(R.string.restore_success, restoreResult.backupFileName),
+                        isRestoreError = false,
                         showDecryptionDialog = false,
                         decryptionCloudFileId = null,
                         decryptionCloudFileName = null,
@@ -213,7 +239,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             isRestoring = false
                         ) }
                     } else {
-                        _uiState.update { it.copy(isRestoring = false, restoreMessage = "Restore failed: ${error.message}") }
+                        _uiState.update { it.copy(
+                            isRestoring = false, 
+                            restoreMessage = getApplication<Application>().getString(R.string.restore_failed, error.message ?: ""),
+                            isRestoreError = true
+                        ) }
                     }
                 }
         }
@@ -227,7 +257,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     listCloudBackups() // Refresh the list
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(cloudBackupError = "Failed to delete backup: ${error.message}") }
+                    _uiState.update { it.copy(
+                        cloudBackupError = getApplication<Application>().getString(R.string.delete_cloud_backup_failed, error.message ?: "")
+                    ) }
                 }
         }
     }
@@ -363,7 +395,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     Log.e("CalendarViewModel", "❌ Erro ao desativar criptografia", exception)
                     _uiState.update { it.copy(
                         isSyncing = false,
-                        syncErrorMessage = "Falha ao desativar criptografia: ${exception.message}"
+                        syncErrorMessage = getApplication<Application>().getString(R.string.disable_encryption_failed, exception.message ?: "")
                     ) }
                 }
         }
@@ -435,6 +467,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             getApplication<Application>().unregisterReceiver(notificationBroadcastReceiver)
         } catch (_: Exception) {
             // Ignorar erro se o receiver não estiver registrado
+        }
+        try {
+            textToSpeech?.stop()
+            textToSpeech?.shutdown()
+        } catch (_: Exception) {
+            // Ignorar erro ao liberar TextToSpeech
         }
     }
     
@@ -741,6 +779,37 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.geminiApiKey.collect { key ->
+                _uiState.update { it.copy(geminiApiKey = key) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.geminiVoiceFeedback.collect { feedback ->
+                _uiState.update { it.copy(geminiVoiceFeedback = feedback) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.geminiModel.collect { model ->
+                _uiState.update { it.copy(geminiModel = model) }
+            }
+        }
+        viewModelScope.launch {
+            aiTemplateRepository.templatesFlow.collect { templates ->
+                _uiState.update { it.copy(aiPrintTemplates = templates) }
+            }
+        }
+        try {
+            textToSpeech = TextToSpeech(getApplication()) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    val result = textToSpeech?.setLanguage(Locale.getDefault())
+                    isTtsReady = (result != TextToSpeech.LANG_MISSING_DATA &&
+                                  result != TextToSpeech.LANG_NOT_SUPPORTED)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("CalendarViewModel", "Erro ao inicializar TextToSpeech", e)
+        }
+        viewModelScope.launch {
             // Observar o estado de login do Google e o nome de boas-vindas
             _uiState.collect { uiState ->
                 val googleAccount = uiState.googleSignInAccount
@@ -779,12 +848,31 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
 
     
+    /**
+     * Verifica e executa o rollover de tarefas não concluídas de dias anteriores para hoje.
+     * Atualiza o cache, a UI e os widgets caso alguma tarefa tenha sido movida.
+     */
+    fun checkAndPerformRollover() {
+        viewModelScope.launch {
+            val rolledCount = com.mss.thebigcalendar.service.RolloverManager.performRollover(getApplication())
+            if (rolledCount > 0) {
+                clearCalendarCache()
+                clearActivityCache()
+                updateAllDateDependentUI()
+                notifyWidgetsDataChanged()
+            }
+        }
+    }
+
     private fun loadData() {
         // Primeiro limpar atividades JSON antigas
         viewModelScope.launch {
             cleanupOldJsonActivities()
         }
         
+        // Executar rollover de tarefas não concluídas de dias anteriores
+        checkAndPerformRollover()
+
         // Carregar apenas as atividades do mês atual
         loadActivitiesForCurrentMonth()
         
@@ -1176,36 +1264,34 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         
-        // Adicionar tarefas finalizadas se a opção estiver ativada
-        if (state.showCompletedActivities) {
-            state.completedActivities.forEach { completedActivity ->
-                try {
-                    val activityDate = LocalDate.parse(completedActivity.date)
-                    val dateMatches = activityDate.isEqual(state.selectedDate)
-                    
-                    if (dateMatches) {
+        // Adicionar tarefas finalizadas para o dia selecionado
+        state.completedActivities.forEach { completedActivity ->
+            try {
+                val activityDate = LocalDate.parse(completedActivity.date)
+                val dateMatches = activityDate.isEqual(state.selectedDate)
+                
+                if (dateMatches) {
+                    if (allTasksForSelectedDate.none { it.id == completedActivity.id }) {
                         allTasksForSelectedDate.add(completedActivity)
                     }
-                } catch (e: Exception) {
-                    // Erro ao processar tarefa finalizada - continuar com outras
                 }
+            } catch (e: Exception) {
+                // Erro ao processar tarefa finalizada - continuar com outras
             }
         }
 
-
-        
         // Filtrar atividades JSON importadas da seção "Agendamentos para..."
         val otherTasks = allTasksForSelectedDate
             .filter { activity -> 
                 // Excluir atividades JSON importadas (marcadas com location começando com "JSON_IMPORTED_")
                 val isJsonImported = activity.location?.startsWith("JSON_IMPORTED_") == true
-                if (isJsonImported) {
-                }
                 !isJsonImported
             }
             .sortedWith(
-                compareByDescending<Activity> { it.categoryColor?.toIntOrNull() ?: 0 }
-                .thenBy { it.startTime ?: LocalTime.MIN }
+                compareBy<Activity> { it.isCompleted }
+                    .thenBy { if (it.isCompleted) it.lastModified else 0L }
+                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
+                    .thenBy { it.startTime ?: LocalTime.MIN }
             )
         
         // Atualizar todas as listas
@@ -1287,32 +1373,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val context = getApplication<Application>()
             val appWidgetManager = AppWidgetManager.getInstance(context)
             
-            // Lista de todos os provedores de widget do app
-            val widgetProviders = listOf(
-                com.mss.thebigcalendar.widget.GreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.CompactGreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.SimpleGreetingWidgetProvider::class.java,
-                com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java
-            )
-
-            for (providerClass in widgetProviders) {
-                val componentName = ComponentName(context, providerClass)
-                val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            // Notificar EventListWidgetProvider
+            val componentName = ComponentName(context, com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            
+            if (appWidgetIds.isNotEmpty()) {
+                Log.d("CalendarViewModel", "📱 Notificando ${appWidgetIds.size} widgets do tipo EventListWidgetProvider")
                 
-                if (appWidgetIds.isNotEmpty()) {
-                    Log.d("CalendarViewModel", "📱 Notificando ${appWidgetIds.size} widgets do tipo ${providerClass.simpleName}")
-                    
-                    val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
-                        component = componentName
-                    }
-                    context.sendBroadcast(intent)
-                    
-                    // Se for o widget de lista, forçar atualização do RemoteViewsFactory
-                    if (providerClass == com.mss.thebigcalendar.widget.EventListWidgetProvider::class.java) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
-                    }
+                val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+                    component = componentName
                 }
+                context.sendBroadcast(intent)
+                
+                // Forçar atualização do RemoteViewsFactory
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
             }
             // Trigger automatic sync with the cloud
             triggerCloudSync()
@@ -1621,6 +1696,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val activity = activityRepository.activities.first().find { it.id == activityId }
             if (activity != null) {
+                val notificationService = NotificationService(getApplication())
+                notificationService.cancelActivityNotifications(activity)
                 deletedActivityRepository.addDeletedActivity(activity)
             }
             activityRepository.deleteActivity(activityId)
@@ -1634,9 +1711,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val duplicates = getDuplicateGroups(allActs)
             if (duplicates.isEmpty()) return@launch
 
+            val notificationService = NotificationService(getApplication())
             duplicates.forEach { group ->
                 val toDelete = group.drop(1)
                 toDelete.forEach { act ->
+                    notificationService.cancelActivityNotifications(act)
                     deletedActivityRepository.addDeletedActivity(act)
                     activityRepository.deleteActivity(act.id)
                 }
@@ -1705,7 +1784,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
                         getApplication(),
-                        "Já existe um agendamento idêntico!",
+                        getApplication<Application>().getString(R.string.duplicate_activity_exists),
                         android.widget.Toast.LENGTH_LONG
                     ).show()
                 }
@@ -1742,16 +1821,24 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Salvar a atividade base atualizada
                     activityRepository.saveActivity(updatedBaseActivity)
                     
-                    // Agendar notificação se configurada - usar a instância específica com data correta
+                    val notificationService = NotificationService(getApplication())
+                    // Cancelar notificação da instância anterior
+                    notificationService.cancelNotification(activityData.id)
+                    val originalInstanceDate = activityData.id.split("_").getOrNull(1)
+                    if (originalInstanceDate != null) {
+                        notificationService.cancelNotification("${baseId}_$originalInstanceDate")
+                    }
+
+                    // Agendar notificação se configurada - usar a instância com a data atualizada
                     if (activityData.notificationSettings.isEnabled &&
                         activityData.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE) {
                         
-                        // Extrair a data da instância específica do ID
-                        val instanceDate = activityData.id.split("_").getOrNull(1)
-                        if (instanceDate != null) {
-                            // Criar uma cópia da atividade com a data correta da instância
-                            val instanceActivity = activityData.copy(date = instanceDate)
-                            val notificationService = NotificationService(getApplication())
+                        val targetDate = activityData.date.takeIf { it.isNotBlank() } ?: originalInstanceDate
+                        if (targetDate != null) {
+                            val instanceActivity = activityData.copy(
+                                id = "${baseId}_$targetDate",
+                                date = targetDate
+                            )
                             notificationService.scheduleNotification(instanceActivity)
                         }
                     }
@@ -1784,6 +1871,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val existingActivity = if (activityToSave.id != "new") {
                 _uiState.value.activities.find { it.id == activityToSave.id }
             } else null
+
+            // Cancelar notificações da atividade anterior (cobrindo alteração de data, horário, recorrência ou desativação de notificações)
+            val notificationService = NotificationService(getApplication())
+            if (existingActivity != null) {
+                notificationService.cancelActivityNotifications(existingActivity)
+            }
 
             val repetitionChanged = existingActivity?.let { existing ->
                 existing.recurrenceRule != activityToSave.recurrenceRule
@@ -1819,25 +1912,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             activityRepository.saveActivity(activityToSave)
 
             // ✅ Agendar notificação se configurada
-            
             if (activityToSave.notificationSettings.isEnabled &&
                 activityToSave.notificationSettings.notificationType != com.mss.thebigcalendar.data.model.NotificationType.NONE) {
-
-                
-                // Para atividades repetitivas, agendar notificação para a data selecionada
-                val activityForNotification = if (activityToSave.recurrenceRule?.isNotEmpty() == true) {
-                    // Se é uma atividade repetitiva, usar a data selecionada no calendário
-                    activityToSave.copy(date = _uiState.value.selectedDate.toString())
-                } else {
-                    // Se não é repetitiva, usar a data original
-                    activityToSave
-                }
-
-                
-                val notificationService = NotificationService(getApplication())
-                notificationService.scheduleNotification(activityForNotification)
-
-            } else {
+                notificationService.scheduleNotification(activityToSave)
             }
 
             // NOTA: Não geramos mais instâncias repetitivas automaticamente
@@ -1987,11 +2064,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     // Verificar se a data alvo é um múltiplo de anos a partir da data base
                     val yearsDiff = ChronoUnit.YEARS.between(baseDate, targetDate)
                     if (yearsDiff > 0) {
-                        val instance = baseActivity.copy(
-                            id = "${baseActivity.id}_${targetDate}",
-                            date = targetDate.toString()
-                        )
-                        instances.add(instance)
+                        val targetDay = minOf(baseDate.dayOfMonth, targetDate.lengthOfMonth())
+                        val adjustedDate = targetDate.withDayOfMonth(targetDay)
+                        if (baseDate.month == targetDate.month && adjustedDate.isEqual(targetDate)) {
+                            val instance = baseActivity.copy(
+                                id = "${baseActivity.id}_${targetDate}",
+                                date = targetDate.toString()
+                            )
+                            instances.add(instance)
+                        }
                     }
                 }
                 else -> {
@@ -2286,7 +2367,21 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 
+                // Se ainda não encontrou, buscar nas atividades finalizadas
+                if (activityToDelete == null) {
+                    activityToDelete = _uiState.value.completedActivities.find { it.id == activityId }
+                }
+                
                 if (activityToDelete != null) {
+                    if (activityToDelete.isCompleted) {
+                        deletedActivityRepository.addDeletedActivity(activityToDelete)
+                        completedActivityRepository.removeCompletedActivity(activityId)
+                        updateAllDateDependentUI()
+                        notifyWidgetsDataChanged()
+                        _uiState.update { it.copy(activityIdToDelete = null) }
+                        return@launch
+                    }
+
                     // ✅ Cancelar notificação antes de deletar
                     val notificationService = NotificationService(getApplication())
                     
@@ -2331,6 +2426,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
                         
                     } else {
+                        // Cancelar notificações da atividade única
+                        notificationService.cancelActivityNotifications(activityToDelete)
+
                         // Mover para a lixeira
                         deletedActivityRepository.addDeletedActivity(activityToDelete)
                         
@@ -2370,17 +2468,26 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 val result = backupService.createBackup(Uri.parse(directoryUri))
                 result.fold(
                     onSuccess = { backupFileName ->
-                        _uiState.update { it.copy(backupMessage = "Backup criado com sucesso: $backupFileName") }
+                        _uiState.update { it.copy(
+                            backupMessage = getApplication<Application>().getString(R.string.backup_created_success, backupFileName),
+                            isBackupError = false
+                        ) }
                         loadBackupFiles()
                     },
                     onFailure = { exception ->
                         Log.e("CalendarViewModel", "❌ Erro ao criar backup", exception)
-                        _uiState.update { it.copy(backupMessage = "Erro ao criar backup: ${exception.message}") }
+                        _uiState.update { it.copy(
+                            backupMessage = getApplication<Application>().getString(R.string.backup_create_failed, exception.message ?: ""),
+                            isBackupError = true
+                        ) }
                     }
                 )
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro inesperado durante backup", e)
-                _uiState.update { it.copy(backupMessage = "Erro inesperado: ${e.message}") }
+                _uiState.update { it.copy(
+                    backupMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: ""),
+                    isBackupError = true
+                ) }
             }
         }
     }
@@ -2398,13 +2505,16 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(needsBackupDirectorySelection = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Falha ao salvar o diretório de backup", e)
-                _uiState.update { it.copy(backupMessage = "Falha ao definir o diretório de backup.") }
+                _uiState.update { it.copy(
+                    backupMessage = getApplication<Application>().getString(R.string.backup_dir_set_failed),
+                    isBackupError = true
+                ) }
             }
         }
     }
 
     fun clearBackupMessage() {
-        _uiState.update { it.copy(backupMessage = null, needsBackupDirectorySelection = false) }
+        _uiState.update { it.copy(backupMessage = null, isBackupError = false, needsBackupDirectorySelection = false) }
     }
 
     fun onRestoreRequest() { println("ViewModel: Pedido de restauração recebido.") }
@@ -2513,6 +2623,35 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
     
     fun markActivityAsCompleted(activityId: String) {
+        val now = System.currentTimeMillis()
+        // Atualização imediata na UI para iniciar a animação de descida instantaneamente
+        _uiState.update { currentState ->
+            val updatedTasks = currentState.tasksForSelectedDate.map { task ->
+                if (task.id == activityId) {
+                    task.copy(isCompleted = true, lastModified = now)
+                } else {
+                    task
+                }
+            }.sortedWith(
+                compareBy<Activity> { it.isCompleted }
+                    .thenBy { if (it.isCompleted) it.lastModified else 0L }
+                    .thenByDescending { it.categoryColor.toIntOrNull() ?: 0 }
+                    .thenBy { it.startTime ?: java.time.LocalTime.MIN }
+            )
+            currentState.copy(
+                tasksForSelectedDate = updatedTasks,
+                activityIdWithDeleteButtonVisible = null,
+                recentlyCompletedTaskId = activityId
+            )
+        }
+
+        viewModelScope.launch {
+            delay(750)
+            if (_uiState.value.recentlyCompletedTaskId == activityId) {
+                _uiState.update { it.copy(recentlyCompletedTaskId = null) }
+            }
+        }
+
         viewModelScope.launch {
             markActivityAsCompletedInternal(activityId)
         }
@@ -3086,7 +3225,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         } else {
                             _uiState.update { it.copy(
                                 isSyncing = false,
-                                syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                                syncErrorMessage = getApplication<Application>().getString(R.string.sync_failed, exception.message ?: "")
                             ) }
                         }
                     }
@@ -3094,7 +3233,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização com o Drive", e)
                 _uiState.update { it.copy(
                     isSyncing = false,
-                    syncErrorMessage = "Erro inesperado: ${e.message}"
+                    syncErrorMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: "")
                 ) }
             }
         }
@@ -3139,7 +3278,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         Log.e("CalendarViewModel", "❌ Erro na sincronização progressiva", exception)
                         _uiState.update { it.copy(
                             isSyncing = false,
-                            syncErrorMessage = "Falha na sincronização: ${exception.message}"
+                            syncErrorMessage = getApplication<Application>().getString(R.string.sync_failed, exception.message ?: "")
                         ) }
                     }
                 )
@@ -3148,7 +3287,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 Log.e("CalendarViewModel", "❌ Erro inesperado na sincronização", e)
                 _uiState.update { it.copy(
                     isSyncing = false,
-                    syncErrorMessage = "Erro inesperado: ${e.message}"
+                    syncErrorMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: "")
                 ) }
             }
         }
@@ -3379,7 +3518,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update { it.copy(backupFiles = backupInfos, isListingLocalBackups = false) }
             } catch (e: Exception) {
                 Log.e("CalendarViewModel", "❌ Erro ao carregar arquivos de backup via SAF", e)
-                _uiState.update { it.copy(backupFiles = emptyList(), backupMessage = "Erro ao carregar backups.", isListingLocalBackups = false) }
+                _uiState.update { it.copy(
+                    backupFiles = emptyList(), 
+                    backupMessage = getApplication<Application>().getString(R.string.backup_load_failed), 
+                    isBackupError = true,
+                    isListingLocalBackups = false
+                ) }
             }
         }
     }
@@ -3389,11 +3533,17 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             val result = backupService.deleteBackupFile(Uri.parse(backupUri))
             result.fold(
                 onSuccess = {
-                    _uiState.update { it.copy(backupMessage = "Backup deletado com sucesso") }
+                    _uiState.update { it.copy(
+                        backupMessage = getApplication<Application>().getString(R.string.backup_deleted_success),
+                        isBackupError = false
+                    ) }
                     loadBackupFiles()
                 },
                 onFailure = { exception ->
-                    _uiState.update { it.copy(backupMessage = "Erro ao deletar backup: ${exception.message}") }
+                    _uiState.update { it.copy(
+                        backupMessage = getApplication<Application>().getString(R.string.backup_delete_failed, exception.message ?: ""),
+                        isBackupError = true
+                    ) }
                 }
             )
         }
@@ -3404,6 +3554,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             try {
                 _uiState.update { it.copy(
                     backupMessage = null,
+                    isBackupError = false,
                     isRestoringBackup = true,
                     localBackupUriBeingRestored = backupUri,
                     restoreProgress = 0f
@@ -3439,7 +3590,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         }
 
                         _uiState.update { it.copy(
-                            backupMessage = "Backup restaurado com sucesso!",
+                            backupMessage = getApplication<Application>().getString(R.string.backup_restored_success),
+                            isBackupError = false,
                             showDecryptionDialog = false,
                             decryptionBackupUri = null,
                             decryptionErrorMessage = null
@@ -3471,7 +3623,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                             ) }
                         } else {
                             _uiState.update { it.copy(
-                                backupMessage = "Erro ao restaurar backup: ${exception.message}",
+                                backupMessage = getApplication<Application>().getString(R.string.backup_restore_failed, exception.message ?: ""),
+                                isBackupError = true,
                                 isRestoringBackup = false,
                                 localBackupUriBeingRestored = null
                             ) }
@@ -3481,7 +3634,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
             } catch (e: Exception) {
                 _uiState.update { it.copy(
-                    backupMessage = "Erro inesperado: ${e.message}",
+                    backupMessage = getApplication<Application>().getString(R.string.unexpected_error, e.message ?: ""),
+                    isBackupError = true,
                     isRestoringBackup = false,
                     localBackupUriBeingRestored = null
                 ) }
@@ -4202,4 +4356,637 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // ===== GEMINI ASSISTANT FUNCTIONS =====
+
+    fun openGeminiAssistantFromOutside() {
+        _uiState.update {
+            it.copy(
+                isSidebarOpen = false,
+                isCalendarVisualizationSettingsOpen = false,
+                isSyncScreenOpen = false,
+                isSettingsScreenOpen = false,
+                isSearchScreenOpen = false,
+                isChartScreenOpen = false,
+                isNotesScreenOpen = false,
+                isAlarmsScreenOpen = false,
+                isTrashScreenOpen = false,
+                isBackupScreenOpen = false,
+                isCompletedTasksScreenOpen = false,
+                isPrintCalendarScreenOpen = false,
+                isJsonConfigScreenOpen = false,
+                activityToEdit = null,
+                isGeminiAssistantOpen = true,
+                geminiErrorMessage = null
+            )
+        }
+    }
+
+    fun openGeminiAssistant() {
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = true,
+                geminiErrorMessage = null
+            )
+        }
+    }
+
+    fun closeGeminiAssistant() {
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = false
+            )
+        }
+    }
+
+    fun openGeminiSettings() {
+        _uiState.update { it.copy(isGeminiSettingsOpen = true) }
+    }
+
+    fun closeGeminiSettings() {
+        _uiState.update { it.copy(isGeminiSettingsOpen = false) }
+    }
+
+    fun saveGeminiSettings(apiKey: String, voiceFeedback: Boolean, model: String) {
+        viewModelScope.launch {
+            settingsRepository.saveGeminiApiKey(apiKey)
+            settingsRepository.saveGeminiVoiceFeedback(voiceFeedback)
+            settingsRepository.saveGeminiModel(model)
+        }
+    }
+
+    fun speakGeminiResponse(text: String) {
+        if (_uiState.value.geminiVoiceFeedback && isTtsReady && text.isNotBlank()) {
+            try {
+                textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "gemini_tts_${System.currentTimeMillis()}")
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao reproduzir voz", e)
+            }
+        }
+    }
+
+    fun updateGeminiActivityDescription(newDescription: String) {
+        val currentActivity = _uiState.value.geminiLastActivity ?: return
+        val updatedActivity = currentActivity.copy(
+            description = newDescription,
+            lastModified = System.currentTimeMillis()
+        )
+        viewModelScope.launch {
+            activityRepository.saveActivity(updatedActivity)
+            _uiState.update {
+                it.copy(
+                    geminiLastActivity = updatedActivity,
+                    activities = it.activities.map { act -> if (act.id == updatedActivity.id) updatedActivity else act }
+                )
+            }
+            loadActivitiesForCurrentMonth()
+            notifyWidgetsDataChanged()
+        }
+    }
+
+    fun processGeminiCommand(prompt: String) {
+        if (prompt.isBlank()) return
+        val apiKey = _uiState.value.geminiApiKey
+        if (apiKey.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    isGeminiAssistantOpen = true,
+                    isGeminiSettingsOpen = true,
+                    geminiErrorMessage = getApplication<Application>().getString(R.string.gemini_no_api_key)
+                )
+            }
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isGeminiAssistantOpen = true,
+                isGeminiProcessing = true,
+                geminiLastPrompt = prompt,
+                geminiErrorMessage = null,
+                geminiErrorDetails = null
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val existingActivities = _uiState.value.activities
+            val model = _uiState.value.geminiModel
+            val result = geminiService.executeCommand(
+                prompt = prompt,
+                apiKey = apiKey,
+                model = model,
+                existingActivities = existingActivities
+            )
+
+            when (result) {
+                is GeminiExecutionResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiErrorMessage = result.message,
+                                geminiErrorDetails = result.details
+                            )
+                        }
+                    }
+                }
+                is GeminiExecutionResult.Success -> {
+                    handleGeminiCommandResult(result.command)
+                }
+            }
+        }
+    }
+
+    private suspend fun handleGeminiCommandResult(command: GeminiCommandResult) {
+        val notificationService = NotificationService(getApplication())
+
+        when (command.action) {
+            GeminiAction.CREATE -> {
+                val actType = try {
+                    command.activityType?.let { ActivityType.valueOf(it.uppercase()) } ?: ActivityType.TASK
+                } catch (e: Exception) {
+                    ActivityType.TASK
+                }
+
+                val visibility = try {
+                    command.visibility?.let { VisibilityLevel.valueOf(it.uppercase()) } ?: VisibilityLevel.LOW
+                } catch (e: Exception) {
+                    VisibilityLevel.LOW
+                }
+
+                val startTime = command.startTime?.let {
+                    try { java.time.LocalTime.parse(it) } catch (e: Exception) { null }
+                }
+
+                val endTime = command.endTime?.let {
+                    try { java.time.LocalTime.parse(it) } catch (e: Exception) { null }
+                }
+
+                val actDate = command.date ?: LocalDate.now().toString()
+
+                val categoryColor = resolveCategoryColor(command.priority, actType)
+
+                val recurrenceRule = recurrenceService.normalizeRecurrenceRule(command.recurrenceRule)
+
+                val newActivity = Activity(
+                    id = UUID.randomUUID().toString(),
+                    title = command.title?.ifBlank { "Nova atividade" } ?: "Nova atividade",
+                    description = command.description,
+                    date = actDate,
+                    startTime = startTime,
+                    endTime = endTime,
+                    isAllDay = command.isAllDay,
+                    location = null,
+                    categoryColor = categoryColor,
+                    activityType = actType,
+                    recurrenceRule = recurrenceRule,
+                    notificationSettings = NotificationSettings(
+                        isEnabled = command.notificationEnabled,
+                        notificationType = if (command.notificationEnabled) {
+                            if (command.notificationMinutesBefore > 0) NotificationType.CUSTOM else NotificationType.BEFORE_ACTIVITY
+                        } else NotificationType.NONE,
+                        customMinutesBefore = if (command.notificationMinutesBefore > 0) command.notificationMinutesBefore else null
+                    ),
+                    isCompleted = false,
+                    visibility = visibility,
+                    showInCalendar = true,
+                    isFromGoogle = false,
+                    lastModified = System.currentTimeMillis()
+                )
+
+                activityRepository.saveActivity(newActivity)
+
+                if (newActivity.notificationSettings.isEnabled) {
+                    notificationService.scheduleNotification(newActivity)
+                }
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(
+                            isGeminiProcessing = false,
+                            geminiLastResult = command,
+                            geminiLastActivity = newActivity,
+                            geminiPreviousActivity = null,
+                            canUndoGeminiAction = true,
+                            geminiErrorMessage = null,
+                            geminiErrorDetails = null
+                        )
+                    }
+                    speakGeminiResponse(command.replyMessage)
+                }
+
+                loadActivitiesForCurrentMonth()
+                notifyWidgetsDataChanged()
+            }
+
+            GeminiAction.UPDATE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    val updatedRecurrenceRule = if (command.recurrenceRule != null) {
+                        recurrenceService.normalizeRecurrenceRule(command.recurrenceRule)
+                    } else {
+                        target.recurrenceRule
+                    }
+
+                    val updatedCategoryColor = if (!command.priority.isNullOrBlank()) {
+                        resolveCategoryColor(command.priority, target.activityType)
+                    } else {
+                        target.categoryColor
+                    }
+
+                    val updated = target.copy(
+                        title = command.title ?: target.title,
+                        date = command.date ?: target.date,
+                        description = command.description ?: target.description,
+                        startTime = command.startTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.startTime } } ?: target.startTime,
+                        endTime = command.endTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.endTime } } ?: target.endTime,
+                        isAllDay = command.isAllDay,
+                        categoryColor = updatedCategoryColor,
+                        recurrenceRule = updatedRecurrenceRule,
+                        notificationSettings = if (command.notificationEnabled) {
+                            target.notificationSettings.copy(
+                                isEnabled = true,
+                                notificationType = if (command.notificationMinutesBefore > 0) NotificationType.CUSTOM else NotificationType.BEFORE_ACTIVITY,
+                                customMinutesBefore = if (command.notificationMinutesBefore > 0) command.notificationMinutesBefore else null
+                            )
+                        } else target.notificationSettings,
+                        lastModified = System.currentTimeMillis()
+                    )
+
+                    // Se a repetição mudou e foi removida, remover instâncias antigas
+                    if (target.recurrenceRule != updated.recurrenceRule &&
+                        (updated.recurrenceRule.isNullOrEmpty() || updated.recurrenceRule == "NONE")) {
+                        removeRecurringInstances(target)
+                    }
+
+                    activityRepository.saveActivity(updated)
+                    if (updated.notificationSettings.isEnabled) {
+                        notificationService.cancelActivityNotifications(target)
+                        notificationService.scheduleNotification(updated)
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = updated,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei o agendamento para atualizar.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.DELETE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    notificationService.cancelActivityNotifications(target)
+                    deletedActivityRepository.addDeletedActivity(target)
+                    activityRepository.deleteActivity(target.id)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = null,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei o agendamento para excluir.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.COMPLETE -> {
+                val allActivities = _uiState.value.activities
+                val target = command.targetActivityId?.let { id -> allActivities.find { it.id == id } }
+                    ?: command.targetActivityTitle?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+                    ?: command.title?.let { title ->
+                        allActivities.find { it.title.contains(title, ignoreCase = true) }
+                    }
+
+                if (target != null) {
+                    val completed = target.copy(isCompleted = true, lastModified = System.currentTimeMillis())
+                    completedActivityRepository.addCompletedActivity(completed)
+                    activityRepository.saveActivity(completed)
+                    notificationService.cancelActivityNotifications(target)
+
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiLastActivity = completed,
+                                geminiPreviousActivity = target,
+                                canUndoGeminiAction = true,
+                                geminiErrorMessage = null,
+                                geminiErrorDetails = null
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+
+                    loadActivitiesForCurrentMonth()
+                    notifyWidgetsDataChanged()
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update {
+                            it.copy(
+                                isGeminiProcessing = false,
+                                geminiLastResult = command,
+                                geminiErrorMessage = "Não encontrei a tarefa para concluir.",
+                                geminiErrorDetails = "Nenhuma atividade corresponde ao título ou ID informado no comando."
+                            )
+                        }
+                        speakGeminiResponse(command.replyMessage)
+                    }
+                }
+            }
+
+            GeminiAction.QUERY, GeminiAction.NONE -> {
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(
+                            isGeminiProcessing = false,
+                            geminiLastResult = command,
+                            geminiErrorMessage = null,
+                            geminiErrorDetails = null
+                        )
+                    }
+                    speakGeminiResponse(command.replyMessage)
+                }
+            }
+        }
+    }
+
+    fun undoLastGeminiAction() {
+        val lastResult = _uiState.value.geminiLastResult ?: return
+        val lastActivity = _uiState.value.geminiLastActivity
+        val previousActivity = _uiState.value.geminiPreviousActivity
+        val notificationService = NotificationService(getApplication())
+
+        viewModelScope.launch(Dispatchers.IO) {
+            when (lastResult.action) {
+                GeminiAction.CREATE -> {
+                    if (lastActivity != null) {
+                        notificationService.cancelActivityNotifications(lastActivity)
+                        if (!lastActivity.recurrenceRule.isNullOrEmpty() && lastActivity.recurrenceRule != "NONE") {
+                            removeRecurringInstances(lastActivity)
+                        }
+                        activityRepository.deleteActivity(lastActivity.id)
+                    }
+                }
+                GeminiAction.UPDATE -> {
+                    if (previousActivity != null) {
+                        activityRepository.saveActivity(previousActivity)
+                        notificationService.scheduleNotification(previousActivity)
+                    }
+                }
+                GeminiAction.DELETE -> {
+                    if (previousActivity != null) {
+                        deletedActivityRepository.removeDeletedActivity(previousActivity.id)
+                        activityRepository.saveActivity(previousActivity)
+                        if (previousActivity.notificationSettings.isEnabled) {
+                            notificationService.scheduleNotification(previousActivity)
+                        }
+                    }
+                }
+                GeminiAction.COMPLETE -> {
+                    if (previousActivity != null) {
+                        completedActivityRepository.removeCompletedActivity(previousActivity.id)
+                        val reopened = previousActivity.copy(isCompleted = false)
+                        activityRepository.saveActivity(reopened)
+                    }
+                }
+                else -> {}
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        canUndoGeminiAction = false,
+                        geminiLastActivity = null,
+                        geminiPreviousActivity = null,
+                        geminiLastResult = null,
+                        geminiErrorMessage = null,
+                        geminiErrorDetails = null
+                    )
+                }
+                val undoneMsg = getApplication<Application>().getString(R.string.gemini_action_undone)
+                speakGeminiResponse(undoneMsg)
+            }
+
+            loadActivitiesForCurrentMonth()
+            notifyWidgetsDataChanged()
+        }
+    }
+
+    private fun resolveCategoryColor(priorityOrColor: String?, actType: ActivityType): String {
+        if (priorityOrColor.isNullOrBlank()) {
+            return when (actType) {
+                ActivityType.TASK -> "2"
+                ActivityType.EVENT -> "2"
+                ActivityType.NOTE -> "#9C27B0"
+                ActivityType.BIRTHDAY -> "#FF69B4"
+                ActivityType.COMMEMORATIVE -> "#FF9800"
+            }
+        }
+
+        val clean = priorityOrColor.trim().lowercase()
+        return when (clean) {
+            "1", "baixa", "baixa prioridade", "low", "branca", "branco", "white" -> "1"
+            "2", "media", "média", "media prioridade", "média prioridade", "medium", "normal", "padrao", "padrão", "azul", "blue" -> "2"
+            "3", "alta", "alta prioridade", "high", "importante", "muito importante", "amarela", "amarelo", "yellow" -> "3"
+            "4", "urgente", "urgência", "urgencia", "urgent", "maxima", "máxima", "maxima prioridade", "máxima prioridade", "critica", "crítica", "altissima", "altíssima", "vermelha", "vermelho", "red" -> "4"
+            "verde", "green" -> "#4CAF50"
+            "laranja", "orange" -> "#FF9800"
+            "roxo", "roxa", "purple" -> "#9C27B0"
+            "rosa", "pink" -> "#FF69B4"
+            "cinza", "gray", "grey" -> "#9E9E9E"
+            "preto", "preta", "black" -> "#212121"
+            else -> {
+                if (clean.startsWith("#")) {
+                    clean.uppercase()
+                } else if (clean.length == 6 && clean.all { it in "0123456789abcdefABCDEF" }) {
+                    "#${clean.uppercase()}"
+                } else {
+                    when (actType) {
+                        ActivityType.TASK -> "2"
+                        ActivityType.EVENT -> "2"
+                        ActivityType.NOTE -> "#9C27B0"
+                        ActivityType.BIRTHDAY -> "#FF69B4"
+                        ActivityType.COMMEMORATIVE -> "#FF9800"
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== AI PRINT ASSISTANT FUNCTIONS =====
+
+    fun openAiPrintAssistant() {
+        _uiState.update {
+            it.copy(
+                isAiPrintAssistantOpen = true,
+                aiPrintErrorMessage = null,
+                aiPrintErrorDetails = null
+            )
+        }
+    }
+
+    fun closeAiPrintAssistant() {
+        _uiState.update {
+            it.copy(
+                isAiPrintAssistantOpen = false,
+                isAiPrintProcessing = false,
+                aiPrintErrorMessage = null,
+                aiPrintErrorDetails = null
+            )
+        }
+    }
+
+    fun generateOrModifyAiPrintTemplate(
+        prompt: String,
+        images: List<android.graphics.Bitmap>,
+        currentTemplate: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?
+    ) {
+        val apiKey = _uiState.value.geminiApiKey
+        if (apiKey.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    aiPrintErrorMessage = "Chave de API do Gemini não configurada.",
+                    aiPrintErrorDetails = "Configure sua chave de API nas configurações do Assistente Gemini para usar a criação de modelos com IA."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isAiPrintProcessing = true,
+                    aiPrintErrorMessage = null,
+                    aiPrintErrorDetails = null
+                )
+            }
+
+            val model = _uiState.value.geminiModel
+            val result = geminiPrintService.generateOrModifyTemplate(
+                prompt = prompt,
+                referenceImages = images.ifEmpty { null },
+                currentTemplate = currentTemplate,
+                apiKey = apiKey,
+                model = model
+            )
+
+            when (result) {
+                is com.mss.thebigcalendar.service.GeminiPrintResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isAiPrintProcessing = false,
+                            activeAiPrintTemplate = result.template,
+                            aiPrintLastReplyMessage = result.replyMessage,
+                            aiPrintErrorMessage = null,
+                            aiPrintErrorDetails = null
+                        )
+                    }
+                    if (_uiState.value.geminiVoiceFeedback && isTtsReady && result.replyMessage.isNotBlank()) {
+                        try {
+                            textToSpeech?.speak(
+                                result.replyMessage,
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                "gemini_print_tts_${System.currentTimeMillis()}"
+                            )
+                        } catch (_: Exception) {}
+                    }
+                }
+                is com.mss.thebigcalendar.service.GeminiPrintResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isAiPrintProcessing = false,
+                            aiPrintErrorMessage = result.message,
+                            aiPrintErrorDetails = result.details
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun saveAiPrintTemplate(template: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec) {
+        viewModelScope.launch {
+            aiTemplateRepository.saveTemplate(template)
+            _uiState.update { it.copy(activeAiPrintTemplate = template) }
+        }
+    }
+
+    fun deleteAiPrintTemplate(templateId: String) {
+        viewModelScope.launch {
+            aiTemplateRepository.deleteTemplate(templateId)
+            if (_uiState.value.activeAiPrintTemplate?.id == templateId) {
+                _uiState.update { it.copy(activeAiPrintTemplate = null) }
+            }
+        }
+    }
+
+    fun setActiveAiPrintTemplate(template: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?) {
+        _uiState.update { it.copy(activeAiPrintTemplate = template) }
+    }
 }

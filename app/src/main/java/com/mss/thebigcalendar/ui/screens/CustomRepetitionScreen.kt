@@ -2,6 +2,7 @@ package com.mss.thebigcalendar.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -24,7 +25,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 data class ParsedRule(
-    val freq: String = "hours",
+    val freq: String = "days",
     val interval: Int = 1,
     val selectedDays: Set<Int> = emptySet(),
     val endDate: String = "",
@@ -76,15 +77,15 @@ fun CustomRepetitionScreen(
     // Parse da regra existente para carregar os dados
     val parsedRule = remember(existingRule) { parseExistingRule(existingRule) }
     
-    var repetitionType by remember { mutableStateOf(parsedRule.freq) }
-    var interval by remember { mutableStateOf(parsedRule.interval) }
-    var intervalText by remember { mutableStateOf(parsedRule.interval.toString()) }
-    var selectedDays by remember { mutableStateOf(parsedRule.selectedDays) }
-    var endDate by remember { mutableStateOf(parsedRule.endDate) }
-    var maxOccurrences by remember { mutableStateOf(parsedRule.maxOccurrences) }
-    var maxOccurrencesText by remember { mutableStateOf(parsedRule.maxOccurrences.toString()) }
-    var hasEndDate by remember { mutableStateOf(parsedRule.hasEndDate) }
-    var hasMaxOccurrences by remember { mutableStateOf(parsedRule.hasMaxOccurrences) }
+    var repetitionType by remember(existingRule) { mutableStateOf(parsedRule.freq) }
+    var interval by remember(existingRule) { mutableStateOf(parsedRule.interval) }
+    var intervalText by remember(existingRule) { mutableStateOf(parsedRule.interval.toString()) }
+    var selectedDays by remember(existingRule) { mutableStateOf(parsedRule.selectedDays) }
+    var endDate by remember(existingRule) { mutableStateOf(parsedRule.endDate) }
+    var maxOccurrences by remember(existingRule) { mutableStateOf(parsedRule.maxOccurrences) }
+    var maxOccurrencesText by remember(existingRule) { mutableStateOf(parsedRule.maxOccurrences.toString()) }
+    var hasEndDate by remember(existingRule) { mutableStateOf(parsedRule.hasEndDate) }
+    var hasMaxOccurrences by remember(existingRule) { mutableStateOf(parsedRule.hasMaxOccurrences) }
     
     val weekDays = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
     
@@ -149,7 +150,9 @@ fun CustomRepetitionScreen(
                     )
                     
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         FilterChip(
@@ -171,6 +174,11 @@ fun CustomRepetitionScreen(
                             onClick = { repetitionType = "months" },
                             label = { Text(stringResource(id = R.string.custom_repetition_months)) },
                             selected = repetitionType == "months"
+                        )
+                        FilterChip(
+                            onClick = { repetitionType = "years" },
+                            label = { Text(stringResource(id = R.string.custom_repetition_years)) },
+                            selected = repetitionType == "years"
                         )
                     }
                 }
@@ -219,6 +227,7 @@ fun CustomRepetitionScreen(
                                 "days" -> if (interval == 1) "dia" else "dias"
                                 "weeks" -> if (interval == 1) "semana" else "semanas"
                                 "months" -> if (interval == 1) "mês" else "meses"
+                                "years" -> if (interval == 1) "ano" else "anos"
                                 else -> "horas"
                             }
                         )
@@ -391,6 +400,7 @@ private fun buildCustomRecurrenceRule(
         "days" -> "DAILY"
         "weeks" -> "WEEKLY"
         "months" -> "MONTHLY"
+        "years" -> "YEARLY"
         else -> "DAILY"
     }
     
@@ -417,12 +427,16 @@ private fun buildCustomRecurrenceRule(
     }
     
     // Adicionar data de término
-    if (endDate != null && endDate != "") {
+    if (endDate != null && endDate.isNotBlank()) {
         try {
-            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-            val parsedDate = LocalDate.parse(endDate, formatter)
-            rule.append(";UNTIL=${parsedDate}")
-        } catch (e: Exception) {
+            val parsedDate = if (endDate.contains("/")) {
+                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                LocalDate.parse(endDate, formatter)
+            } else {
+                LocalDate.parse(endDate)
+            }
+            rule.append(";UNTIL=$parsedDate")
+        } catch (_: Exception) {
             // Ignorar data inválida
         }
     }
@@ -457,6 +471,7 @@ private fun parseExistingRule(rule: String): ParsedRule {
             "DAILY" -> "days"
             "WEEKLY" -> "weeks"
             "MONTHLY" -> "months"
+            "YEARLY" -> "years"
             else -> "days"
         }
         
