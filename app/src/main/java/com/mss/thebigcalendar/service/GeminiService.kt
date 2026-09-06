@@ -57,10 +57,15 @@ class GeminiService {
             val jsonRequestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = true)
             val textRequestBody = buildRequestBody(prompt, systemInstruction, jsonMimeType = false)
 
-            // Fila de modelos prioritários para contingência automática (Geração Gemini 3.x)
+            // Fila de modelos prioritários para contingência automática
             val candidateModels = linkedSetOf<String>()
             candidateModels.add(primaryModel)
             listOf(
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-2.5-pro",
                 "gemini-3.8-flash",
                 "gemini-3.7-flash",
                 "gemini-3.6-flash",

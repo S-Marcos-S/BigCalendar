@@ -70,10 +70,14 @@ fun GeminiSettingsDialog(
     }
 
     val availableModels = listOf(
-        "gemini-3.8-flash" to "Gemini 3.8 Flash (Mais Recente e Rápido)",
-        "gemini-3.7-flash" to "Gemini 3.7 Flash (Estável)",
-        "gemini-3.6-flash" to "Gemini 3.6 Flash (Padrão)",
-        "gemini-3.6-pro" to "Gemini 3.6 Pro (Raciocínio Avançado)"
+        "gemini-2.5-flash" to "Gemini 2.5 Flash (Recomendado)",
+        "gemini-2.0-flash" to "Gemini 2.0 Flash (Rápido)",
+        "gemini-1.5-flash" to "Gemini 1.5 Flash (Alta Disponibilidade)",
+        "gemini-1.5-pro" to "Gemini 1.5 Pro",
+        "gemini-3.8-flash" to "Gemini 3.8 Flash (Experimental)",
+        "gemini-3.7-flash" to "Gemini 3.7 Flash (Experimental)",
+        "gemini-3.6-flash" to "Gemini 3.6 Flash (Experimental)",
+        "gemini-3.6-pro" to "Gemini 3.6 Pro (Experimental)"
     )
 
     AlertDialog(

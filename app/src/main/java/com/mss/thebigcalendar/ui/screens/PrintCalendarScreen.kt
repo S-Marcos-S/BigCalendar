@@ -31,6 +31,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -200,6 +204,8 @@ fun PrintCalendarScreen(
         }
     }
     var expandedColorPickers by remember { mutableStateOf(List(7) { false }) }
+    var inspectingAiTemplate by remember { mutableStateOf<CalendarAiTemplateSpec?>(null) }
+    var inspectingLegacyModel by remember { mutableStateOf<String?>(null) }
 
     // LaunchedEffect para controlar o estado de geração
     LaunchedEffect(isGeneratingPdf) {
@@ -451,11 +457,11 @@ fun PrintCalendarScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Galeria de Modelos (Lado a Lado)
+                            // Galeria de Modelos (Lado a Lado - Maior e com Visualização Detalhada)
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.Center,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
                                 // Opção "Nenhum" como um Card vazio estilizado
                                 Column(
@@ -465,32 +471,46 @@ fun PrintCalendarScreen(
                                     val isNoneSelected = selectedModel == null && activeAiTemplate == null
                                     Card(
                                         modifier = Modifier
-                                            .height(100.dp)
-                                            .width(70.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .height(145.dp)
+                                            .width(105.dp)
+                                            .clip(RoundedCornerShape(12.dp))
                                             .border(
                                                 width = if (isNoneSelected) 3.dp else 1.dp,
-                                                color = if (isNoneSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                shape = RoundedCornerShape(8.dp)
+                                                color = if (isNoneSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                                shape = RoundedCornerShape(12.dp)
                                             )
                                             .clickable {
                                                 selectedModel = null
                                                 activeAiTemplate = null
                                                 onSetActiveAiTemplate(null)
                                             },
-                                        elevation = CardDefaults.cardElevation(defaultElevation = if (isNoneSelected) 6.dp else 1.dp)
+                                        elevation = CardDefaults.cardElevation(defaultElevation = if (isNoneSelected) 6.dp else 2.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(28.dp)
+                                                )
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = "Padrão Limpo",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                     Text(
                                         text = stringResource(id = R.string.no_design_model),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(top = 4.dp)
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(top = 6.dp),
+                                        fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
 
@@ -501,32 +521,42 @@ fun PrintCalendarScreen(
                                 ) {
                                     Card(
                                         modifier = Modifier
-                                            .height(100.dp)
-                                            .width(70.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .height(145.dp)
+                                            .width(105.dp)
+                                            .clip(RoundedCornerShape(12.dp))
                                             .border(
-                                                width = 1.dp,
+                                                width = 1.5.dp,
                                                 color = MaterialTheme.colorScheme.primary,
-                                                shape = RoundedCornerShape(8.dp)
+                                                shape = RoundedCornerShape(12.dp)
                                             )
                                             .clickable { onOpenAiPrintAssistant() },
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text("+ Novo IA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
+                                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    "+ Novo IA",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    "Criar Modelo",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                                )
                                             }
                                         }
                                     }
                                     Text(
                                         text = "Criar IA",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(top = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(top = 6.dp),
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -535,55 +565,118 @@ fun PrintCalendarScreen(
                                 // Lista de Modelos da IA Salvos / Presets
                                 uiState.aiPrintTemplates.forEach { aiSpec ->
                                     val isAiSelected = activeAiTemplate?.id == aiSpec.id
+                                    val cardBg = CalendarAiTemplateSpec.parseHexColor(aiSpec.pageBackgroundColor, androidx.compose.ui.graphics.Color.White)
+                                    val primaryTextColor = CalendarAiTemplateSpec.parseHexColor(aiSpec.primaryColor, androidx.compose.ui.graphics.Color.Black)
+                                    val secondaryTextColor = CalendarAiTemplateSpec.parseHexColor(aiSpec.secondaryColor, androidx.compose.ui.graphics.Color.DarkGray)
+
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.padding(4.dp)
                                     ) {
                                         Card(
                                             modifier = Modifier
-                                                .height(100.dp)
-                                                .width(70.dp)
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .height(145.dp)
+                                                .width(105.dp)
+                                                .clip(RoundedCornerShape(12.dp))
                                                 .border(
                                                     width = if (isAiSelected) 3.dp else 1.dp,
-                                                    color = if (isAiSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                    shape = RoundedCornerShape(8.dp)
+                                                    color = if (isAiSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                                    shape = RoundedCornerShape(12.dp)
                                                 )
                                                 .clickable {
                                                     activeAiTemplate = aiSpec
                                                     selectedModel = null
                                                     onSetActiveAiTemplate(aiSpec)
                                                 },
-                                            elevation = CardDefaults.cardElevation(defaultElevation = if (isAiSelected) 6.dp else 1.dp)
+                                            elevation = CardDefaults.cardElevation(defaultElevation = if (isAiSelected) 6.dp else 2.dp)
                                         ) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxSize()
-                                                    .background(CalendarAiTemplateSpec.parseHexColor(aiSpec.pageBackgroundColor, androidx.compose.ui.graphics.Color.White))
-                                                    .padding(4.dp)
+                                                    .background(cardBg)
+                                                    .padding(8.dp)
                                             ) {
                                                 Column(modifier = Modifier.fillMaxSize()) {
-                                                    Text(
-                                                        text = aiSpec.name,
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = CalendarAiTemplateSpec.parseHexColor(aiSpec.primaryColor, androidx.compose.ui.graphics.Color.Black),
-                                                        maxLines = 2
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = aiSpec.name,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = primaryTextColor,
+                                                            maxLines = 2,
+                                                            modifier = Modifier.weight(1f)
+                                                        )
+                                                        IconButton(
+                                                            onClick = { inspectingAiTemplate = aiSpec },
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.ZoomIn,
+                                                                contentDescription = "Visualizar Modelo",
+                                                                tint = primaryTextColor,
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(1.dp)
+                                                            .background(secondaryTextColor.copy(alpha = 0.4f))
                                                     )
-                                                    Spacer(modifier = Modifier.weight(1f))
+                                                    Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
                                                         text = aiSpec.layoutType.name.replace("_", " "),
-                                                        fontSize = 6.sp,
-                                                        color = CalendarAiTemplateSpec.parseHexColor(aiSpec.secondaryColor, androidx.compose.ui.graphics.Color.DarkGray),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = secondaryTextColor,
                                                         maxLines = 1
                                                     )
+                                                    if (aiSpec.description.isNotBlank()) {
+                                                        Text(
+                                                            text = aiSpec.description,
+                                                            fontSize = 7.sp,
+                                                            color = secondaryTextColor.copy(alpha = 0.8f),
+                                                            maxLines = 2
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.weight(1f))
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
+                                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                            .clickable { inspectingAiTemplate = aiSpec },
+                                                        horizontalArrangement = Arrangement.Center,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            Icons.Default.Visibility,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(11.dp),
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(
+                                                            text = "Visualizar",
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                         Text(
                                             text = aiSpec.name,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            modifier = Modifier.padding(top = 4.dp).width(70.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(top = 6.dp).width(105.dp),
                                             fontWeight = if (isAiSelected) FontWeight.Bold else FontWeight.Normal,
                                             color = if (isAiSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
@@ -611,36 +704,65 @@ fun PrintCalendarScreen(
                                     ) {
                                         Card(
                                             modifier = Modifier
-                                                .height(100.dp)
-                                                .width(70.dp)
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .height(145.dp)
+                                                .width(105.dp)
+                                                .clip(RoundedCornerShape(12.dp))
                                                 .border(
                                                     width = if (isSelected) 3.dp else 1.dp,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                    shape = RoundedCornerShape(8.dp)
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                                    shape = RoundedCornerShape(12.dp)
                                                 )
                                                 .clickable {
                                                     selectedModel = modelPath
                                                     activeAiTemplate = null
                                                     onSetActiveAiTemplate(null)
                                                 },
-                                            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 1.dp)
+                                            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 2.dp)
                                         ) {
-                                            bitmap?.let {
-                                                Image(
-                                                    bitmap = it.asImageBitmap(),
-                                                    contentDescription = "Preview $modelPath",
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentScale = ContentScale.Crop
-                                                )
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                bitmap?.let {
+                                                    Image(
+                                                        bitmap = it.asImageBitmap(),
+                                                        contentDescription = "Preview $modelPath",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomCenter)
+                                                        .fillMaxWidth()
+                                                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.6f))
+                                                        .padding(vertical = 3.dp)
+                                                        .clickable { inspectingLegacyModel = modelPath },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.ZoomIn,
+                                                            contentDescription = "Visualizar",
+                                                            tint = androidx.compose.ui.graphics.Color.White,
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(3.dp))
+                                                        Text(
+                                                            text = "Visualizar",
+                                                            fontSize = 9.sp,
+                                                            color = androidx.compose.ui.graphics.Color.White,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                         Text(
                                             text = stringResource(R.string.print_model_label, printModels.indexOf(modelPath) + 1),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            modifier = Modifier.padding(top = 4.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(top = 6.dp).width(105.dp),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
                                     }
                                 }
@@ -2445,6 +2567,215 @@ fun PrintCalendarScreen(
             onOpenSettings = onOpenGeminiSettings,
             onDismissRequest = onCloseAiPrintAssistant
         )
+    }
+
+    // Modal de Inspeção e Visualização Completa de Modelo IA
+    inspectingAiTemplate?.let { templateToInspect ->
+        val monthActivities = remember(uiState.activities, selectedMonth) {
+            uiState.activities.filter {
+                try {
+                    val date = java.time.LocalDate.parse(it.date)
+                    date.year == selectedMonth.year && date.month == selectedMonth.month
+                } catch (_: Exception) { false }
+            }
+        }
+        val monthHolidays = remember(uiState.nationalHolidays, selectedMonth) {
+            uiState.nationalHolidays.values.filter {
+                try {
+                    val date = java.time.LocalDate.parse(it.date)
+                    date.year == selectedMonth.year && date.month == selectedMonth.month
+                } catch (_: Exception) { false }
+            }
+        }
+
+        Dialog(
+            onDismissRequest = { inspectingAiTemplate = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .heightIn(max = 700.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = templateToInspect.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (templateToInspect.description.isNotBlank()) {
+                                Text(
+                                    text = templateToInspect.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        IconButton(onClick = { inspectingAiTemplate = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Fechar")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.mss.thebigcalendar.ui.components.AiTemplateComposePreview(
+                            template = templateToInspect,
+                            selectedMonth = selectedMonth,
+                            activities = monthActivities,
+                            holidays = monthHolidays,
+                            moonPhases = emptyList(),
+                            modifier = Modifier.fillMaxHeight()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { inspectingAiTemplate = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Voltar")
+                        }
+                        Button(
+                            onClick = {
+                                activeAiTemplate = templateToInspect
+                                selectedModel = null
+                                onSetActiveAiTemplate(templateToInspect)
+                                inspectingAiTemplate = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Usar Modelo")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal de Inspeção e Visualização Completa de Modelo Legado (Assets)
+    inspectingLegacyModel?.let { modelPath ->
+        val fullBitmap = remember(modelPath) {
+            try {
+                context.assets.open("print_models/$modelPath").use {
+                    BitmapFactory.decodeStream(it)
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        Dialog(
+            onDismissRequest = { inspectingLegacyModel = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .heightIn(max = 700.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.print_model_label, printModels.indexOf(modelPath) + 1),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { inspectingLegacyModel = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Fechar")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        fullBitmap?.let { bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "Preview Detalhado",
+                                modifier = Modifier.fillMaxHeight(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } ?: run {
+                            Text("Erro ao carregar pré-visualização")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { inspectingLegacyModel = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Voltar")
+                        }
+                        Button(
+                            onClick = {
+                                selectedModel = modelPath
+                                activeAiTemplate = null
+                                onSetActiveAiTemplate(null)
+                                inspectingLegacyModel = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Usar Modelo")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

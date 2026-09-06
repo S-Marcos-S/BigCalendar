@@ -269,14 +269,22 @@ fun AiPrintAssistantDialog(
 
                             if (showLivePreview) {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                AiTemplateComposePreview(
-                                    template = currentTemplate,
-                                    selectedMonth = selectedMonth,
-                                    activities = activities,
-                                    holidays = holidays,
-                                    moonPhases = moonPhases,
-                                    modifier = Modifier.height(160.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 160.dp, max = 260.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AiTemplateComposePreview(
+                                        template = currentTemplate,
+                                        selectedMonth = selectedMonth,
+                                        activities = activities,
+                                        holidays = holidays,
+                                        moonPhases = moonPhases,
+                                        modifier = Modifier.fillMaxHeight()
+                                    )
+                                }
                             }
                         }
                     }
