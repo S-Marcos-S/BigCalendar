@@ -554,12 +554,7 @@ class DynamicPdfRenderer(private val context: Context) {
                 if (template.moonPhasesPosition == MoonPhaseDisplayPosition.IN_DAY_CELLS) {
                     val moon = moonPhases.firstOrNull { it.date == date }
                     if (moon != null) {
-                        val moonSymbol = when (moon.phase) {
-                            com.mss.thebigcalendar.ui.components.MoonPhaseType.NEW_MOON -> "🌑"
-                            com.mss.thebigcalendar.ui.components.MoonPhaseType.FIRST_QUARTER -> "🌓"
-                            com.mss.thebigcalendar.ui.components.MoonPhaseType.FULL_MOON -> "🌕"
-                            com.mss.thebigcalendar.ui.components.MoonPhaseType.LAST_QUARTER -> "🌗"
-                        }
+                        val moonSymbol = moon.phase.emoji
                         cellHeaderTable.addCell(
                             Cell().add(
                                 Paragraph(moonSymbol)
