@@ -981,4 +981,21 @@
     <string name="gemini_speech_not_supported">Reconhecimento de voz não suportado neste dispositivo. Use a digitação.</string>
     <string name="gemini_tile_label">Gemini</string>
     <string name="gemini_tile_subtitle">Assistente do Calendário</string>
+
+    <!-- AI Print Assistant -->
+    <string name="ai_print_title">Design com IA</string>
+    <string name="ai_print_subtitle">Crie ou personalize modelos para impressão</string>
+    <string name="ai_print_create_button">✨ Criar com IA</string>
+    <string name="ai_print_prompt_hint">Descreva o modelo ou as alterações desejadas...</string>
+    <string name="ai_print_attach_photo">Anexar Foto</string>
+    <string name="ai_print_reference_photos">Fotos / Modelos de Referência</string>
+    <string name="ai_print_popular_styles">Estilos Populares:</string>
+    <string name="ai_print_generating">Criando com IA...</string>
+    <string name="ai_print_generate_button">Gerar Modelo</string>
+    <string name="ai_print_modify_button">Modificar Modelo</string>
+    <string name="ai_print_save_button">Salvar Modelo</string>
+    <string name="ai_print_apply_button">Aplicar ao Calendário de Impressão</string>
+    <string name="ai_print_save_dialog_title">Salvar Modelo de Calendário</string>
+    <string name="ai_print_saved_success">Modelo salvo com sucesso!</string>
+    <string name="ai_print_no_api_key">Chave de API do Gemini não configurada.</string>
 </resources>

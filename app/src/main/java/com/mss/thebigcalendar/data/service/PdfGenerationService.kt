@@ -35,6 +35,8 @@ import android.content.Context
 
 class PdfGenerationService(private val context: Context) {
     
+    private val dynamicPdfRenderer = DynamicPdfRenderer(context)
+    
     /**
      * Converte uma cor do Compose para uma cor do iText PDF
      */
@@ -53,6 +55,18 @@ class PdfGenerationService(private val context: Context) {
         jsonHolidays: List<JsonHoliday>,
         moonPhases: List<MoonPhase>
     ): File {
+        // Redirecionar se houver um modelo de IA selecionado
+        if (printOptions.aiTemplateSpec != null) {
+            return dynamicPdfRenderer.renderPdf(
+                template = printOptions.aiTemplateSpec,
+                selectedMonth = printOptions.selectedMonth,
+                activities = activities,
+                holidays = holidays,
+                jsonHolidays = jsonHolidays,
+                moonPhases = moonPhases
+            )
+        }
+
         // Redirecionar conforme o modelo selecionado
         when (printOptions.selectedModel) {
             "ideia1.jpeg" -> return generateIdea1Pdf(printOptions, activities, holidays, jsonHolidays, moonPhases)

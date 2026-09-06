@@ -390,7 +390,22 @@ class MainActivity : ComponentActivity() {
                                 onNavigateBack = { viewModel.closePrintCalendarScreen() },
                                 onGeneratePdf = { printOptions, onPdfGenerated ->
                                     viewModel.generateCalendarPdf(printOptions, onPdfGenerated)
-                                }
+                                },
+                                onOpenAiPrintAssistant = { viewModel.openAiPrintAssistant() },
+                                onCloseAiPrintAssistant = { viewModel.closeAiPrintAssistant() },
+                                onGenerateOrModifyAiTemplate = { prompt, images, current ->
+                                    viewModel.generateOrModifyAiPrintTemplate(prompt, images, current)
+                                },
+                                onSaveAiTemplate = { template ->
+                                    viewModel.saveAiPrintTemplate(template)
+                                },
+                                onDeleteAiTemplate = { templateId ->
+                                    viewModel.deleteAiPrintTemplate(templateId)
+                                },
+                                onSetActiveAiTemplate = { template ->
+                                    viewModel.setActiveAiPrintTemplate(template)
+                                },
+                                onOpenGeminiSettings = { viewModel.openGeminiSettings() }
                             )
                         }
                         uiState.isSearchScreenOpen -> {

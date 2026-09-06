@@ -200,7 +200,16 @@ data class CalendarUiState(
     val geminiPreviousActivity: Activity? = null,
     val geminiErrorMessage: String? = null,
     val geminiErrorDetails: String? = null,
-    val canUndoGeminiAction: Boolean = false
+    val canUndoGeminiAction: Boolean = false,
+
+    // AI Print Assistant State
+    val isAiPrintAssistantOpen: Boolean = false,
+    val isAiPrintProcessing: Boolean = false,
+    val aiPrintTemplates: List<CalendarAiTemplateSpec> = emptyList(),
+    val activeAiPrintTemplate: CalendarAiTemplateSpec? = null,
+    val aiPrintLastReplyMessage: String? = null,
+    val aiPrintErrorMessage: String? = null,
+    val aiPrintErrorDetails: String? = null
 )
 
 data class SyncedDevice(

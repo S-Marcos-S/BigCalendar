@@ -115,6 +115,8 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     private val pdfGenerationService = com.mss.thebigcalendar.data.service.PdfGenerationService(application)
     private val backupScheduler = com.mss.thebigcalendar.service.BackupScheduler(application)
     private val geminiService = GeminiService()
+    private val geminiPrintService = com.mss.thebigcalendar.service.GeminiPrintService()
+    private val aiTemplateRepository = com.mss.thebigcalendar.data.repository.CalendarAiTemplateRepository(application)
     private var textToSpeech: TextToSpeech? = null
     private var isTtsReady: Boolean = false
 
@@ -789,6 +791,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             settingsRepository.geminiModel.collect { model ->
                 _uiState.update { it.copy(geminiModel = model) }
+            }
+        }
+        viewModelScope.launch {
+            aiTemplateRepository.templatesFlow.collect { templates ->
+                _uiState.update { it.copy(aiPrintTemplates = templates) }
             }
         }
         try {
@@ -4869,5 +4876,117 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+    }
+
+    // ===== AI PRINT ASSISTANT FUNCTIONS =====
+
+    fun openAiPrintAssistant() {
+        _uiState.update {
+            it.copy(
+                isAiPrintAssistantOpen = true,
+                aiPrintErrorMessage = null,
+                aiPrintErrorDetails = null
+            )
+        }
+    }
+
+    fun closeAiPrintAssistant() {
+        _uiState.update {
+            it.copy(
+                isAiPrintAssistantOpen = false,
+                isAiPrintProcessing = false,
+                aiPrintErrorMessage = null,
+                aiPrintErrorDetails = null
+            )
+        }
+    }
+
+    fun generateOrModifyAiPrintTemplate(
+        prompt: String,
+        images: List<android.graphics.Bitmap>,
+        currentTemplate: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?
+    ) {
+        val apiKey = _uiState.value.geminiApiKey
+        if (apiKey.isBlank()) {
+            _uiState.update {
+                it.copy(
+                    aiPrintErrorMessage = "Chave de API do Gemini não configurada.",
+                    aiPrintErrorDetails = "Configure sua chave de API nas configurações do Assistente Gemini para usar a criação de modelos com IA."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isAiPrintProcessing = true,
+                    aiPrintErrorMessage = null,
+                    aiPrintErrorDetails = null
+                )
+            }
+
+            val model = _uiState.value.geminiModel
+            val result = geminiPrintService.generateOrModifyTemplate(
+                prompt = prompt,
+                referenceImages = images.ifEmpty { null },
+                currentTemplate = currentTemplate,
+                apiKey = apiKey,
+                model = model
+            )
+
+            when (result) {
+                is com.mss.thebigcalendar.service.GeminiPrintResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isAiPrintProcessing = false,
+                            activeAiPrintTemplate = result.template,
+                            aiPrintLastReplyMessage = result.replyMessage,
+                            aiPrintErrorMessage = null,
+                            aiPrintErrorDetails = null
+                        )
+                    }
+                    if (_uiState.value.geminiVoiceFeedback && isTtsReady && result.replyMessage.isNotBlank()) {
+                        try {
+                            textToSpeech?.speak(
+                                result.replyMessage,
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                "gemini_print_tts_${System.currentTimeMillis()}"
+                            )
+                        } catch (_: Exception) {}
+                    }
+                }
+                is com.mss.thebigcalendar.service.GeminiPrintResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isAiPrintProcessing = false,
+                            aiPrintErrorMessage = result.message,
+                            aiPrintErrorDetails = result.details
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun saveAiPrintTemplate(template: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec) {
+        viewModelScope.launch {
+            aiTemplateRepository.saveTemplate(template)
+            _uiState.update { it.copy(activeAiPrintTemplate = template) }
+        }
+    }
+
+    fun deleteAiPrintTemplate(templateId: String) {
+        viewModelScope.launch {
+            aiTemplateRepository.deleteTemplate(templateId)
+            if (_uiState.value.activeAiPrintTemplate?.id == templateId) {
+                _uiState.update { it.copy(activeAiPrintTemplate = null) }
+            }
+        }
+    }
+
+    fun setActiveAiPrintTemplate(template: com.mss.thebigcalendar.data.model.CalendarAiTemplateSpec?) {
+        _uiState.update { it.copy(activeAiPrintTemplate = template) }
     }
 }
