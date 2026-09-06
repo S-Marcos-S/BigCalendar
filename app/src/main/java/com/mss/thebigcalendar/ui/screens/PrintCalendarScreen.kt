@@ -2249,7 +2249,7 @@ fun PrintCalendarScreen(
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(200.dp),
+                                        .height(260.dp),
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                                     ),

@@ -272,7 +272,7 @@ fun AiPrintAssistantDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(min = 160.dp, max = 260.dp)
+                                        .height(210.dp)
                                         .clip(RoundedCornerShape(8.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {

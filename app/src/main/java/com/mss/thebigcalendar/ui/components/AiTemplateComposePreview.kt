@@ -103,9 +103,8 @@ fun AiTemplateComposePreview(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(aspectRatio)
-            .shadow(6.dp, RoundedCornerShape(8.dp)),
+            .aspectRatio(aspectRatio, matchHeightConstraintsFirst = true)
+            .shadow(4.dp, RoundedCornerShape(8.dp)),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = pageBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
