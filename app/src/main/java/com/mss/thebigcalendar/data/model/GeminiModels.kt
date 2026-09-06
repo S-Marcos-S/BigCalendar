@@ -42,6 +42,9 @@ data class GeminiCommandResult(
     @SerializedName("activityType")
     val activityType: String? = "TASK", // "EVENT", "TASK", "NOTE", "BIRTHDAY"
 
+    @SerializedName("priority")
+    val priority: String? = null, // "1" (Baixa/Branco), "2" (Média/Azul), "3" (Alta/Amarelo), "4" (Urgente/Vermelho) ou hex
+
     @SerializedName("visibility")
     val visibility: String? = "LOW", // "LOW", "MEDIUM", "HIGH"
 

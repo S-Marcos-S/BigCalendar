@@ -420,12 +420,21 @@ class GeminiService {
 
         // Filtrar agendamentos relevantes próximos para dar contexto ao Gemini
         val contextActivities = existingActivities.take(30).map { act ->
+            val priorityInfo = when (act.categoryColor) {
+                "1" -> "1 (Baixa / Branco)"
+                "2" -> "2 (Média / Azul)"
+                "3" -> "3 (Alta / Amarelo)"
+                "4" -> "4 (Urgente / Vermelho)"
+                else -> act.categoryColor
+            }
             mapOf(
                 "id" to act.id,
                 "title" to act.title,
                 "date" to act.date,
                 "startTime" to act.startTime?.toString(),
                 "activityType" to act.activityType.name,
+                "priority" to priorityInfo,
+                "categoryColor" to act.categoryColor,
                 "recurrenceRule" to act.recurrenceRule,
                 "isCompleted" to act.isCompleted
             )
@@ -478,6 +487,28 @@ RESOLUÇÃO DE HORÁRIOS:
   "startTime": null
   "endTime": null
 
+SISTEMA DE PRIORIDADES E CORES DO CALENDÁRIO (MUITO IMPORTANTE):
+O Big Calendar possui 4 prioridades oficiais com cores visuais distintas e ordenação automática na tela diária:
+- "1" = Prioridade Baixa (Cor: Branco / White)
+  Use quando o usuário disser: "baixa prioridade", "pouco importante", "sem pressa", "branco", "cor branca", "prioridade 1".
+- "2" = Prioridade Média / Normal (Cor: Azul / Blue) -> PADRÃO
+  É a prioridade padrão do aplicativo para tarefas e compromissos normais.
+  Use quando o usuário disser: "média prioridade", "normal", "padrão", "azul", "cor azul", "prioridade 2".
+  IMPORTANTE: Se o usuário NÃO disser nenhuma prioridade para uma tarefa ou evento, SEMPRE retorne "2".
+- "3" = Prioridade Alta (Cor: Amarelo / Yellow)
+  Use quando o usuário disser: "alta prioridade", "importante", "muito importante", "atenção", "amarelo", "cor amarela", "prioridade 3".
+- "4" = Prioridade Urgente / Máxima (Cor: Vermelho / Red)
+  No Big Calendar, atividades marcadas com "4" ficam destacadas em vermelho no TOPO absoluto de todas as tarefas do dia!
+  Use quando o usuário disser: "urgente", "urgência", "máxima prioridade", "prioridade máxima", "crítica", "altíssima", "imediata", "vermelho", "cor vermelha", "prioridade 4".
+
+CORES PERSONALIZADAS:
+Se o usuário pedir explicitamente outra cor (ex: "verde", "laranja", "rosa", "roxo" ou código hex "#RRGGBB"), você pode retornar o nome da cor ou o código hex no campo "priority".
+
+QUANDO PREENCHER "priority":
+- Em "CREATE": defina "priority" como "1", "2", "3", "4" ou a cor pedida. Se o usuário não mencionar, use "2" para TASK e EVENT.
+- Em "UPDATE": se o usuário pedir para alterar a prioridade ou a cor (ex: "coloque essa tarefa como urgente", "mude a cor para amarelo"), preencha o novo valor no campo "priority".
+- Em "QUERY": consulte o campo "categoryColor" / "priority" das atividades de contexto para responder sobre urgências ou prioridades quando o usuário perguntar.
+
 RECORRÊNCIA E REPETIÇÃO (recurrenceRule):
 Se o usuário solicitar que a atividade se repita ou seja recorrente, preencha o campo "recurrenceRule" estritamente de acordo com estes formatos:
 1. A cada N horas (ex: "a cada 8 horas", "de 4 em 4 horas", "a cada 6h", "a cada 2 horas"):
@@ -525,6 +556,7 @@ AÇÕES SUPORTADAS:
 
 MENSAGEM DE RESPOSTA (replyMessage):
 - Sempre retorne uma frase amigável, clara e concisa no idioma do usuário (${locale.displayLanguage}) resumindo a ação feita ou respondendo à dúvida.
+- Se a atividade possuir prioridade urgente ou alta ou cor personalizada solicitada, mencione isso na resposta (ex: "Tarefa urgente 'Enviar relatório' agendada para hoje.", "Tarefa com alta prioridade criada na cor amarela.").
 - Se a atividade possuir repetição, confirme a frequência na replyMessage (ex: "Lembrete 'Tomar remédio' agendado a cada 8 horas.", "Reunião de equipe agendada para toda semana às 14:00.", "Renovação agendada para repetir a cada 5 anos.").
 - Essa mensagem poderá ser lida em voz alta para o usuário.
 
@@ -539,6 +571,7 @@ Retorne única e exclusivamente um objeto JSON com esta estrutura:
   "isAllDay": true | false,
   "description": "descrição formatada conforme as regras acima",
   "activityType": "TASK" | "EVENT" | "NOTE" | "BIRTHDAY",
+  "priority": "1" | "2" | "3" | "4" | "verde" | "#RRGGBB" | null,
   "visibility": "LOW" | "MEDIUM" | "HIGH",
   "recurrenceRule": "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "FREQ=HOURLY;INTERVAL=N" | "FREQ=DAILY;INTERVAL=N" | "FREQ=YEARLY;INTERVAL=N" | null,
   "notificationEnabled": true | false,

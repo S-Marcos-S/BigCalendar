@@ -12,6 +12,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -450,7 +451,8 @@ fun GeminiAssistantDialog(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f, fill = false)
                                     ) {
                                         val typeIcon = when (lastActivity.activityType) {
                                             ActivityType.TASK -> Icons.Default.CheckCircle
@@ -470,6 +472,55 @@ fun GeminiAssistantDialog(
                                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
+                                    }
+
+                                    val priorityLabel = remember(lastActivity.categoryColor) {
+                                        when (lastActivity.categoryColor) {
+                                            "1" -> "Baixa"
+                                            "2" -> "Média"
+                                            "3" -> "Alta"
+                                            "4" -> "Urgente"
+                                            else -> null
+                                        }
+                                    }
+                                    val priorityColor = remember(lastActivity.categoryColor) {
+                                        when (lastActivity.categoryColor) {
+                                            "1" -> Color.White
+                                            "2" -> Color(0xFF2563EB)
+                                            "3" -> Color(0xFFEAB308)
+                                            "4" -> Color(0xFFDC2626)
+                                            else -> {
+                                                try {
+                                                    Color(android.graphics.Color.parseColor(lastActivity.categoryColor))
+                                                } catch (e: Exception) {
+                                                    null
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (priorityColor != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = priorityColor,
+                                            border = if (lastActivity.categoryColor == "1") BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
+                                            modifier = Modifier.padding(start = 6.dp)
+                                        ) {
+                                            if (priorityLabel != null) {
+                                                Text(
+                                                    text = priorityLabel,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = if (lastActivity.categoryColor == "1" || lastActivity.categoryColor == "3") Color.Black else Color.White,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .padding(2.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
 

@@ -4516,13 +4516,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
                 val actDate = command.date ?: LocalDate.now().toString()
 
-                val categoryColor = when (actType) {
-                    ActivityType.TASK -> "#3B82F6"
-                    ActivityType.NOTE -> "#10B981"
-                    ActivityType.BIRTHDAY -> "#FF69B4"
-                    ActivityType.EVENT -> "#F43F5E"
-                    ActivityType.COMMEMORATIVE -> "#8B5CF6"
-                }
+                val categoryColor = resolveCategoryColor(command.priority, actType)
 
                 val recurrenceRule = recurrenceService.normalizeRecurrenceRule(command.recurrenceRule)
 
@@ -4594,6 +4588,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         target.recurrenceRule
                     }
 
+                    val updatedCategoryColor = if (!command.priority.isNullOrBlank()) {
+                        resolveCategoryColor(command.priority, target.activityType)
+                    } else {
+                        target.categoryColor
+                    }
+
                     val updated = target.copy(
                         title = command.title ?: target.title,
                         date = command.date ?: target.date,
@@ -4601,6 +4601,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                         startTime = command.startTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.startTime } } ?: target.startTime,
                         endTime = command.endTime?.let { try { java.time.LocalTime.parse(it) } catch (e: Exception) { target.endTime } } ?: target.endTime,
                         isAllDay = command.isAllDay,
+                        categoryColor = updatedCategoryColor,
                         recurrenceRule = updatedRecurrenceRule,
                         notificationSettings = if (command.notificationEnabled) {
                             target.notificationSettings.copy(
@@ -4826,6 +4827,47 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
             loadActivitiesForCurrentMonth()
             notifyWidgetsDataChanged()
+        }
+    }
+
+    private fun resolveCategoryColor(priorityOrColor: String?, actType: ActivityType): String {
+        if (priorityOrColor.isNullOrBlank()) {
+            return when (actType) {
+                ActivityType.TASK -> "2"
+                ActivityType.EVENT -> "2"
+                ActivityType.NOTE -> "#9C27B0"
+                ActivityType.BIRTHDAY -> "#FF69B4"
+                ActivityType.COMMEMORATIVE -> "#FF9800"
+            }
+        }
+
+        val clean = priorityOrColor.trim().lowercase()
+        return when (clean) {
+            "1", "baixa", "baixa prioridade", "low", "branca", "branco", "white" -> "1"
+            "2", "media", "média", "media prioridade", "média prioridade", "medium", "normal", "padrao", "padrão", "azul", "blue" -> "2"
+            "3", "alta", "alta prioridade", "high", "importante", "muito importante", "amarela", "amarelo", "yellow" -> "3"
+            "4", "urgente", "urgência", "urgencia", "urgent", "maxima", "máxima", "maxima prioridade", "máxima prioridade", "critica", "crítica", "altissima", "altíssima", "vermelha", "vermelho", "red" -> "4"
+            "verde", "green" -> "#4CAF50"
+            "laranja", "orange" -> "#FF9800"
+            "roxo", "roxa", "purple" -> "#9C27B0"
+            "rosa", "pink" -> "#FF69B4"
+            "cinza", "gray", "grey" -> "#9E9E9E"
+            "preto", "preta", "black" -> "#212121"
+            else -> {
+                if (clean.startsWith("#")) {
+                    clean.uppercase()
+                } else if (clean.length == 6 && clean.all { it in "0123456789abcdefABCDEF" }) {
+                    "#${clean.uppercase()}"
+                } else {
+                    when (actType) {
+                        ActivityType.TASK -> "2"
+                        ActivityType.EVENT -> "2"
+                        ActivityType.NOTE -> "#9C27B0"
+                        ActivityType.BIRTHDAY -> "#FF69B4"
+                        ActivityType.COMMEMORATIVE -> "#FF9800"
+                    }
+                }
+            }
         }
     }
 }
