@@ -8,13 +8,13 @@ import com.mss.thebigcalendar.data.model.Activity
 import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.model.GeminiAction
 import com.mss.thebigcalendar.data.model.GeminiCommandResult
-import com.mss.thebigcalendar.data.model.GeminiExecutionResult
 import com.mss.thebigcalendar.data.model.NotificationSettings
 import com.mss.thebigcalendar.data.model.NotificationType
 import com.mss.thebigcalendar.data.model.VisibilityLevel
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
 import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
+import com.mss.thebigcalendar.service.GeminiExecutionResult
 import com.mss.thebigcalendar.service.GeminiService
 import com.mss.thebigcalendar.service.NotificationService
 import com.mss.thebigcalendar.service.RecurrenceService
@@ -50,11 +50,11 @@ class GeminiSchedulerWorker(
         Log.d(TAG, "Iniciando processamento em segundo plano do comando IA: $prompt")
 
         val activityRepository = ActivityRepository(applicationContext)
-        val recurrenceService = RecurrenceService(activityRepository)
+        val recurrenceService = RecurrenceService()
         val notificationService = NotificationService(applicationContext)
         val geminiService = GeminiService()
 
-        try {
+        return@withContext try {
             val existingActivities = activityRepository.activities.first()
             val result = geminiService.executeCommand(
                 prompt = prompt,
