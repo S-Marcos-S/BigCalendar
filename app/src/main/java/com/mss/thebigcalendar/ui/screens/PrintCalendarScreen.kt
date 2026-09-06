@@ -400,7 +400,7 @@ fun PrintCalendarScreen(
                                 ) {
                                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("✨ Criar com IA", fontSize = 12.sp)
+                                    Text("Criar com IA", fontSize = 12.sp)
                                 }
                             }
 

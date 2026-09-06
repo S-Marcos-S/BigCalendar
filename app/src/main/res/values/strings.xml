@@ -985,7 +985,7 @@
     <!-- AI Print Assistant -->
     <string name="ai_print_title">Design com IA</string>
     <string name="ai_print_subtitle">Crie ou personalize modelos para impressão</string>
-    <string name="ai_print_create_button">✨ Criar com IA</string>
+    <string name="ai_print_create_button">Criar com IA</string>
     <string name="ai_print_prompt_hint">Descreva o modelo ou as alterações desejadas...</string>
     <string name="ai_print_attach_photo">Anexar Foto</string>
     <string name="ai_print_reference_photos">Fotos / Modelos de Referência</string>
