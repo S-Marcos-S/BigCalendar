@@ -595,80 +595,48 @@ fun PrintCalendarScreen(
                                                 modifier = Modifier
                                                     .fillMaxSize()
                                                     .background(cardBg)
-                                                    .padding(8.dp)
                                             ) {
-                                                Column(modifier = Modifier.fillMaxSize()) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = aiSpec.name,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = primaryTextColor,
-                                                            maxLines = 2,
-                                                            modifier = Modifier.weight(1f)
-                                                        )
-                                                        IconButton(
-                                                            onClick = { inspectingAiTemplate = aiSpec },
-                                                            modifier = Modifier.size(24.dp)
-                                                        ) {
-                                                            Icon(
-                                                                Icons.Default.ZoomIn,
-                                                                contentDescription = "Visualizar Modelo",
-                                                                tint = primaryTextColor,
-                                                                modifier = Modifier.size(18.dp)
-                                                            )
-                                                        }
-                                                    }
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(1.dp)
-                                                            .background(secondaryTextColor.copy(alpha = 0.4f))
+                                                // Pré-visualização visual em miniatura do modelo de calendário
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(bottom = 22.dp)
+                                                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    com.mss.thebigcalendar.ui.components.AiTemplateComposePreview(
+                                                        template = aiSpec,
+                                                        selectedMonth = selectedMonth,
+                                                        activities = emptyList(),
+                                                        holidays = emptyList(),
+                                                        moonPhases = emptyList(),
+                                                        modifier = Modifier.fillMaxSize()
                                                     )
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Text(
-                                                        text = aiSpec.layoutType.name.replace("_", " "),
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = secondaryTextColor,
-                                                        maxLines = 1
-                                                    )
-                                                    if (aiSpec.description.isNotBlank()) {
-                                                        Text(
-                                                            text = aiSpec.description,
-                                                            fontSize = 7.sp,
-                                                            color = secondaryTextColor.copy(alpha = 0.8f),
-                                                            maxLines = 2
-                                                        )
-                                                    }
-                                                    Spacer(modifier = Modifier.weight(1f))
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
-                                                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                                                            .clickable { inspectingAiTemplate = aiSpec },
-                                                        horizontalArrangement = Arrangement.Center,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
+                                                }
+
+                                                // Barra inferior de Visualização
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomCenter)
+                                                        .fillMaxWidth()
+                                                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.65f))
+                                                        .padding(vertical = 3.dp)
+                                                        .clickable { inspectingAiTemplate = aiSpec },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Icon(
-                                                            Icons.Default.Visibility,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(11.dp),
-                                                            tint = MaterialTheme.colorScheme.primary
+                                                            Icons.Default.ZoomIn,
+                                                            contentDescription = "Visualizar",
+                                                            tint = androidx.compose.ui.graphics.Color.White,
+                                                            modifier = Modifier.size(13.dp)
                                                         )
                                                         Spacer(modifier = Modifier.width(3.dp))
                                                         Text(
                                                             text = "Visualizar",
-                                                            fontSize = 8.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = MaterialTheme.colorScheme.primary
+                                                            fontSize = 9.sp,
+                                                            color = androidx.compose.ui.graphics.Color.White,
+                                                            fontWeight = FontWeight.Bold
                                                         )
                                                     }
                                                 }
