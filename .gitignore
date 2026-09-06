@@ -24,11 +24,6 @@ captures/
 
 # --- Arquivos Confidenciais e Testes Locais (Segurança) ---
 client_secrets.json
-<<<<<<< HEAD
 calendar_events.txt
 keystore.properties
 .kotlin/
-
-=======
-calendar_events.txt
->>>>>>> parent of 501dfd8 (Configure Termux Android build environment)
