@@ -143,9 +143,9 @@ class NotificationService(
         )
 
         val builder = NotificationCompat.Builder(context, AI_SCHEDULING_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(message)
+            .setSmallIcon(R.drawable.ic_notification_calendar)
+            .setContentTitle(title as CharSequence)
+            .setContentText(message as CharSequence)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
