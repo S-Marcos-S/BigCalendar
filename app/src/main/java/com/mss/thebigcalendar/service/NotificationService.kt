@@ -42,6 +42,9 @@ class NotificationService(
         const val MANUAL_BACKUP_CHANNEL_ID = "manual_backup_notifications"
         const val MANUAL_BACKUP_CHANNEL_NAME = "Backup e Restauração Manual"
         const val MANUAL_BACKUP_CHANNEL_DESCRIPTION = "Notificações sobre backup e restauração manual"
+
+        const val AI_SCHEDULING_CHANNEL_ID = "ai_scheduling_notifications"
+        const val AI_SCHEDULING_NOTIFICATION_ID = 8888
         
         // Ações para as notificações
         const val ACTION_VIEW_ACTIVITY = "com.mss.thebigcalendar.VIEW_ACTIVITY"
@@ -110,7 +113,45 @@ class NotificationService(
                 description = context.getString(R.string.channel_manual_backup_description)
             }
             notificationManager.createNotificationChannel(manualBackupChannel)
+
+            val aiChannel = NotificationChannel(
+                AI_SCHEDULING_CHANNEL_ID,
+                "Agendamentos com IA",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notificações de conclusão de agendamento por Inteligência Artificial"
+                enableVibration(true)
+                enableLights(true)
+                setShowBadge(true)
+            }
+            notificationManager.createNotificationChannel(aiChannel)
         }
+    }
+
+    /**
+     * Exibe notificação quando um agendamento feito por IA é concluído em segundo plano
+     */
+    fun showAiSchedulingSuccessNotification(title: String, message: String) {
+        val mainIntent = Intent(context, com.mss.thebigcalendar.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            AI_SCHEDULING_NOTIFICATION_ID,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, AI_SCHEDULING_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        notificationManager.notify(AI_SCHEDULING_NOTIFICATION_ID, builder.build())
     }
 
     fun showBackupInProgressNotification() {

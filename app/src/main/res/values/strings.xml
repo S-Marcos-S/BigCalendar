@@ -972,6 +972,8 @@
     <string name="gemini_speak_now">Fale seu comando agora...</string>
     <string name="gemini_prompt_hint">Ex: Me lembre amanhã de comprar queijo...</string>
     <string name="gemini_processing">Processando com Gemini...</string>
+    <string name="gemini_processing_long_notice">Você pode sair do calendário tranquilamente! Vamos te avisar com uma notificação assim que o agendamento for marcado.</string>
+    <string name="gemini_leave_dialog">Fechar e aguardar em segundo plano</string>
     <string name="gemini_send">Enviar</string>
     <string name="gemini_undo">Desfazer</string>
     <string name="gemini_done">Concluir</string>

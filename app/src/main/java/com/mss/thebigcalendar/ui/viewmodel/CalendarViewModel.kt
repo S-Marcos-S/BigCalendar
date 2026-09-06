@@ -4466,8 +4466,25 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 geminiErrorDetails = null
             )
         }
+        // Agenda via WorkManager para garantir execução mesmo se o usuário fechar o app e tirá-lo dos recentes
+        val workData = androidx.work.Data.Builder()
+            .putString(com.mss.thebigcalendar.worker.GeminiSchedulerWorker.KEY_PROMPT, prompt)
+            .putString(com.mss.thebigcalendar.worker.GeminiSchedulerWorker.KEY_API_KEY, apiKey)
+            .putString(com.mss.thebigcalendar.worker.GeminiSchedulerWorker.KEY_MODEL, _uiState.value.geminiModel)
+            .build()
 
-        viewModelScope.launch(Dispatchers.IO) {
+        val workRequest = androidx.work.OneTimeWorkRequestBuilder<com.mss.thebigcalendar.worker.GeminiSchedulerWorker>()
+            .setInputData(workData)
+            .build()
+
+        androidx.work.WorkManager.getInstance(getApplication())
+            .enqueueUniqueWork(
+                com.mss.thebigcalendar.worker.GeminiSchedulerWorker.WORK_NAME,
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+
+        com.mss.thebigcalendar.TheBigCalendarApplication.applicationScope.launch {
             val existingActivities = _uiState.value.activities
             val model = _uiState.value.geminiModel
             val result = geminiService.executeCommand(
@@ -4476,6 +4493,14 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 model = model,
                 existingActivities = existingActivities
             )
+
+            // Como finalizou em memória via applicationScope, cancela o WorkManager para evitar processamento duplicado
+            try {
+                androidx.work.WorkManager.getInstance(getApplication())
+                    .cancelUniqueWork(com.mss.thebigcalendar.worker.GeminiSchedulerWorker.WORK_NAME)
+            } catch (e: Exception) {
+                // Ignore
+            }
 
             when (result) {
                 is GeminiExecutionResult.Error -> {
@@ -4558,6 +4583,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 if (newActivity.notificationSettings.isEnabled) {
                     notificationService.scheduleNotification(newActivity)
                 }
+
+                // Notificação de confirmação do agendamento com IA
+                val notifMessage = command.replyMessage.ifBlank {
+                    "Agendamento '${newActivity.title}' foi marcado com sucesso!"
+                }
+                notificationService.showAiSchedulingSuccessNotification(
+                    "Agendamento Concluído",
+                    notifMessage
+                )
 
                 withContext(Dispatchers.Main) {
                     _uiState.update {

@@ -14,7 +14,13 @@ import kotlinx.coroutines.launch
 
 class TheBigCalendarApplication : Application(), Configuration.Provider {
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    companion object {
+        lateinit var instance: TheBigCalendarApplication
+            private set
+        val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    private val appScope = applicationScope
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -23,6 +29,7 @@ class TheBigCalendarApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
 
         if (isMainProcess()) {
             // Initialize Crashlytics and Analytics based on user consent in main process

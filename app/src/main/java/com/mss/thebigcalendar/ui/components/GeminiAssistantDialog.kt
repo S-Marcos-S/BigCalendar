@@ -105,7 +105,17 @@ fun GeminiAssistantDialog(
     val context = LocalContext.current
     var inputText by remember { mutableStateOf("") }
     var isErrorDetailsExpanded by remember(errorDetails) { mutableStateOf(false) }
+    var showBackgroundNotice by remember { mutableStateOf(false) }
     val speechPromptHint = stringResource(id = R.string.gemini_speak_now)
+
+    LaunchedEffect(isProcessing) {
+        if (isProcessing) {
+            kotlinx.coroutines.delay(5000L)
+            showBackgroundNotice = true
+        } else {
+            showBackgroundNotice = false
+        }
+    }
 
     // Launcher para reconhecimento de voz nativo do Android
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
@@ -150,8 +160,8 @@ fun GeminiAssistantDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
-            dismissOnBackPress = !isProcessing,
-            dismissOnClickOutside = !isProcessing
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
         )
     ) {
         Surface(
@@ -383,21 +393,73 @@ fun GeminiAssistantDialog(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = stringResource(id = R.string.gemini_processing),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.5.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = stringResource(id = R.string.gemini_processing),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = showBackgroundNotice,
+                                    enter = fadeIn() + expandVertically(),
+                                    exit = fadeOut() + shrinkVertically()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Notifications,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Text(
+                                                    text = stringResource(id = R.string.gemini_processing_long_notice),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = onDismissRequest,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(id = R.string.gemini_leave_dialog),
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
