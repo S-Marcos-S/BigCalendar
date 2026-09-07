@@ -14,7 +14,7 @@ plugins {
 
 android {
     namespace = "com.mss.thebigcalendar"
-    compileSdk = 35
+    compileSdk = 36
 
     sourceSets {
         getByName("main") {
@@ -25,7 +25,7 @@ android {
     defaultConfig {
         applicationId = "com.mss.thebigcalendar"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 54
         versionName = "1.8.9"
 
