@@ -48,9 +48,10 @@ fi
 
 CURRENT_BRANCH="$(git branch --show-current 2>/dev/null || echo "termux")"
 CURRENT_SHA="$(git rev-parse HEAD 2>/dev/null || echo "")"
+CURRENT_TITLE="$(git log -1 --format="%s" 2>/dev/null || echo "")"
 
 echo "🌿 Branch atual: $CURRENT_BRANCH"
-echo "📌 Commit atual: ${CURRENT_SHA:0:7}"
+echo "📌 Commit atual: ${CURRENT_SHA:0:7} - $CURRENT_TITLE"
 echo
 
 # 3. Verificar alterações não commitadas
@@ -178,23 +179,51 @@ if [ $WATCH_EXIT_CODE -eq 0 ]; then
     if [ "$DOWNLOAD_SUCCESS" = "true" ]; then
         DOWNLOADED_APK="$(find "$TMP_DIR" -type f -name "*.apk" | head -n 1)"
         if [ -n "$DOWNLOADED_APK" ] && [ -f "$DOWNLOADED_APK" ]; then
-            cp -f "$DOWNLOADED_APK" "$FINAL_APK"
-            rm -rf "$TMP_DIR"
-            
+            # Calcular hash SHA256 do novo APK
+            NEW_HASH="$(sha256sum "$DOWNLOADED_APK" 2>/dev/null | awk '{print $1}' || echo "")"
+            OLD_HASH=""
+            TARGET_DOWNLOAD_APK="$DOWNLOAD_DIR/Big_Calendar-release.apk"
+
+            if [ -f "$FINAL_APK" ]; then
+                OLD_HASH="$(sha256sum "$FINAL_APK" 2>/dev/null | awk '{print $1}' || echo "")"
+            elif [ -f "$TARGET_DOWNLOAD_APK" ]; then
+                OLD_HASH="$(sha256sum "$TARGET_DOWNLOAD_APK" 2>/dev/null | awk '{print $1}' || echo "")"
+            fi
+
             echo "=========================================================="
-            echo "                     APK PRONTO!"
-            echo "=========================================================="
-            echo "📁 Local do APK gerado:"
-            echo "   $FINAL_APK"
-            echo
-            ls -lh "$FINAL_APK"
-            echo
-            
-            if [ -d "$DOWNLOAD_DIR" ]; then
-                cp -f "$FINAL_APK" "$DOWNLOAD_DIR/Big_Calendar-release.apk"
-                echo "📱 Copiado para Downloads:"
-                echo "   $DOWNLOAD_DIR/Big_Calendar-release.apk"
+            if [ -n "$NEW_HASH" ] && [ "$NEW_HASH" = "$OLD_HASH" ]; then
+                echo "ℹ️  O APK gerado é IDÊNTICO ao que já está no celular."
+                echo "🔑 SHA256: $NEW_HASH"
+                echo "=========================================================="
+                echo "📁 APK mantido em:"
+                echo "   $FINAL_APK"
+                if [ -f "$TARGET_DOWNLOAD_APK" ]; then
+                    echo "📱 Downloads:"
+                    echo "   $TARGET_DOWNLOAD_APK"
+                fi
                 echo
+                rm -rf "$TMP_DIR"
+            else
+                cp -f "$DOWNLOADED_APK" "$FINAL_APK"
+                rm -rf "$TMP_DIR"
+                
+                echo "                     APK NOVO PRONTO!"
+                echo "=========================================================="
+                if [ -n "$NEW_HASH" ]; then
+                    echo "🔑 SHA256: $NEW_HASH"
+                fi
+                echo "📁 Local do APK gerado:"
+                echo "   $FINAL_APK"
+                echo
+                ls -lh "$FINAL_APK"
+                echo
+                
+                if [ -d "$DOWNLOAD_DIR" ]; then
+                    cp -f "$FINAL_APK" "$TARGET_DOWNLOAD_APK"
+                    echo "📱 Copiado para Downloads:"
+                    echo "   $TARGET_DOWNLOAD_APK"
+                    echo
+                fi
             fi
         else
             echo "⚠️  Artefato baixado, mas nenhum arquivo .apk foi encontrado no pacote."
