@@ -19,7 +19,14 @@ echo
 cd "$PROJECT_DIR"
 
 echo "[1/3] Gerando APK Release..."
-./gradlew assembleRelease
+EXTRA_ARGS=""
+if [ -f "/data/data/com.termux/files/usr/bin/aapt2" ]; then
+    EXTRA_ARGS="$EXTRA_ARGS -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2"
+fi
+if [ -d "/usr/lib/jvm/java-17-openjdk-amd64" ]; then
+    EXTRA_ARGS="$EXTRA_ARGS -Dorg.gradle.java.home=/usr/lib/jvm/java-17-openjdk-amd64"
+fi
+./gradlew assembleRelease $EXTRA_ARGS
 
 echo
 echo "[2/3] Verificando APK..."
