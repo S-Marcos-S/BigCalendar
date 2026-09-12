@@ -85,6 +85,20 @@ class EventListWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_title, appPendingIntent)
 
+        // Set up the click listener for the add button to open the create appointment screen for today
+        val createIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_CREATE_ACTIVITY
+            putExtra(MainActivity.EXTRA_OPEN_CREATE_ACTIVITY, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val createPendingIntent = PendingIntent.getActivity(
+            context,
+            appWidgetId + 2000,
+            createIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_add_button, createPendingIntent)
+
         // Set up the click listener for the refresh button
         val refreshIntent = Intent(context, EventListWidgetProvider::class.java).apply {
             action = ACTION_REFRESH_EVENT_LIST_WIDGET

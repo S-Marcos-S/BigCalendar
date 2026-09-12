@@ -621,6 +621,7 @@
     <string name="widget_event_title_placeholder">Título do Evento</string>
     <string name="widget_event_time_placeholder">Horário do Evento</string>
     <string name="widget_test_tasks">09:00 Reunião\n10:30 Café\n12:00 Almoço</string>
+    <string name="widget_add_appointment">Criar agendamento</string>
 
     <!-- CustomRepetitionScreen.kt -->
     <string name="custom_repetition_type_title">Tipo de Repetição</string>

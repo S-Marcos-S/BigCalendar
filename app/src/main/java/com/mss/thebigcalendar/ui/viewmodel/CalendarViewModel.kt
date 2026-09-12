@@ -4358,6 +4358,32 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     // ===== GEMINI ASSISTANT FUNCTIONS =====
 
+    fun openCreateActivityFromOutside(date: LocalDate = LocalDate.now(), activityType: ActivityType = ActivityType.EVENT) {
+        _uiState.update {
+            it.copy(
+                isSidebarOpen = false,
+                isCalendarVisualizationSettingsOpen = false,
+                isSyncScreenOpen = false,
+                isSettingsScreenOpen = false,
+                isSearchScreenOpen = false,
+                isChartScreenOpen = false,
+                isNotesScreenOpen = false,
+                isAlarmsScreenOpen = false,
+                isTrashScreenOpen = false,
+                isBackupScreenOpen = false,
+                isCompletedTasksScreenOpen = false,
+                isPrintCalendarScreenOpen = false,
+                isJsonConfigScreenOpen = false,
+                isGeminiAssistantOpen = false,
+                activityIdWithDeleteButtonVisible = null
+            )
+        }
+        onDateSelected(date)
+        if (_uiState.value.activityToEdit == null) {
+            openCreateActivityModal(activity = null, activityType = activityType)
+        }
+    }
+
     fun openGeminiAssistantFromOutside() {
         _uiState.update {
             it.copy(

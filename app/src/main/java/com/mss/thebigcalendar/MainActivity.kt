@@ -70,6 +70,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_GEMINI = "com.mss.thebigcalendar.action.OPEN_GEMINI"
         const val EXTRA_OPEN_GEMINI = "extra_open_gemini"
+        const val ACTION_CREATE_ACTIVITY = "com.mss.thebigcalendar.action.CREATE_ACTIVITY"
+        const val EXTRA_OPEN_CREATE_ACTIVITY = "extra_open_create_activity"
 
         private var isAppAlreadyRunning = false
         private var isActivityResumed = false
@@ -568,6 +570,16 @@ class MainActivity : ComponentActivity() {
             if (::viewModel.isInitialized) {
                 viewModel.skipLoadingAnimation()
                 viewModel.openGeminiAssistantFromOutside()
+            }
+        }
+
+        val openCreate = intent.action == ACTION_CREATE_ACTIVITY || intent.getBooleanExtra(EXTRA_OPEN_CREATE_ACTIVITY, false)
+        if (openCreate) {
+            intent.action = null
+            intent.removeExtra(EXTRA_OPEN_CREATE_ACTIVITY)
+            if (::viewModel.isInitialized) {
+                viewModel.skipLoadingAnimation()
+                viewModel.openCreateActivityFromOutside()
             }
         }
     }
