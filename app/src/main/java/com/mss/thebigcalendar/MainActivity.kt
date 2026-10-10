@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.model.AppIconMode
 import com.mss.thebigcalendar.data.model.Language
 import android.util.Log
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_GEMINI = "extra_open_gemini"
         const val ACTION_CREATE_ACTIVITY = "com.mss.thebigcalendar.action.CREATE_ACTIVITY"
         const val EXTRA_OPEN_CREATE_ACTIVITY = "extra_open_create_activity"
+        const val EXTRA_ACTIVITY_TYPE = "extra_activity_type"
 
         private var isAppAlreadyRunning = false
         private var isActivityResumed = false
@@ -575,11 +577,14 @@ class MainActivity : ComponentActivity() {
 
         val openCreate = intent.action == ACTION_CREATE_ACTIVITY || intent.getBooleanExtra(EXTRA_OPEN_CREATE_ACTIVITY, false)
         if (openCreate) {
+            val typeStr = intent.getStringExtra(EXTRA_ACTIVITY_TYPE)
+            val activityType = if (typeStr == "EVENT") ActivityType.EVENT else ActivityType.TASK
             intent.action = null
             intent.removeExtra(EXTRA_OPEN_CREATE_ACTIVITY)
+            intent.removeExtra(EXTRA_ACTIVITY_TYPE)
             if (::viewModel.isInitialized) {
                 viewModel.skipLoadingAnimation()
-                viewModel.openCreateActivityFromOutside()
+                viewModel.openCreateActivityFromOutside(activityType = activityType)
             }
         }
     }

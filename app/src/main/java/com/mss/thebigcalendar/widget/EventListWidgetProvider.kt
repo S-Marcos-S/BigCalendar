@@ -85,10 +85,11 @@ class EventListWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_title, appPendingIntent)
 
-        // Set up the click listener for the add button to open the create appointment screen for today
+        // Set up the click listener for the add button to open the create task screen for today
         val createIntent = Intent(context, MainActivity::class.java).apply {
             action = MainActivity.ACTION_CREATE_ACTIVITY
             putExtra(MainActivity.EXTRA_OPEN_CREATE_ACTIVITY, true)
+            putExtra(MainActivity.EXTRA_ACTIVITY_TYPE, "TASK")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val createPendingIntent = PendingIntent.getActivity(
@@ -98,6 +99,20 @@ class EventListWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_add_button, createPendingIntent)
+
+        // Set up the click listener for the Gemini AI button (same behavior as QS tile)
+        val geminiIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_OPEN_GEMINI
+            putExtra(MainActivity.EXTRA_OPEN_GEMINI, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val geminiPendingIntent = PendingIntent.getActivity(
+            context,
+            appWidgetId + 3000,
+            geminiIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.widget_gemini_button, geminiPendingIntent)
 
         // Set up the click listener for the refresh button
         val refreshIntent = Intent(context, EventListWidgetProvider::class.java).apply {

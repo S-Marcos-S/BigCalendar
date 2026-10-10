@@ -4358,7 +4358,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     // ===== GEMINI ASSISTANT FUNCTIONS =====
 
-    fun openCreateActivityFromOutside(date: LocalDate = LocalDate.now(), activityType: ActivityType = ActivityType.EVENT) {
+    fun openCreateActivityFromOutside(date: LocalDate = LocalDate.now(), activityType: ActivityType = ActivityType.TASK) {
         _uiState.update {
             it.copy(
                 isSidebarOpen = false,
@@ -4375,13 +4375,23 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 isPrintCalendarScreenOpen = false,
                 isJsonConfigScreenOpen = false,
                 isGeminiAssistantOpen = false,
-                activityIdWithDeleteButtonVisible = null
+                activityIdWithDeleteButtonVisible = null,
+                activityToEdit = null
             )
         }
-        onDateSelected(date)
-        if (_uiState.value.activityToEdit == null) {
-            openCreateActivityModal(activity = null, activityType = activityType)
+        val monthChanged = _uiState.value.displayedYearMonth.month != date.month || _uiState.value.displayedYearMonth.year != date.year
+        _uiState.update {
+            it.copy(
+                selectedDate = date,
+                displayedYearMonth = if (monthChanged) YearMonth.from(date) else it.displayedYearMonth
+            )
         }
+        if (monthChanged) {
+            updateActivitiesForNewMonth(YearMonth.from(date))
+        } else {
+            updateAllDateDependentUI()
+        }
+        openCreateActivityModal(activity = null, activityType = activityType)
     }
 
     fun openGeminiAssistantFromOutside() {
