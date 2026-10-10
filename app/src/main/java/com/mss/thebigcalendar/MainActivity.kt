@@ -599,6 +599,7 @@ class MainActivity : ComponentActivity() {
         // ✅ Verificar e executar rollover caso o app estivesse em segundo plano durante a virada do dia
         if (::viewModel.isInitialized) {
             viewModel.checkAndPerformRollover()
+            viewModel.syncWithLauncher()
         }
     }
     

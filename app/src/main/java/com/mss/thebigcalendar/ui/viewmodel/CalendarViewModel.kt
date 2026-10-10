@@ -282,14 +282,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         loadData()
         checkForExistingSignIn()
         // Sincronizar com a Viagara Launcher se instalada
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                backupService.syncWithLocalLauncherFile()
-                loadData()
-            } catch (e: Exception) {
-                Log.e("CalendarViewModel", "Erro ao sincronizar com launcher no início: ${e.message}", e)
-            }
-        }
+        syncWithLauncher()
         // Garantir que o calendário inicie no mês atual
         onGoToToday()
         
@@ -1375,9 +1368,9 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     // ===== WIDGET NOTIFICATION FUNCTIONS =====
     
     /**
-     * Notifica todos os widgets sobre mudanças nos dados
+     * Notifica todos os widgets sobre mudanças nos dados sem redisparar sincronização
      */
-    private fun notifyWidgetsDataChanged() {
+    fun notifyWidgetsOnly() {
         try {
             val context = getApplication<Application>()
             val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -1398,11 +1391,38 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
                 // Forçar atualização do RemoteViewsFactory
                 appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
             }
-            // Trigger automatic sync with the cloud
-            triggerCloudSync()
         } catch (e: Exception) {
             Log.e("CalendarViewModel", "❌ Erro ao notificar widgets", e)
         }
+    }
+
+    /**
+     * Sincroniza com arquivo local da Viagara Launcher e atualiza dados e widgets
+     */
+    fun syncWithLauncher() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = backupService.syncWithLocalLauncherFile()
+                if (result.isSuccess) {
+                    loadData()
+                    loadActivitiesForCurrentMonth()
+                    withContext(Dispatchers.Main) {
+                        notifyWidgetsOnly()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao sincronizar com launcher: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Notifica todos os widgets sobre mudanças nos dados e dispara sincronização
+     */
+    private fun notifyWidgetsDataChanged() {
+        notifyWidgetsOnly()
+        // Trigger automatic sync with the cloud
+        triggerCloudSync()
     }
 
     // ===== CALENDAR NAVIGATION FUNCTIONS =====
@@ -3250,13 +3270,7 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
 
     fun triggerCloudSync() {
         // Disparar sincronização local com a Viagara Launcher se instalada
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                backupService.syncWithLocalLauncherFile()
-            } catch (e: Exception) {
-                Log.e("CalendarViewModel", "Erro ao sincronizar com arquivo local da launcher: ${e.message}", e)
-            }
-        }
+        syncWithLauncher()
 
         cloudSyncJob?.cancel()
         cloudSyncJob = viewModelScope.launch(Dispatchers.IO) {

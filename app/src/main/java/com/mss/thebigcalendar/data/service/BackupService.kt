@@ -1523,8 +1523,8 @@ class BackupService(
             val localCompleted = completedActivityRepository.completedActivities.first()
             val localDeleted = deletedActivityRepository.deletedActivities.first()
 
-            val localDeletedIds = localDeleted.map { it.originalActivity.id }.toSet()
-            var finalDeletedIds = localDeletedIds + remoteDeletedIds
+            val localDeletedReal = localDeleted.filter { it.deletedBy != "sync" }
+            val localDeletedIds = localDeletedReal.map { it.originalActivity.id }.toSet()
 
             val localCustomActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
             val localJsonActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") == true }
@@ -1534,6 +1534,10 @@ class BackupService(
 
             val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
             val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+
+            // Não marcar como deletadas atividades que estejam ativas localmente
+            val explicitlyActiveIds = localCustomActive.map { it.id }.toSet()
+            val finalDeletedIds = (localDeletedIds + remoteDeletedIds).filter { it !in explicitlyActiveIds }.toSet()
 
             data class SyncSignature(
                 val title: String,
@@ -1568,7 +1572,6 @@ class BackupService(
 
             val completedSignatures = mutableSetOf<SyncSignature>()
             val activeSignatures = mutableSetOf<SyncSignature>()
-            val discardedIds = mutableSetOf<String>()
 
             allCustomActivities.forEach { act ->
                 val id = act.id
@@ -1594,35 +1597,25 @@ class BackupService(
                         val sig = activeVersion.toSyncSignature()
                         if (activeSignatures.add(sig)) {
                             mergedCustomActive.add(activeVersion)
-                        } else {
-                            discardedIds.add(id)
                         }
                     } else {
                         val sig = completedVersion.toSyncSignature()
                         if (completedSignatures.add(sig)) {
                             mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
-                        } else {
-                            discardedIds.add(id)
                         }
                     }
                 } else if (activeVersion != null) {
                     val sig = activeVersion.toSyncSignature()
                     if (activeSignatures.add(sig)) {
                         mergedCustomActive.add(activeVersion)
-                    } else {
-                        discardedIds.add(id)
                     }
                 } else if (completedVersion != null) {
                     val sig = completedVersion.toSyncSignature()
                     if (completedSignatures.add(sig)) {
                         mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
-                    } else {
-                        discardedIds.add(id)
                     }
                 }
             }
-
-            finalDeletedIds = finalDeletedIds + discardedIds
 
             val finalActive = mergedCustomActive + localJsonActive
             val finalCompleted = mergedCustomCompleted + localJsonCompleted
@@ -1634,60 +1627,39 @@ class BackupService(
             completedActivityRepository.saveAllCompletedActivities(finalCompleted)
 
             deletedActivityRepository.clearAllDeletedActivities()
-            val updatedDeletedActivities = mutableListOf<DeletedActivity>()
-            finalDeletedIds.forEach { deletedId ->
-                val localFound = localDeleted.find { it.originalActivity.id == deletedId }
-                if (localFound != null) {
-                    updatedDeletedActivities.add(localFound)
-                } else {
-                    val origAct = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
-                        .find { it.id == deletedId }
-                        ?: Activity(
-                            id = deletedId,
-                            title = "Excluído",
-                            description = null,
-                            date = java.time.LocalDate.now().toString(),
-                            startTime = null,
-                            endTime = null,
-                            isAllDay = true,
-                            location = null,
-                            categoryColor = "1",
-                            activityType = com.mss.thebigcalendar.data.model.ActivityType.EVENT,
-                            recurrenceRule = null,
-                            notificationSettings = com.mss.thebigcalendar.data.model.NotificationSettings()
-                        )
-                    updatedDeletedActivities.add(
-                        DeletedActivity(
-                            id = java.util.UUID.randomUUID().toString(),
-                            originalActivity = origAct,
-                            deletedAt = LocalDateTime.now(),
-                            deletedBy = "sync"
-                        )
-                    )
-                }
-            }
+            val updatedDeletedActivities = localDeletedReal.filter { it.originalActivity.id in finalDeletedIds }
             deletedActivityRepository.saveAllDeletedActivities(updatedDeletedActivities)
 
             // Escrever arquivo de sincronização atualizado em JSON puro
-            val syncJson = JSONObject().apply {
-                put("backupVersion", "1.1")
-                put("createdAt", LocalDateTime.now().toString())
-                put("appVersion", "TheBigCalendar")
+            try {
+                val syncJson = JSONObject().apply {
+                    put("backupVersion", "1.1")
+                    put("createdAt", LocalDateTime.now().toString())
+                    put("appVersion", "TheBigCalendar")
 
-                val activitiesJsonArray = JSONArray()
-                mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
-                put("activities", activitiesJsonArray)
+                    val activitiesJsonArray = JSONArray()
+                    mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
+                    put("activities", activitiesJsonArray)
 
-                val completedJsonArray = JSONArray()
-                mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
-                put("completedActivities", completedJsonArray)
+                    val completedJsonArray = JSONArray()
+                    mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
+                    put("completedActivities", completedJsonArray)
 
-                val deletedJsonArray = JSONArray()
-                finalDeletedIds.forEach { deletedJsonArray.put(it) }
-                put("deletedActivities", deletedJsonArray)
+                    val deletedJsonArray = JSONArray()
+                    finalDeletedIds.forEach { deletedJsonArray.put(it) }
+                    put("deletedActivities", deletedJsonArray)
+                }
+
+                syncFile.writeText(syncJson.toString(), Charsets.UTF_8)
+
+                // Enviar broadcast opcional para acordar a Launcher
+                val broadcastIntent = Intent("dev.viagaralauncher.SYNC_DATA_UPDATED").apply {
+                    setPackage(launcherPackage)
+                }
+                context.sendBroadcast(broadcastIntent)
+            } catch (e: Exception) {
+                android.util.Log.e("BackupService", "Aviso ao salvar arquivo de sincronização: ${e.message}", e)
             }
-
-            syncFile.writeText(syncJson.toString(), Charsets.UTF_8)
 
             Result.success(Unit)
         } catch (e: Exception) {
