@@ -100,11 +100,9 @@ class EventListWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_add_button, createPendingIntent)
 
-        // Set up the click listener for the Gemini AI button (same behavior as QS tile)
-        val geminiIntent = Intent(context, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_OPEN_GEMINI
-            putExtra(MainActivity.EXTRA_OPEN_GEMINI, true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        // Set up the click listener for the Gemini AI button to open only the voice prompt on the home screen
+        val geminiIntent = Intent(context, com.mss.thebigcalendar.ui.screens.GeminiVoiceTriggerActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
         val geminiPendingIntent = PendingIntent.getActivity(
             context,

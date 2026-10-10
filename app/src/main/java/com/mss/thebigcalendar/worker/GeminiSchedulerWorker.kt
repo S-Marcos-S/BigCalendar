@@ -1,9 +1,14 @@
 package com.mss.thebigcalendar.worker
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Activity
 import com.mss.thebigcalendar.data.model.ActivityType
 import com.mss.thebigcalendar.data.model.GeminiAction
@@ -14,14 +19,17 @@ import com.mss.thebigcalendar.data.model.VisibilityLevel
 import com.mss.thebigcalendar.data.repository.ActivityRepository
 import com.mss.thebigcalendar.data.repository.CompletedActivityRepository
 import com.mss.thebigcalendar.data.repository.DeletedActivityRepository
+import com.mss.thebigcalendar.data.repository.SettingsRepository
 import com.mss.thebigcalendar.service.GeminiExecutionResult
 import com.mss.thebigcalendar.service.GeminiService
 import com.mss.thebigcalendar.service.NotificationService
 import com.mss.thebigcalendar.service.RecurrenceService
+import com.mss.thebigcalendar.widget.EventListWidgetProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -67,13 +75,25 @@ class GeminiSchedulerWorker(
                 is GeminiExecutionResult.Success -> {
                     val command = result.command
                     handleCommand(command, activityRepository, recurrenceService, notificationService)
-                    
+                    notifyWidgets()
+
                     // Notificar o usuário que o agendamento foi concluído
                     val notifTitle = "Agendamento com IA Concluído"
                     val notifMessage = command.replyMessage.ifBlank {
                         "Sua solicitação foi agendada com sucesso no Big Calendar."
                     }
                     notificationService.showAiSchedulingSuccessNotification(notifTitle, notifMessage)
+
+                    try {
+                        val settingsRepository = SettingsRepository(applicationContext)
+                        val voiceFeedback = settingsRepository.geminiVoiceFeedback.first()
+                        if (voiceFeedback && command.replyMessage.isNotBlank()) {
+                            speakFeedback(command.replyMessage)
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Falha ao emitir feedback de voz", e)
+                    }
+
                     Log.d(TAG, "Agendamento concluído com sucesso via Worker!")
                     Result.success()
                 }
@@ -284,4 +304,37 @@ class GeminiSchedulerWorker(
             }
         }
     }
+
+    private fun notifyWidgets() {
+        try {
+            val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
+            val componentName = ComponentName(applicationContext, EventListWidgetProvider::class.java)
+            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+            if (appWidgetIds.isNotEmpty()) {
+                val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+                    component = componentName
+                }
+                applicationContext.sendBroadcast(intent)
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.event_list_view)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao notificar widgets no worker", e)
+        }
+    }
+
+    private suspend fun speakFeedback(text: String) = withContext(Dispatchers.Main) {
+        try {
+            var tts: TextToSpeech? = null
+            tts = TextToSpeech(applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    tts?.language = Locale.getDefault()
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "gemini_worker_tts")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao emitir feedback de voz", e)
+        }
+    }
 }
+

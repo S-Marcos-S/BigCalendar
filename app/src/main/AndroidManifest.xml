@@ -162,6 +162,16 @@
             </intent-filter>
         </service>
 
+        <activity
+            android:name=".ui.screens.GeminiVoiceTriggerActivity"
+            android:theme="@style/Theme.Transparent"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:launchMode="singleTask" />
+
         <receiver
             android:name=".service.NotificationReceiver"
             android:exported="true"

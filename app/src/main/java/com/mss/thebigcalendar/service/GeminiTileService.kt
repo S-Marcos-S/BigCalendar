@@ -26,10 +26,8 @@ class GeminiTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
-        val intent = Intent(this, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_OPEN_GEMINI
-            putExtra(MainActivity.EXTRA_OPEN_GEMINI, true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val intent = Intent(this, com.mss.thebigcalendar.ui.screens.GeminiVoiceTriggerActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
         fun launchActivity() {

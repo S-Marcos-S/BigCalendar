@@ -7,4 +7,15 @@
 
     <!-- Final App theme that will be used in the Manifest -->
     <style name="Theme.TheBigCalendar" parent="Theme.TheBigCalendar.Base" />
+
+    <!-- Transparent theme for floating voice dialog activity on home screen -->
+    <style name="Theme.Transparent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
