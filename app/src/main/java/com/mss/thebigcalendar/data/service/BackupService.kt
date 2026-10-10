@@ -1440,6 +1440,261 @@ class BackupService(
             Result.failure(e)
         }
     }
+
+    /**
+     * Sincronização local por arquivo compartilhado com a Viagara Launcher.
+     * Salva e lê em formato JSON direto sem criptografia para comunicação no aparelho.
+     */
+    suspend fun syncWithLocalLauncherFile(): Result<Unit> = withContext(Dispatchers.IO) {
+        val launcherPackage = "dev.viagaralauncher"
+        val isLauncherInstalled = try {
+            context.packageManager.getPackageInfo(launcherPackage, 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+        if (!isLauncherInstalled) {
+            return@withContext Result.success(Unit)
+        }
+
+        try {
+            val docsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS)
+            val appDir = File(docsDir, "TheBigCalendar")
+            if (!appDir.exists()) {
+                appDir.mkdirs()
+            }
+            val syncFile = File(appDir, "TBCalendar_Sync_Data.json")
+
+            var remoteActivities = emptyList<Activity>()
+            var remoteCompleted = emptyList<Activity>()
+            var remoteDeletedIds = emptySet<String>()
+
+            if (syncFile.exists() && syncFile.length() > 0) {
+                val content = syncFile.readText(Charsets.UTF_8)
+                if (content.isNotBlank() && !com.mss.thebigcalendar.crypto.CryptoHelper.isEncrypted(content)) {
+                    val json = JSONObject(content)
+
+                    val parsedActs = mutableListOf<Activity>()
+                    val actsArray = json.optJSONArray("activities")
+                    if (actsArray != null) {
+                        for (i in 0 until actsArray.length()) {
+                            try {
+                                parsedActs.add(parseActivityFromJson(actsArray.getJSONObject(i)))
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    remoteActivities = parsedActs
+
+                    val parsedCompleted = mutableListOf<Activity>()
+                    val completedArray = json.optJSONArray("completedActivities")
+                    if (completedArray != null) {
+                        for (i in 0 until completedArray.length()) {
+                            try {
+                                parsedCompleted.add(parseActivityFromJson(completedArray.getJSONObject(i)))
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    remoteCompleted = parsedCompleted
+
+                    val parsedDeletedIds = mutableSetOf<String>()
+                    val deletedArray = json.optJSONArray("deletedActivities")
+                    if (deletedArray != null) {
+                        for (i in 0 until deletedArray.length()) {
+                            try {
+                                val optObj = deletedArray.optJSONObject(i)
+                                if (optObj != null) {
+                                    val origObj = optObj.optJSONObject("originalActivity")
+                                    val origId = origObj?.optString("id") ?: optObj.optString("id")
+                                    if (!origId.isNullOrEmpty()) parsedDeletedIds.add(origId)
+                                } else {
+                                    val strId = deletedArray.getString(i)
+                                    if (!strId.isNullOrEmpty()) parsedDeletedIds.add(strId)
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    remoteDeletedIds = parsedDeletedIds
+                }
+            }
+
+            // Mesclar com dados locais
+            val localActivities = activityRepository.activities.first()
+            val localCompleted = completedActivityRepository.completedActivities.first()
+            val localDeleted = deletedActivityRepository.deletedActivities.first()
+
+            val localDeletedIds = localDeleted.map { it.originalActivity.id }.toSet()
+            var finalDeletedIds = localDeletedIds + remoteDeletedIds
+
+            val localCustomActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val localJsonActive = localActivities.filter { it.location?.startsWith("JSON_IMPORTED_") == true }
+
+            val localCustomCompleted = localCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val localJsonCompleted = localCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") == true }
+
+            val remoteCustomActive = remoteActivities.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+            val remoteCustomCompleted = remoteCompleted.filter { it.location?.startsWith("JSON_IMPORTED_") != true }
+
+            data class SyncSignature(
+                val title: String,
+                val date: String,
+                val startTime: String?,
+                val endTime: String?,
+                val isAllDay: Boolean,
+                val description: String,
+                val location: String,
+                val activityType: String,
+                val recurrenceRule: String
+            )
+
+            fun Activity.toSyncSignature() = SyncSignature(
+                title = title.trim().lowercase(),
+                date = date,
+                startTime = startTime?.toString(),
+                endTime = endTime?.toString(),
+                isAllDay = isAllDay,
+                description = description?.trim()?.lowercase() ?: "",
+                location = location?.trim()?.lowercase() ?: "",
+                activityType = activityType.name,
+                recurrenceRule = recurrenceRule?.trim()?.lowercase() ?: ""
+            )
+
+            val allCustomActivities = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
+                .filter { it.id !in finalDeletedIds }
+                .distinctBy { it.id }
+
+            val mergedCustomCompleted = mutableListOf<Activity>()
+            val mergedCustomActive = mutableListOf<Activity>()
+
+            val completedSignatures = mutableSetOf<SyncSignature>()
+            val activeSignatures = mutableSetOf<SyncSignature>()
+            val discardedIds = mutableSetOf<String>()
+
+            allCustomActivities.forEach { act ->
+                val id = act.id
+                val localActiveAct = localCustomActive.find { it.id == id }
+                val remoteActiveAct = remoteCustomActive.find { it.id == id }
+                val localCompletedAct = localCustomCompleted.find { it.id == id }
+                val remoteCompletedAct = remoteCustomCompleted.find { it.id == id }
+
+                val activeVersion = if (localActiveAct != null && remoteActiveAct != null) {
+                    if (localActiveAct.lastModified >= remoteActiveAct.lastModified) localActiveAct else remoteActiveAct
+                } else {
+                    localActiveAct ?: remoteActiveAct
+                }
+
+                val completedVersion = if (localCompletedAct != null && remoteCompletedAct != null) {
+                    if (localCompletedAct.lastModified >= remoteCompletedAct.lastModified) localCompletedAct else remoteCompletedAct
+                } else {
+                    localCompletedAct ?: remoteCompletedAct
+                }
+
+                if (activeVersion != null && completedVersion != null) {
+                    if (activeVersion.lastModified > completedVersion.lastModified) {
+                        val sig = activeVersion.toSyncSignature()
+                        if (activeSignatures.add(sig)) {
+                            mergedCustomActive.add(activeVersion)
+                        } else {
+                            discardedIds.add(id)
+                        }
+                    } else {
+                        val sig = completedVersion.toSyncSignature()
+                        if (completedSignatures.add(sig)) {
+                            mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
+                        } else {
+                            discardedIds.add(id)
+                        }
+                    }
+                } else if (activeVersion != null) {
+                    val sig = activeVersion.toSyncSignature()
+                    if (activeSignatures.add(sig)) {
+                        mergedCustomActive.add(activeVersion)
+                    } else {
+                        discardedIds.add(id)
+                    }
+                } else if (completedVersion != null) {
+                    val sig = completedVersion.toSyncSignature()
+                    if (completedSignatures.add(sig)) {
+                        mergedCustomCompleted.add(completedVersion.copy(isCompleted = true, showInCalendar = false))
+                    } else {
+                        discardedIds.add(id)
+                    }
+                }
+            }
+
+            finalDeletedIds = finalDeletedIds + discardedIds
+
+            val finalActive = mergedCustomActive + localJsonActive
+            val finalCompleted = mergedCustomCompleted + localJsonCompleted
+
+            activityRepository.clearAllActivities()
+            activityRepository.saveAllActivities(finalActive)
+
+            completedActivityRepository.clearAllCompletedActivities()
+            completedActivityRepository.saveAllCompletedActivities(finalCompleted)
+
+            deletedActivityRepository.clearAllDeletedActivities()
+            val updatedDeletedActivities = mutableListOf<DeletedActivity>()
+            finalDeletedIds.forEach { deletedId ->
+                val localFound = localDeleted.find { it.originalActivity.id == deletedId }
+                if (localFound != null) {
+                    updatedDeletedActivities.add(localFound)
+                } else {
+                    val origAct = (localCustomActive + remoteCustomActive + localCustomCompleted + remoteCustomCompleted)
+                        .find { it.id == deletedId }
+                        ?: Activity(
+                            id = deletedId,
+                            title = "Excluído",
+                            description = null,
+                            date = java.time.LocalDate.now().toString(),
+                            startTime = null,
+                            endTime = null,
+                            isAllDay = true,
+                            location = null,
+                            categoryColor = "1",
+                            activityType = com.mss.thebigcalendar.data.model.ActivityType.EVENT,
+                            recurrenceRule = null,
+                            notificationSettings = com.mss.thebigcalendar.data.model.NotificationSettings()
+                        )
+                    updatedDeletedActivities.add(
+                        DeletedActivity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            originalActivity = origAct,
+                            deletedAt = LocalDateTime.now(),
+                            deletedBy = "sync"
+                        )
+                    )
+                }
+            }
+            deletedActivityRepository.saveAllDeletedActivities(updatedDeletedActivities)
+
+            // Escrever arquivo de sincronização atualizado em JSON puro
+            val syncJson = JSONObject().apply {
+                put("backupVersion", "1.1")
+                put("createdAt", LocalDateTime.now().toString())
+                put("appVersion", "TheBigCalendar")
+
+                val activitiesJsonArray = JSONArray()
+                mergedCustomActive.forEach { activitiesJsonArray.put(serializeActivityToJson(it)) }
+                put("activities", activitiesJsonArray)
+
+                val completedJsonArray = JSONArray()
+                mergedCustomCompleted.forEach { completedJsonArray.put(serializeActivityToJson(it)) }
+                put("completedActivities", completedJsonArray)
+
+                val deletedJsonArray = JSONArray()
+                finalDeletedIds.forEach { deletedJsonArray.put(it) }
+                put("deletedActivities", deletedJsonArray)
+            }
+
+            syncFile.writeText(syncJson.toString(), Charsets.UTF_8)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("BackupService", "Erro na sincronização local com a launcher: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }
 
 /**

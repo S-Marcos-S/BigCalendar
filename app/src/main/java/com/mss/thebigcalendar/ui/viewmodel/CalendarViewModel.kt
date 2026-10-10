@@ -281,6 +281,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
         loadSettings()
         loadData()
         checkForExistingSignIn()
+        // Sincronizar com a Viagara Launcher se instalada
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                backupService.syncWithLocalLauncherFile()
+                loadData()
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao sincronizar com launcher no início: ${e.message}", e)
+            }
+        }
         // Garantir que o calendário inicie no mês atual
         onGoToToday()
         
@@ -3240,6 +3249,15 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun triggerCloudSync() {
+        // Disparar sincronização local com a Viagara Launcher se instalada
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                backupService.syncWithLocalLauncherFile()
+            } catch (e: Exception) {
+                Log.e("CalendarViewModel", "Erro ao sincronizar com arquivo local da launcher: ${e.message}", e)
+            }
+        }
+
         cloudSyncJob?.cancel()
         cloudSyncJob = viewModelScope.launch(Dispatchers.IO) {
             delay(2000) // Debounce de 2 segundos para evitar múltiplos uploads consecutivos
