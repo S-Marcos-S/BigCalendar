@@ -97,6 +97,3 @@ Um aplicativo de calendário completo para Android.
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
----
-
-**Desenvolvido com ❤️ para a comunidade Android**
