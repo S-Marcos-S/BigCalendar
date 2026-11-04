@@ -233,6 +233,7 @@ jobs:
 
       - name: Deploy to Google Play (Internal Track)
         if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.PLAY_STORE_JSON_KEY != ''
+        continue-on-error: true
         uses: r0adkll/upload-google-play@v1
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
