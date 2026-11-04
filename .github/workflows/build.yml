@@ -6,15 +6,50 @@ on:
       - main
       - master
       - termux
-    tags:
-      - 'v*'
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  check-version:
+    name: Check Version in Commit
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Check commit message for version
+        id: check
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message || github.event.pull_request.title }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Workflow manually triggered via workflow_dispatch, proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Inspecting commit message:"
+          printf '%s\n' "$COMMIT_MSG"
+
+          # Match version pattern like v1.8.13, 1.8.13, v1.0.0, etc.
+          if printf '%s' "$COMMIT_MSG" | grep -qE '\b(v?[0-9]+\.[0-9]+(\.[0-9]+)?(-beta(\.[0-9]+)?)?)\b'; then
+            DETECTED_VERSION=$(printf '%s' "$COMMIT_MSG" | grep -oE '\b(v?[0-9]+\.[0-9]+(\.[0-9]+)?(-beta(\.[0-9]+)?)?)\b' | head -n 1)
+            echo "Version number detected in commit: $DETECTED_VERSION. Proceeding with build."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "version=$DETECTED_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "No version number found in commit message. Skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    name: Build Release APK and AAB
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -92,41 +127,118 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK and AAB
-        run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee assemble-output.log || {
+            echo "==================== ASSEMBLE RELEASE ERROR SUMMARY ===================="
+            tail -n 120 assemble-output.log || true
+            exit 1
+          }
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-log
+          path: assemble-output.log
+          if-no-files-found: ignore
+
+      - name: Clean up temporary keystore
+        if: always()
+        run: rm -f app/key01.jks app/keystore.properties keystore.properties
+
+      - name: Prepare artifacts for upload
+        run: |
+          mkdir -p artifacts
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk artifacts/Big_Calendar-release.apk
+          fi
+          if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
+            cp app/build/outputs/bundle/release/app-release.aab artifacts/Big_Calendar-release.aab
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BigCalendar-Release-APK
-          path: app/build/outputs/apk/release/*.apk
+          path: artifacts/Big_Calendar-release.apk
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BigCalendar-Release-AAB
-          path: app/build/outputs/bundle/release/*.aab
+          path: artifacts/Big_Calendar-release.aab
 
-      - name: Create GitHub Release with Automatic Changelog
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Detect Version and Check for New Release
+        id: version_check
+        run: |
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          TAG_NAME="v${VERSION_NAME}"
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_OUTPUT
+
+          # Verifica se a tag ja existe no repositorio remoto
+          if git ls-remote --tags origin "refs/tags/${TAG_NAME}" | grep -q "${TAG_NAME}"; then
+            echo "Tag ${TAG_NAME} already exists in repository. Skipping version release creation."
+            echo "IS_NEW_VERSION=false" >> $GITHUB_OUTPUT
+          else
+            echo "Tag ${TAG_NAME} does NOT exist yet. A new version release will be created!"
+            echo "IS_NEW_VERSION=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare Release Notes
+        run: |
+          awk 'BEGIN{p=1} /^---/{p=0} p{print}' CHANGELOG_LATEST.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "### Big Calendar ${{ steps.version_check.outputs.TAG_NAME }}" > RELEASE_NOTES.md
+            echo "Atualizacoes e melhorias de estabilidade." >> RELEASE_NOTES.md
+          fi
+
+          cat >> RELEASE_NOTES.md <<EOF
+
+          ### Direct APK Download
+          - [Download Release APK](https://github.com/${{ github.repository }}/releases/download/latest/Big_Calendar-release.apk)
+
+          Built automatically from commit \`${{ github.sha }}\`.
+          EOF
+
+      - name: Create or Update Version Release
+        if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && steps.version_check.outputs.IS_NEW_VERSION == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version_check.outputs.TAG_NAME }}
+          name: "Big Calendar ${{ steps.version_check.outputs.TAG_NAME }}"
+          body_path: RELEASE_NOTES.md
+          prerelease: false
           files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
-          generate_release_notes: true
+            artifacts/Big_Calendar-release.apk
+            artifacts/Big_Calendar-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub Release for direct download
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Big Calendar - Latest APK (${{ steps.version_check.outputs.TAG_NAME }})"
+          body_path: RELEASE_NOTES.md
+          prerelease: false
+          files: |
+            artifacts/Big_Calendar-release.apk
+            artifacts/Big_Calendar-release.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to Google Play (Internal Track)
-        if: (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && env.PLAY_STORE_JSON_KEY != ''
+        if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && env.PLAY_STORE_JSON_KEY != ''
         uses: r0adkll/upload-google-play@v1
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
           packageName: com.mss.thebigcalendar
-          releaseFiles: app/build/outputs/bundle/release/*.aab
+          releaseFiles: artifacts/Big_Calendar-release.aab
           track: internal
           status: completed
-
-

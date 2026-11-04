@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Decode Keystore with Python
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p app
+          python3 -c "
+          import base64, os, sys
+          data = os.environ.get('KEYSTORE_BASE64', '').strip()
+          if not data:
+              print('Erro: KEYSTORE_BASE64 nao encontrado')
+              sys.exit(1)
+          
+          clean_data = ''.join(data.split())
+          missing_padding = len(clean_data) % 4
+          if missing_padding == 2:
+              clean_data += '=='
+          elif missing_padding == 3:
+              clean_data += '='
+          
+          try:
+              with open('app/key01.jks', 'wb') as f:
+                  f.write(base64.b64decode(clean_data))
+              print('Keystore decodificada com sucesso via Python!')
+          except Exception as e:
+              print(f'Erro ao decodificar (tamanho={len(clean_data)}): {e}')
+              sys.exit(1)
+          "
+
+      - name: Create keystore.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          python3 -c "
+          import os
+          store_pass = os.environ.get('STORE_PASSWORD', '').strip()
+          key_alias = os.environ.get('KEY_ALIAS', '').strip()
+          key_pass = os.environ.get('KEY_PASSWORD', '').strip()
+          
+          if not key_alias or key_alias != 'tbc-key01':
+              key_alias = 'tbc-key01'
+          
+          with open('app/keystore.properties', 'w') as f:
+              f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
+          
+          with open('keystore.properties', 'w') as f:
+              f.write(f'storeFile=key01.jks\nstorePassword={store_pass}\nkeyAlias={key_alias}\nkeyPassword={key_pass}\n')
+          print('keystore.properties gerado com sucesso com alias:', key_alias)
+          "
+
+      - name: Configure gradle.properties for CI
+        run: |
+          sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
+          sed -i '/org.gradle.java.home/d' gradle.properties
+          sed -i 's/-Xmx2048m/-Xmx6144m/' gradle.properties
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK and AAB
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace 2>&1 | tee assemble-output.log || {
+            echo "==================== ASSEMBLE RELEASE ERROR SUMMARY ===================="
+            tail -n 120 assemble-output.log || true
+            exit 1
+          }
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f app/key01.jks app/keystore.properties keystore.properties
+
+      - name: Verify APK is signed
+        run: test -f app/build/outputs/apk/release/app-release.apk
+
+      - name: Prepare Release Notes
+        run: |
+          awk 'BEGIN{p=1} /^---/{p=0} p{print}' CHANGELOG_LATEST.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "### Big Calendar ${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+            echo "Atualizacoes e melhorias de estabilidade." >> RELEASE_NOTES.md
+          fi
+
+          cat >> RELEASE_NOTES.md <<EOF
+
+          ### Direct APK Download
+          - [Download Release APK](https://github.com/${{ github.repository }}/releases/download/latest/Big_Calendar-release.apk)
+
+          Built automatically from commit \`${{ github.sha }}\`.
+          EOF
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk_asset="Big_Calendar-${GITHUB_REF_NAME}.apk"
+          aab_asset="Big_Calendar-${GITHUB_REF_NAME}.aab"
+          cp app/build/outputs/apk/release/app-release.apk "$apk_asset"
+          if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
+            cp app/build/outputs/bundle/release/app-release.aab "$aab_asset"
+          fi
+
+          if [ -s RELEASE_NOTES.md ]; then
+            gh release create "$GITHUB_REF_NAME" --title "Big Calendar $GITHUB_REF_NAME" \
+              --notes-file RELEASE_NOTES.md "$apk_asset" ${aab_asset:+"$aab_asset"}
+          else
+            gh release create "$GITHUB_REF_NAME" --title "Big Calendar $GITHUB_REF_NAME" \
+              --generate-notes "$apk_asset" ${aab_asset:+"$aab_asset"}
+          fi
