@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -298,13 +299,18 @@ fun SearchResultItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadiusDp = 12.dp,
+        fallbackColor = MaterialTheme.colorScheme.surface,
+        onClick = onClick
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         // Ícone baseado no tipo de resultado
         Box(
             modifier = Modifier
@@ -358,6 +364,7 @@ fun SearchResultItem(
             }
         }
     }
+}
 }
 
 private fun formatDate(date: LocalDate): String {

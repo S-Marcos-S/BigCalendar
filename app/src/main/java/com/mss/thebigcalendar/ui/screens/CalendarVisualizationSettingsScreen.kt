@@ -265,7 +265,7 @@ fun CalendarVisualizationSettingsScreen(
                     checked = when (uiState.theme) {
                         com.mss.thebigcalendar.data.model.Theme.LIGHT -> false
                         com.mss.thebigcalendar.data.model.Theme.DARK -> true
-                        com.mss.thebigcalendar.data.model.Theme.SYSTEM -> isSystemInDarkTheme()
+                        else -> isSystemInDarkTheme()
                     },
                     onCheckedChange = { isChecked ->
                         val newTheme = if (isChecked) {
@@ -318,6 +318,33 @@ fun CalendarVisualizationSettingsScreen(
                         viewModel.setPureBlackTheme(enabled)
                     },
                     enabled = isDarkThemeActive
+                )
+            }
+
+            // Opção do tema de vidro
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.glass_theme_title),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(id = R.string.glass_theme_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = uiState.isGlassTheme,
+                    onCheckedChange = { enabled ->
+                        viewModel.onGlassThemeChange(enabled)
+                    }
                 )
             }
 

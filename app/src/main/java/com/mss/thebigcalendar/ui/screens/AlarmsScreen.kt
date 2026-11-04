@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.AlertDialog
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -92,15 +93,13 @@ private fun IndependentAlarmCard(
 ) {
     val isEnabled = alarm.isEnabled
     
-    Card(
+    GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEnabled)
-                MaterialTheme.colorScheme.primaryContainer
-            else 
-                MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        cornerRadiusDp = 12.dp,
+        fallbackColor = if (isEnabled)
+            MaterialTheme.colorScheme.primaryContainer
+        else 
+            MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(
             modifier = Modifier
@@ -954,16 +953,15 @@ private fun AlarmCard(
     val isTomorrow = activityDate == LocalDate.now().plusDays(1)
     val isPast = activityDate.isBefore(LocalDate.now())
     
-    Card(
+    GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                isPast -> MaterialTheme.colorScheme.errorContainer
-                isToday -> MaterialTheme.colorScheme.primaryContainer
-                isTomorrow -> MaterialTheme.colorScheme.secondaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
-        )
+        cornerRadiusDp = 12.dp,
+        fallbackColor = when {
+            isPast -> MaterialTheme.colorScheme.errorContainer
+            isToday -> MaterialTheme.colorScheme.primaryContainer
+            isTomorrow -> MaterialTheme.colorScheme.secondaryContainer
+            else -> MaterialTheme.colorScheme.surfaceVariant
+        }
     ) {
         Column(
             modifier = Modifier.padding(16.dp)

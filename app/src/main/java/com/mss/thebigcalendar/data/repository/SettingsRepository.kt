@@ -40,6 +40,7 @@ class SettingsRepository(private val context: Context) {
         val CALENDAR_SCALE = stringPreferencesKey("calendar_scale")
         val HIDE_OTHER_MONTH_DAYS = booleanPreferencesKey("hide_other_month_days")
         val PURE_BLACK_THEME = booleanPreferencesKey("pure_black_theme")
+        val GLASS_THEME = booleanPreferencesKey("glass_theme")
         val PRIMARY_COLOR = stringPreferencesKey("primary_color")
         val UNFIX_HEADERS_ON_SCROLL = booleanPreferencesKey("unfix_headers_on_scroll")
         
@@ -159,7 +160,11 @@ class SettingsRepository(private val context: Context) {
     val theme: Flow<Theme> = context.dataStore.data
         .map { preferences ->
             val themeName = preferences[PreferencesKeys.THEME] ?: Theme.SYSTEM.name
-            Theme.valueOf(themeName)
+            try {
+                Theme.valueOf(themeName)
+            } catch (e: Exception) {
+                Theme.SYSTEM
+            }
         }
 
     val appIconMode: Flow<AppIconMode> = context.dataStore.data
@@ -231,6 +236,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setPureBlackTheme(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[PreferencesKeys.PURE_BLACK_THEME] = enabled
+        }
+    }
+
+    val glassTheme: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[PreferencesKeys.GLASS_THEME] ?: false
+        }
+
+    suspend fun saveGlassTheme(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.GLASS_THEME] = enabled
         }
     }
 

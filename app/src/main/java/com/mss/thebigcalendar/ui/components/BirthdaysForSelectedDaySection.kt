@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -121,18 +122,21 @@ private fun BirthdayItem(
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-            .padding(start = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadiusDp = 8.dp,
+        fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                )
+                .padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         // Barra colorida rosa (similar à barra de prioridade das tarefas)
         Box(
             modifier = Modifier
@@ -207,4 +211,5 @@ private fun BirthdayItem(
             }
         }
     }
+}
 }

@@ -9,7 +9,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -185,16 +187,19 @@ private fun hslToRgb(hsl: HslColor): Color {
     )
 }
 
+val LocalGlassThemeActive = compositionLocalOf { false }
+
 @Composable
 fun TheBigCalendarTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     pureBlack: Boolean = false,
     primaryColorHex: String = "AUTO",
+    isGlassTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     // Gerar esquema de cores baseado na configuração
-    val colorScheme = if (primaryColorHex == "AUTO") {
+    val rawColorScheme = if (primaryColorHex == "AUTO") {
         // Modo automático: usar cores dinâmicas do Android
         val context = LocalContext.current
         val baseScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -217,6 +222,25 @@ fun TheBigCalendarTheme(
         generateCustomColorScheme(customPrimaryColor, darkTheme, pureBlack)
     }
 
+    val colorScheme = if (isGlassTheme) {
+        rawColorScheme.copy(
+            background = Color.Transparent,
+            surface = if (darkTheme) Color(0x33101520) else Color(0x33F0F4F8),
+            surfaceVariant = if (darkTheme) Color(0x441F2937) else Color(0x44D9E2EC),
+            surfaceContainer = if (darkTheme) Color(0x33141B26) else Color(0x33E5EDF4),
+            surfaceContainerHigh = if (darkTheme) Color(0x441F2937) else Color(0x44D9E2EC),
+            surfaceContainerHighest = if (darkTheme) Color(0x552D3748) else Color(0x55CBD5E1),
+            surfaceContainerLow = if (darkTheme) Color(0x220B0F17) else Color(0x22F1F5F9),
+            outline = if (darkTheme) Color(0x4DFFFFFF) else Color(0x4D000000),
+            outlineVariant = if (darkTheme) Color(0x33FFFFFF) else Color(0x33000000),
+            onBackground = if (darkTheme) Color(0xFFF1F5F9) else Color(0xFF1E293B),
+            onSurface = if (darkTheme) Color(0xFFF1F5F9) else Color(0xFF1E293B),
+            onSurfaceVariant = if (darkTheme) Color(0xFFCBD5E1) else Color(0xFF475569)
+        )
+    } else {
+        rawColorScheme
+    }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -225,9 +249,13 @@ fun TheBigCalendarTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalGlassThemeActive provides isGlassTheme
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

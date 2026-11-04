@@ -29,6 +29,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -259,12 +260,17 @@ fun DeletedActivityItem(
 ) {
     val activity = deletedActivity.originalActivity
     
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadiusDp = 12.dp,
+        fallbackColor = MaterialTheme.colorScheme.surface
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         // Ícone baseado no tipo de atividade
         Box(
             modifier = Modifier
@@ -364,6 +370,7 @@ fun DeletedActivityItem(
             }
         }
     }
+}
 }
 
 private fun formatDate(dateString: String): String {

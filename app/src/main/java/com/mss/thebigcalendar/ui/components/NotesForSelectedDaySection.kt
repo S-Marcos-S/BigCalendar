@@ -29,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
@@ -138,18 +139,22 @@ private fun NoteItem(
         }
     }
 
-    Column(
+    GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .animateContentSize()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
+            .bringIntoViewRequester(bringIntoViewRequester),
+        cornerRadiusDp = 8.dp,
+        fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                )
+        ) {
         Row(
             modifier = Modifier.padding(start = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -289,4 +294,5 @@ private fun NoteItem(
             }
         }
     }
+}
 }

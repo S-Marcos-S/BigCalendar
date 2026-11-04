@@ -156,6 +156,7 @@ data class CalendarUiState(
     val isSyncScreenOpen: Boolean = false,
     val hideOtherMonthDays: Boolean = false,
     val pureBlackTheme: Boolean = false,
+    val isGlassTheme: Boolean = false,
     val primaryColor: String = "AUTO",
     val unfixHeadersOnScroll: Boolean = true,
 
@@ -218,7 +219,7 @@ data class SyncedDevice(
     val lastSyncTime: Long
 )
 
-enum class Theme { LIGHT, DARK, SYSTEM }
+enum class Theme { LIGHT, DARK, SYSTEM, GLASS }
 enum class AppIconMode { DYNAMIC, WHITE, BLACK }
 enum class ViewMode { MONTHLY, YEARLY }
 enum class HolidayType { NATIONAL, COMMEMORATIVE, JSON_IMPORT }

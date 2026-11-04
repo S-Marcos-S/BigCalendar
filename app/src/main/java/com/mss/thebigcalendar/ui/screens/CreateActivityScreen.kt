@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.window.Dialog
@@ -599,14 +600,11 @@ fun CreateActivityScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Opção de Despertador
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showAlarmScreen = true },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    cornerRadiusDp = 12.dp,
+                    fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    onClick = { showAlarmScreen = true }
                 ) {
                     Row(
                         modifier = Modifier
@@ -744,15 +742,12 @@ fun CreateActivityScreen(
                 usePlatformDefaultWidth = false
             )
         ) {
-            Card(
+            GlassCard(
                 modifier = Modifier
                     .fillMaxWidth(0.91f)
                     .wrapContentHeight(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                cornerRadiusDp = 24.dp,
+                fallbackColor = MaterialTheme.colorScheme.background
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp)

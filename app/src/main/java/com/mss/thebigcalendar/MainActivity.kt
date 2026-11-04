@@ -55,6 +55,7 @@ import com.mss.thebigcalendar.ui.screens.SyncSettingsScreen
 import com.mss.thebigcalendar.ui.screens.SearchScreen
 import com.mss.thebigcalendar.ui.screens.TrashScreen
 import com.mss.thebigcalendar.ui.theme.TheBigCalendarTheme
+import com.mss.thebigcalendar.ui.theme.glass.GlassAppBackground
 import com.mss.thebigcalendar.ui.viewmodel.CalendarViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -232,20 +233,26 @@ class MainActivity : ComponentActivity() {
             }
 
             if (isThemeLoaded) {
-        TheBigCalendarTheme(
-            darkTheme = when (uiState.theme) {
-                Theme.LIGHT -> false
-                Theme.DARK -> true
-                else -> isSystemInDarkTheme()
-            },
-            dynamicColor = true, // Sempre permitir cores dinâmicas
-            pureBlack = uiState.pureBlackTheme && when (uiState.theme) {
-                Theme.LIGHT -> false
-                Theme.DARK -> true
-                else -> isSystemInDarkTheme()
-            },
-            primaryColorHex = uiState.primaryColor
-        ) {
+                val isGlassActive = uiState.isGlassTheme || uiState.theme == Theme.GLASS
+                val resolvedDark = when (uiState.theme) {
+                    Theme.LIGHT -> false
+                    Theme.DARK -> true
+                    else -> isSystemInDarkTheme()
+                }
+                TheBigCalendarTheme(
+                    darkTheme = resolvedDark,
+                    dynamicColor = true, // Sempre permitir cores dinâmicas
+                    pureBlack = uiState.pureBlackTheme && resolvedDark,
+                    primaryColorHex = uiState.primaryColor,
+                    isGlassTheme = isGlassActive
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (isGlassActive) {
+                            GlassAppBackground(
+                                isDark = resolvedDark,
+                                primaryColorHex = uiState.primaryColor
+                            )
+                        }
                     if (showOnboarding) {
                         OnboardingFlow(
                             isLoggingIn = uiState.isLoggingIn,
@@ -555,6 +562,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,14 +49,16 @@ fun MiniMonthView(
     }
     val weekDayAbbreviations = getWeekDayAbbreviations() // Do CalendarUtils.kt (D, S, T, Q, Q, S, S)
 
-    Column(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .clickable { onMonthClicked(yearMonth) }
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    GlassCard(
+        modifier = modifier,
+        cornerRadiusDp = 12.dp,
+        fallbackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        onClick = { onMonthClicked(yearMonth) }
     ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Text(
             text = monthName,
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
@@ -113,4 +116,5 @@ fun MiniMonthView(
             }
         }
     }
+}
 }

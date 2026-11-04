@@ -681,6 +681,11 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
             }
         }
         viewModelScope.launch {
+            settingsRepository.glassTheme.collect { enabled ->
+                _uiState.update { it.copy(isGlassTheme = enabled) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.primaryColor.collect { color ->
                 _uiState.update { it.copy(primaryColor = color) }
             }
@@ -1590,6 +1595,12 @@ class CalendarViewModel(application: Application) : AndroidViewModel(application
     fun onThemeChange(newTheme: Theme) {
         viewModelScope.launch {
             settingsRepository.saveTheme(newTheme)
+        }
+    }
+
+    fun onGlassThemeChange(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.saveGlassTheme(enabled)
         }
     }
 

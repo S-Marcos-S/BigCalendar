@@ -153,7 +153,7 @@ private fun DayCell(
     val isDark = when (theme) {
         com.mss.thebigcalendar.data.model.Theme.DARK -> true
         com.mss.thebigcalendar.data.model.Theme.LIGHT -> false
-        com.mss.thebigcalendar.data.model.Theme.SYSTEM -> isSystemInDarkTheme()
+        else -> isSystemInDarkTheme()
     }
     val cellModifier = modifier
         .padding(1.dp)

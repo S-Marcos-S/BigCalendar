@@ -62,7 +62,7 @@ data class CalendarDay(
     val isJsonHolidayDay: Boolean = false
 )
 
-enum class Theme { LIGHT, DARK, SYSTEM }
+enum class Theme { LIGHT, DARK, SYSTEM, GLASS }
 enum class ViewMode { MONTHLY, YEARLY }
 enum class HolidayType { NATIONAL, COMMEMORATIVE, SAINT, JSON_IMPORT }
 

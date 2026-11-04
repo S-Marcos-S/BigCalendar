@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -315,24 +316,28 @@ fun TaskItem(
         }
     }
 
-    Column(
+    GlassCard(
         modifier = modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .animateContentSize()
-            .combinedClickable(
-                onClick = {
-                    if (task.activityType == ActivityType.COMMEMORATIVE) {
-                        onCommemorativeClick(task)
-                    } else {
-                        onTaskLongClick(task.id)
-                    }
-                },
-                onLongClick = if (task.activityType == ActivityType.COMMEMORATIVE) null else { { onTaskClick(task) } }
-            )
+            .bringIntoViewRequester(bringIntoViewRequester),
+        cornerRadiusDp = 8.dp,
+        fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .combinedClickable(
+                    onClick = {
+                        if (task.activityType == ActivityType.COMMEMORATIVE) {
+                            onCommemorativeClick(task)
+                        } else {
+                            onTaskLongClick(task.id)
+                        }
+                    },
+                    onLongClick = if (task.activityType == ActivityType.COMMEMORATIVE) null else { { onTaskClick(task) } }
+                )
+        ) {
         Row(
             modifier = Modifier.padding(start = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -464,6 +469,7 @@ fun TaskItem(
                 }
             }
         }
+    }
     }
 
     if (showConfirmCompleteDialog) {

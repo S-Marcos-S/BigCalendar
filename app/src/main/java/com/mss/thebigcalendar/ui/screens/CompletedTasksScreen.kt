@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -194,11 +195,10 @@ fun CompletedTasksScreen(
             )
             
             // Contador de tarefas
-            Card(
+            GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                cornerRadiusDp = 12.dp,
+                fallbackColor = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Row(
                     modifier = Modifier
@@ -276,12 +276,10 @@ private fun CompletedTaskItem(
     onDeleteClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Card(
+    GlassCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        cornerRadiusDp = 12.dp,
+        fallbackColor = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier

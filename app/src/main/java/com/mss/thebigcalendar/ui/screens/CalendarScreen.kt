@@ -4,9 +4,11 @@ package com.mss.thebigcalendar.ui.screens
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -664,15 +666,13 @@ fun MainCalendarView(
                         key = "calendar-${uiState.displayedYearMonth}",
                         contentType = "calendarHeader"
                     ) {
-                        Box(
+                        GlassCard(
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 16.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    shape = MaterialTheme.shapes.medium
-                                )
-                                .onGloballyPositioned { onCalendarReady(it) }
+                                .onGloballyPositioned { onCalendarReady(it) },
+                            cornerRadiusDp = 16.dp,
+                            fallbackColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
                         ) {
                             Column(
                                 modifier = Modifier.padding(vertical = 8.dp)

@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.mss.thebigcalendar.ui.theme.LocalGlassThemeActive
+import com.mss.thebigcalendar.ui.theme.glass.GlassStyle
+import com.mss.thebigcalendar.ui.theme.glass.GlassSurface
 import kotlinx.coroutines.launch
 
 /**
@@ -103,44 +106,59 @@ fun CustomDrawer(
         }
         
         // Drawer com animação de abertura customizada e suporte a arrastar para fechar
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(drawerWidth)
-                .graphicsLayer {
-                    translationX = drawerOffset
-                }
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
-                .pointerInput(gesturesEnabled && drawerState.isOpen) {
-                    if (gesturesEnabled && drawerState.isOpen) {
-                        detectDragGestures(
-                            onDragStart = { 
-                                isDragging = true
-                                dragOffset = 0f // Reset do offset quando começar a arrastar
-                            },
-                            onDragEnd = {
-                                isDragging = false
-                                // Determinar se deve fechar baseado na distância arrastada
-                                val shouldClose = dragOffset < -drawerWidthPx * 0.3f // 30% da largura
-                                scope.launch {
-                                    if (shouldClose) {
-                                        drawerState.close()
-                                    } else {
-                                        // Voltar para posição aberta
-                                        dragOffset = 0f
-                                    }
+        val isGlass = LocalGlassThemeActive.current
+        val drawerModifier = Modifier
+            .fillMaxHeight()
+            .width(drawerWidth)
+            .graphicsLayer {
+                translationX = drawerOffset
+            }
+            .pointerInput(gesturesEnabled && drawerState.isOpen) {
+                if (gesturesEnabled && drawerState.isOpen) {
+                    detectDragGestures(
+                        onDragStart = { 
+                            isDragging = true
+                            dragOffset = 0f // Reset do offset quando começar a arrastar
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            // Determinar se deve fechar baseado na distância arrastada
+                            val shouldClose = dragOffset < -drawerWidthPx * 0.3f // 30% da largura
+                            scope.launch {
+                                if (shouldClose) {
+                                    drawerState.close()
+                                } else {
+                                    // Voltar para posição aberta
+                                    dragOffset = 0f
                                 }
-                            },
-                            onDrag = { _, dragAmount ->
-                                // Permitir arrastar em ambas as direções durante o arrasto
-                                val newOffset = dragOffset + dragAmount.x
-                                // Limitar entre posição fechada (-drawerWidthPx) e aberta (0f)
-                                dragOffset = newOffset.coerceIn(-drawerWidthPx, 0f)
                             }
-                        )
-                    }
-                },
-            content = drawerContent
-        )
+                        },
+                        onDrag = { _, dragAmount ->
+                            // Permitir arrastar em ambas as direções durante o arrasto
+                            val newOffset = dragOffset + dragAmount.x
+                            // Limitar entre posição fechada (-drawerWidthPx) e aberta (0f)
+                            dragOffset = newOffset.coerceIn(-drawerWidthPx, 0f)
+                        }
+                    )
+                }
+            }
+
+        if (isGlass) {
+            GlassSurface(
+                modifier = drawerModifier,
+                cornerPx = 0f,
+                style = GlassStyle.DIALOG
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    content = drawerContent
+                )
+            }
+        } else {
+            Column(
+                modifier = drawerModifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
+                content = drawerContent
+            )
+        }
     }
 }

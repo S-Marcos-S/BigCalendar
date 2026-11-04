@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mss.thebigcalendar.R
 import com.mss.thebigcalendar.data.model.Holiday
+import com.mss.thebigcalendar.ui.theme.glass.GlassCard
 
 @Composable
 fun CommemorativeDatesForSelectedDaySection(
@@ -54,19 +55,21 @@ fun CommemorativeDateItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        cornerRadiusDp = 8.dp,
+        fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        onClick = onClick
     ) {
-        Text(
-            text = commemorative.name, 
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color(0xFFFF9800) // Laranja
-        )
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = commemorative.name, 
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFFFF9800) // Laranja
+            )
+        }
     }
 }
