@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,8 +48,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -258,51 +263,64 @@ fun CalendarScreen(
                     TopAppBar(
                             scrollBehavior = scrollBehavior,
                             title = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    when (uiState.viewMode) {
-                                        ViewMode.MONTHLY -> {
-                                            val monthName = uiState.displayedYearMonth.month
-                                                .getDisplayName(
-                                                    java.time.format.TextStyle.FULL,
+                                when (uiState.viewMode) {
+                                    ViewMode.MONTHLY -> {
+                                        val monthName = uiState.displayedYearMonth.month
+                                            .getDisplayName(
+                                                java.time.format.TextStyle.FULL,
+                                                Locale.getDefault()
+                                            )
+                                            .replaceFirstChar {
+                                                it.titlecase(
                                                     Locale.getDefault()
                                                 )
-                                                .replaceFirstChar {
-                                                    it.titlecase(
-                                                        Locale.getDefault()
-                                                    )
-                                                }
-                                            Column(horizontalAlignment = Alignment.Start) {
-                                                Text(
-                                                    text = monthName,
-                                                    style = MaterialTheme.typography.titleMedium
-                                                )
-                                                Text(
-                                                    text = uiState.displayedYearMonth.year.toString(),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = appBarContentColor
-                                                )
                                             }
-                                        }
-
-                                        ViewMode.YEARLY -> {
+                                        Column(
+                                            horizontalAlignment = Alignment.Start,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = monthName,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                             Text(
                                                 text = uiState.displayedYearMonth.year.toString(),
-                                                style = MaterialTheme.typography.titleMedium
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = appBarContentColor,
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                         }
                                     }
-                                    
+
+                                    ViewMode.YEARLY -> {
+                                        Text(
+                                            text = uiState.displayedYearMonth.year.toString(),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
                                 }
                             },
                             navigationIcon = {
-                                IconButton(onClick = {
-                                    viewModel.openSidebar()
-                                }) {
-                                    Icon(
-                                        Icons.Default.Menu,
-                                        stringResource(id = R.string.open_close_menu),
-                                        tint = appBarContentColor
-                                    )
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.openSidebar()
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Menu,
+                                            stringResource(id = R.string.open_close_menu),
+                                            tint = appBarContentColor,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                 }
                             },
                             actions = {
@@ -316,100 +334,130 @@ fun CalendarScreen(
                                         { viewModel.onNextYear() })
                                 }
 
-                                if (uiState.viewMode == ViewMode.MONTHLY) {
-                                    if (uiState.duplicateGroups.isNotEmpty()) {
-                                        IconButton(onClick = { viewModel.showDuplicateDialog() }) {
-                                            Icon(
-                                                Icons.Default.Warning,
-                                                contentDescription = "Agendamentos repetidos detectados",
-                                                tint = androidx.compose.ui.graphics.Color.Red
-                                            )
+                                CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                                    if (uiState.viewMode == ViewMode.MONTHLY) {
+                                        if (uiState.duplicateGroups.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = { viewModel.showDuplicateDialog() },
+                                                modifier = Modifier.size(34.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Warning,
+                                                    contentDescription = stringResource(id = R.string.duplicate_events_detected),
+                                                    tint = androidx.compose.ui.graphics.Color.Red,
+                                                    modifier = Modifier.size(19.dp)
+                                                )
+                                            }
                                         }
-                                    }
-                                    IconButton(onClick = {
-                                        if (uiState.geminiApiKey.isBlank()) {
-                                            viewModel.openGeminiSettings()
-                                        } else {
-                                            viewModel.openGeminiAssistant()
-                                        }
-                                    }) {
-                                        Icon(
-                                            Icons.Default.AutoAwesome,
-                                            contentDescription = stringResource(id = R.string.gemini_assistant_title),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                    IconButton(onClick = { viewModel.onSearchIconClick() }) {
-                                        Icon(
-                                            Icons.Default.Search,
-                                            stringResource(id = R.string.search),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.onGoToToday() },
-                                        modifier = Modifier.onGloballyPositioned {
-                                            tutorialCoordinates = tutorialCoordinates + ("today" to it)
-                                        }
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Today,
-                                            contentDescription = stringResource(id = R.string.go_to_today),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.onChartIconClick() },
-                                        modifier = Modifier.onGloballyPositioned {
-                                            tutorialCoordinates = tutorialCoordinates + ("charts" to it)
-                                        }
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.BarChart,
-                                            stringResource(id = R.string.chart),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                    if (uiState.googleSignInAccount != null) {
                                         IconButton(
-                                            onClick = { viewModel.syncGoogleCalendarSimple() },
-                                            modifier = Modifier.size(40.dp)
+                                            onClick = {
+                                                if (uiState.geminiApiKey.isBlank()) {
+                                                    viewModel.openGeminiSettings()
+                                                } else {
+                                                    viewModel.openGeminiAssistant()
+                                                }
+                                            },
+                                            modifier = Modifier.size(34.dp)
                                         ) {
                                             Icon(
-                                                Icons.Filled.Sync,
-                                                contentDescription = stringResource(id = R.string.sync_now),
-                                                modifier = Modifier.size(20.dp),
+                                                Icons.Default.AutoAwesome,
+                                                contentDescription = stringResource(id = R.string.gemini_assistant_title),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.onSearchIconClick() },
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Search,
+                                                stringResource(id = R.string.search),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.onGoToToday() },
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .onGloballyPositioned {
+                                                    tutorialCoordinates = tutorialCoordinates + ("today" to it)
+                                                }
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Today,
+                                                contentDescription = stringResource(id = R.string.go_to_today),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.onChartIconClick() },
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .onGloballyPositioned {
+                                                    tutorialCoordinates = tutorialCoordinates + ("charts" to it)
+                                                }
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.BarChart,
+                                                stringResource(id = R.string.chart),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                        if (uiState.googleSignInAccount != null) {
+                                            IconButton(
+                                                onClick = { viewModel.syncGoogleCalendarSimple() },
+                                                modifier = Modifier.size(34.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.Sync,
+                                                    contentDescription = stringResource(id = R.string.sync_now),
+                                                    modifier = Modifier.size(19.dp),
+                                                    tint = appBarContentColor
+                                                )
+                                            }
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.onTrashIconClick() },
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .onGloballyPositioned {
+                                                    tutorialCoordinates = tutorialCoordinates + ("trash" to it)
+                                                }
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = stringResource(id = R.string.trash),
+                                                modifier = Modifier.size(19.dp),
                                                 tint = appBarContentColor
                                             )
                                         }
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.onTrashIconClick() },
-                                        modifier = Modifier.size(40.dp).onGloballyPositioned {
-                                            tutorialCoordinates = tutorialCoordinates + ("trash" to it)
+                                    } else {
+                                        IconButton(
+                                            onClick = prevAction,
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ArrowBack,
+                                                stringResource(id = R.string.previous),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
                                         }
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = stringResource(id = R.string.trash),
-                                            modifier = Modifier.size(20.dp),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                } else {
-                                    IconButton(onClick = prevAction) {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.ArrowBack,
-                                            stringResource(id = R.string.previous),
-                                            tint = appBarContentColor
-                                        )
-                                    }
-                                    IconButton(onClick = nextAction) {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.ArrowForward,
-                                            stringResource(id = R.string.next),
-                                            tint = appBarContentColor
-                                        )
+                                        IconButton(
+                                            onClick = nextAction,
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ArrowForward,
+                                                stringResource(id = R.string.next),
+                                                tint = appBarContentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
                                     }
                                 }
                             },

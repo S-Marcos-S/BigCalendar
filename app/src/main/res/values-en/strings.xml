@@ -628,6 +628,7 @@
     <string name="pure_black_theme_desc">Use pure black instead of dark gray in dark mode</string>
     <string name="glass_theme_title">Glass Theme</string>
     <string name="glass_theme_desc">Translucent glass effect with liquid reflections and refraction</string>
+    <string name="duplicate_events_detected">Duplicate events detected</string>
     <string name="primary_color">Primary Color</string>
     <string name="primary_color_desc">Choose the primary color of the application</string>
     <string name="changes_saved_automatically">Changes are saved automatically.</string>
