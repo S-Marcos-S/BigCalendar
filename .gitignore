@@ -28,3 +28,6 @@ calendar_events.txt
 keystore.properties
 .kotlin/
 play_store_icon_512.png
+
+# AI Assistant
+GEMINI.md
